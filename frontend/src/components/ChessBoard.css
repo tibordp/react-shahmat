@@ -60,6 +60,7 @@
   box-shadow: none;
 }
 
+/* Constants matching JavaScript SQUARE_SIZE */
 .chess-board {
   display: grid;
   grid-template-columns: repeat(8, 64px);
@@ -68,6 +69,7 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 
 .square {
@@ -160,7 +162,20 @@
 
 .piece:active {
   cursor: grabbing;
-  transform: scale(1.02);
+}
+
+/* Animating piece styles */
+.animating-piece {
+  position: absolute;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.animating-piece-img {
+  width: 60px;
+  height: 60px;
+  filter: drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8));
+  object-fit: contain;
 }
 
 /* Custom drag layer for piece preview */
@@ -278,10 +293,6 @@
   .square {
     width: 48px;
     height: 48px;
-  }
-
-  .piece {
-    font-size: 32px;
   }
 
   .game-info {

@@ -25,10 +25,12 @@ export interface Position {
 export class JSChessEngine {
   private board: (Piece | null)[][];
   private currentPlayer: Color;
+  private enPassantTarget: Position | null; // Square where en passant capture can happen
 
   constructor() {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
+    this.enPassantTarget = null;
     this.setupInitialPosition();
   }
 
@@ -137,6 +139,12 @@ export class JSChessEngine {
         if (target && target.color !== color) {
           moves.push({ file: newFile, rank: newRank });
         }
+        // En passant capture
+        else if (this.enPassantTarget && 
+                 this.enPassantTarget.file === newFile && 
+                 this.enPassantTarget.rank === newRank) {
+          moves.push({ file: newFile, rank: newRank });
+        }
       }
     }
   }
@@ -232,9 +240,30 @@ export class JSChessEngine {
     
     if (!isValidMove) return false;
 
-    // Check if this is a pawn promotion
+    // Clear en passant target from previous turn
+    const previousEnPassantTarget = this.enPassantTarget;
+    this.enPassantTarget = null;
+
+    // Handle pawn moves
     if (piece.type === PieceType.Pawn) {
       const promotionRank = piece.color === Color.White ? 7 : 0;
+      const direction = piece.color === Color.White ? 1 : -1;
+      
+      // Check for en passant capture
+      if (previousEnPassantTarget && 
+          toFile === previousEnPassantTarget.file && 
+          toRank === previousEnPassantTarget.rank) {
+        // En passant capture - remove the captured pawn
+        const capturedPawnRank = toRank - direction;
+        this.board[capturedPawnRank][toFile] = null;
+      }
+      
+      // Check for double pawn move (sets en passant target)
+      if (Math.abs(toRank - fromRank) === 2) {
+        this.enPassantTarget = { file: toFile, rank: fromRank + direction };
+      }
+      
+      // Check if this is a promotion
       if (toRank === promotionRank) {
         if (!promotionPiece) {
           // Return false to indicate promotion is needed
@@ -242,12 +271,11 @@ export class JSChessEngine {
         }
         // Promote the pawn
         this.board[toRank][toFile] = { type: promotionPiece, color: piece.color };
-        this.board[fromRank][fromFile] = null;
       } else {
         // Regular pawn move
         this.board[toRank][toFile] = piece;
-        this.board[fromRank][fromFile] = null;
       }
+      this.board[fromRank][fromFile] = null;
     } else {
       // Regular piece move
       this.board[toRank][toFile] = piece;
@@ -271,6 +299,7 @@ export class JSChessEngine {
   public resetGame(): void {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
+    this.enPassantTarget = null;
     this.setupInitialPosition();
   }
 }

@@ -1,14 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DndProvider, useDrag, useDrop, useDragLayer } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import './ChessBoard.css';
-import { useJSChessEngine } from '../hooks/useJSChessEngine';
-import { Piece, Position, PieceType } from '../engine/jsChessEngine';
-
-// Using the JS engine types directly
-
-// Import SVG icons
 import whitePawn from '../icons/pawn-w.svg';
 import whiteRook from '../icons/rook-w.svg';
 import whiteKnight from '../icons/knight-w.svg';
@@ -21,6 +14,13 @@ import blackKnight from '../icons/knight-b.svg';
 import blackBishop from '../icons/bishop-b.svg';
 import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
+import { useJSChessEngine } from '../hooks/useJSChessEngine';
+import { Piece, Position, PieceType, Color } from '../engine/jsChessEngine';
+import './ChessBoard.css';
+
+// Constants
+const SQUARE_SIZE = 64;
+const ANIMATION_DURATION = 300;
 
 const PIECE_ICONS: { [key: string]: string } = {
   'White_Pawn': whitePawn,
@@ -43,7 +43,7 @@ function getPieceTypeName(pieceType: number): string {
 }
 
 function getPieceIcon(piece: Piece): string {
-  const colorName = piece.color === 0 ? 'White' : 'Black';
+  const colorName = piece.color === Color.White ? 'White' : 'Black';
   const typeName = getPieceTypeName(piece.type);
   return PIECE_ICONS[`${colorName}_${typeName}`];
 }
@@ -57,6 +57,7 @@ interface SquareProps {
   isValidDropTarget: boolean;
   isCapture: boolean;
   isDragCapture: boolean;
+  isAnimatingFrom: boolean;
   onSquareClick: (file: number, rank: number) => void;
   onDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
   onDragStart: (file: number, rank: number) => void;
@@ -112,9 +113,74 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = () => {
   );
 };
 
+interface AnimatingPieceProps {
+  piece: Piece;
+  from: Position;
+  to: Position;
+  startTime: number;
+  onComplete: () => void;
+}
+
+const AnimatingPiece: React.FC<AnimatingPieceProps> = ({ piece, from, to, startTime, onComplete }) => {
+  const fromX = from.file * SQUARE_SIZE + SQUARE_SIZE / 2;
+  const fromY = (7 - from.rank) * SQUARE_SIZE + SQUARE_SIZE / 2;
+  const toX = to.file * SQUARE_SIZE + SQUARE_SIZE / 2;
+  const toY = (7 - to.rank) * SQUARE_SIZE + SQUARE_SIZE / 2;
+  
+  const [position, setPosition] = useState({ x: fromX, y: fromY });
+  const animationRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+      
+      // Easing function for smooth animation
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      
+      const currentX = fromX + (toX - fromX) * easeOutQuart;
+      const currentY = fromY + (toY - fromY) * easeOutQuart;
+      
+      setPosition({ x: currentX, y: currentY });
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        onComplete();
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [fromX, fromY, toX, toY, startTime, onComplete]);
+
+  const pieceIcon = getPieceIcon(piece);
+
+  return (
+    <div
+      className="animating-piece"
+      style={{
+        left: position.x - 30,
+        top: position.y - 30,
+      }}
+    >
+      <img
+        src={pieceIcon}
+        alt="animating piece"
+        className="animating-piece-img"
+      />
+    </div>
+  );
+};
+
 interface PromotionDialogProps {
   isOpen: boolean;
-  color: number;
+  color: Color;
   onSelect: (pieceType: PieceType) => void;
   onCancel: () => void;
 }
@@ -152,7 +218,7 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, onSele
   );
 };
 
-const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isValidDropTarget, isCapture, isDragCapture, onSquareClick, onDrop, onDragStart, onDragEnd }) => {
+const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isValidDropTarget, isCapture, isDragCapture, isAnimatingFrom, onSquareClick, onDrop, onDragStart, onDragEnd }) => {
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: 'piece',
     item: () => {
@@ -215,7 +281,7 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
           src={pieceIcon}
           alt="chess piece"
           className="piece"
-          style={{ opacity: isDragging ? 0 : 1 }}
+          style={{ opacity: isDragging || isAnimatingFrom ? 0 : 1 }}
         />
       )}
       {(isValidMove || isValidDropTarget) && (
@@ -230,41 +296,84 @@ export const ChessBoard: React.FC = () => {
   const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[]>([]);
   const [dragValidMoves, setDragValidMoves] = useState<Position[]>([]);
+  const [animatingPiece, setAnimatingPiece] = useState<{
+    piece: Piece;
+    from: Position;
+    to: Position;
+    startTime: number;
+    moveData: {
+      fromFile: number;
+      fromRank: number;
+      toFile: number;
+      toRank: number;
+    };
+  } | null>(null);
   const [promotionDialog, setPromotionDialog] = useState<{
     isOpen: boolean;
     fromFile: number;
     fromRank: number;
     toFile: number;
     toRank: number;
-    color: number;
+    color: Color;
   }>({
     isOpen: false,
     fromFile: 0,
     fromRank: 0,
     toFile: 0,
     toRank: 0,
-    color: 0,
+    color: Color.White,
   });
 
-  const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
+  const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
     if (!chessEngine) return false;
+
+    // First check if the move is valid by checking valid moves
+    const piece = chessEngine.getPiece(fromFile, fromRank);
+    if (!piece || piece.color !== chessEngine.getCurrentPlayer()) return false;
+    
+    const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
+    const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
+    
+    if (!isValidMove) return false;
 
     // Check if this is a pawn promotion
     if (chessEngine.isPawnPromotion(fromFile, fromRank, toFile, toRank)) {
       const boardState = chessEngine.getBoardState();
-      const piece = boardState[7 - fromRank]?.[fromFile];
+      const boardPiece = boardState[7 - fromRank]?.[fromFile];
       setPromotionDialog({
         isOpen: true,
         fromFile,
         fromRank,
         toFile,
         toRank,
-        color: piece?.color || 0,
+        color: boardPiece?.color || Color.White,
       });
       return true; // Don't clear selection yet
     }
 
-    // Regular move
+    // If animation requested, start animation and defer the move until completion
+    if (animate) {
+      const boardState = chessEngine.getBoardState();
+      const boardPiece = boardState[7 - fromRank]?.[fromFile];
+      if (boardPiece) {
+        setAnimatingPiece({
+          piece: boardPiece,
+          from: { file: fromFile, rank: fromRank },
+          to: { file: toFile, rank: toRank },
+          startTime: Date.now(),
+          moveData: { fromFile, fromRank, toFile, toRank },
+        });
+        
+        // Clear selection immediately but don't make the move yet
+        setSelectedSquare(null);
+        setValidMoves([]);
+        setDragValidMoves([]);
+        
+        return true;
+      }
+    }
+
+    // Regular move (immediate)
     const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
     if (success) {
       setSelectedSquare(null);
@@ -273,6 +382,15 @@ export const ChessBoard: React.FC = () => {
     }
     return success;
   }, [chessEngine]);
+
+  const handleAnimationComplete = useCallback(() => {
+    if (animatingPiece && chessEngine) {
+      // Execute the move now that animation is complete
+      const { fromFile, fromRank, toFile, toRank } = animatingPiece.moveData;
+      chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
+    }
+    setAnimatingPiece(null);
+  }, [animatingPiece, chessEngine]);
 
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
@@ -316,8 +434,8 @@ export const ChessBoard: React.FC = () => {
         const moves = chessEngine.getValidMoves(file, rank);
         setValidMoves(moves);
       } else {
-        // Attempt to make a move
-        attemptMove(selectedSquare.file, selectedSquare.rank, file, rank);
+        // Attempt to make a move with animation
+        attemptMove(selectedSquare.file, selectedSquare.rank, file, rank, true);
       }
     } else if (piece && piece.color === chessEngine.getCurrentPlayer()) {
       // Select a piece and show valid moves
@@ -373,6 +491,10 @@ export const ChessBoard: React.FC = () => {
     return !!targetPiece;
   }, [chessEngine, isValidDropTarget]);
 
+  const isAnimatingFrom = useCallback((file: number, rank: number) => {
+    return animatingPiece?.from.file === file && animatingPiece?.from.rank === rank;
+  }, [animatingPiece]);
+
   const resetGame = useCallback(() => {
     if (!chessEngine) return;
 
@@ -395,7 +517,7 @@ export const ChessBoard: React.FC = () => {
       <div className="chess-game">
         <div className="game-info">
           <h2>Chess Game</h2>
-          <p>Current Player: {currentPlayer === 0 ? 'White' : 'Black'}</p>
+          <p>Current Player: {currentPlayer === Color.White ? 'White' : 'Black'}</p>
           <button onClick={resetGame}>New Game</button>
         </div>
         <div className="chess-board">
@@ -413,6 +535,7 @@ export const ChessBoard: React.FC = () => {
                   isValidDropTarget={isValidDropTarget(fileIndex, actualRank)}
                   isCapture={isCapture(fileIndex, actualRank)}
                   isDragCapture={isDragCapture(fileIndex, actualRank)}
+                  isAnimatingFrom={isAnimatingFrom(fileIndex, actualRank)}
                   onSquareClick={handleSquareClick}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
@@ -421,6 +544,15 @@ export const ChessBoard: React.FC = () => {
               );
             })
           ))}
+          {animatingPiece && (
+            <AnimatingPiece
+              piece={animatingPiece.piece}
+              from={animatingPiece.from}
+              to={animatingPiece.to}
+              startTime={animatingPiece.startTime}
+              onComplete={handleAnimationComplete}
+            />
+          )}
         </div>
         <PromotionDialog
           isOpen={promotionDialog.isOpen}
