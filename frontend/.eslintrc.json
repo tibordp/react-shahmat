@@ -1,0 +1,15 @@
+{
+  "extends": ["react-app"],
+  "globals": {
+    "FinalizationRegistry": "readonly"
+  },
+  "overrides": [
+    {
+      "files": ["src/chess-engine/**/*.js"],
+      "rules": {
+        "no-undef": "off",
+        "eqeqeq": "off"
+      }
+    }
+  ]
+}
