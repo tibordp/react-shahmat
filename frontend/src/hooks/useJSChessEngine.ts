@@ -8,6 +8,7 @@ interface ChessEngineAPI {
   getPiece: (file: number, rank: number) => Piece | null;
   makeMove: (fromFile: number, fromRank: number, toFile: number, toRank: number, promotionPiece?: PieceType) => boolean;
   isPawnPromotion: (fromFile: number, fromRank: number, toFile: number, toRank: number) => boolean;
+  isKingInCheck: (color: Color) => boolean;
   resetGame: () => void;
 }
 
@@ -53,6 +54,10 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     return engine.isPawnPromotion(fromFile, fromRank, toFile, toRank);
   }, [engine]);
 
+  const isKingInCheck = useCallback((color: Color): boolean => {
+    return engine.isKingInCheck(color);
+  }, [engine]);
+
   const resetGame = useCallback(() => {
     engine.resetGame();
     triggerUpdate();
@@ -70,6 +75,7 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getPiece,
     makeMove,
     isPawnPromotion,
+    isKingInCheck,
     resetGame
   };
 };

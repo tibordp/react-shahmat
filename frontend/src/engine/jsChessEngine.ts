@@ -296,6 +296,39 @@ export class JSChessEngine {
     return toRank === promotionRank;
   }
 
+  public isKingInCheck(color: Color): boolean {
+    // Find the king of the specified color
+    let kingPosition: Position | null = null;
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece && piece.type === PieceType.King && piece.color === color) {
+          kingPosition = { file, rank };
+          break;
+        }
+      }
+      if (kingPosition) break;
+    }
+
+    if (!kingPosition) return false;
+
+    // Check if any enemy piece can attack the king's position
+    const enemyColor = color === Color.White ? Color.Black : Color.White;
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece && piece.color === enemyColor) {
+          const moves = this.getValidMoves(file, rank);
+          if (moves.some(move => move.file === kingPosition!.file && move.rank === kingPosition!.rank)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   public resetGame(): void {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;

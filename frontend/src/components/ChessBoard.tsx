@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DndProvider, useDrag, useDrop, useDragLayer } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { TouchBackend } from 'react-dnd-touch-backend';
 import { getEmptyImage } from 'react-dnd-html5-backend';
 import whitePawn from '../icons/pawn-w.svg';
 import whiteRook from '../icons/rook-w.svg';
@@ -16,10 +16,10 @@ import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
 import { Piece, Position, PieceType, Color } from '../engine/jsChessEngine';
+import { soundManager } from '../utils/soundManager';
 import './ChessBoard.css';
 
 // Constants
-const SQUARE_SIZE = 64;
 const ANIMATION_DURATION = 300;
 
 const PIECE_ICONS: { [key: string]: string } = {
@@ -71,9 +71,11 @@ interface DragItem {
   piece: Piece;
 }
 
-interface CustomDragLayerProps {}
+interface CustomDragLayerProps {
+  squareSize: number;
+}
 
-const CustomDragLayer: React.FC<CustomDragLayerProps> = () => {
+const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
   const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
     item: monitor.getItem(),
     currentOffset: monitor.getClientOffset(),
@@ -98,9 +100,11 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = () => {
       <div
         className="drag-preview-piece"
         style={{
-          left: x - 30,
-          top: y - 30,
+          left: x - (squareSize * 0.45),
+          top: y - (squareSize * 0.45),
           position: 'absolute',
+          width: squareSize * 0.9,
+          height: squareSize * 0.9,
         }}
       >
         <img
@@ -121,12 +125,12 @@ interface AnimatingPieceProps {
   onComplete: () => void;
 }
 
-const AnimatingPiece: React.FC<AnimatingPieceProps> = ({ piece, from, to, startTime, onComplete }) => {
-  const fromX = from.file * SQUARE_SIZE + SQUARE_SIZE / 2;
-  const fromY = (7 - from.rank) * SQUARE_SIZE + SQUARE_SIZE / 2;
-  const toX = to.file * SQUARE_SIZE + SQUARE_SIZE / 2;
-  const toY = (7 - to.rank) * SQUARE_SIZE + SQUARE_SIZE / 2;
-  
+const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number }> = ({ piece, from, to, startTime, onComplete, squareSize }) => {
+  const fromX = from.file * squareSize + squareSize / 2;
+  const fromY = (7 - from.rank) * squareSize + squareSize / 2;
+  const toX = to.file * squareSize + squareSize / 2;
+  const toY = (7 - to.rank) * squareSize + squareSize / 2;
+
   const [position, setPosition] = useState({ x: fromX, y: fromY });
   const animationRef = useRef<number | undefined>(undefined);
 
@@ -134,15 +138,15 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({ piece, from, to, startT
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
-      
+
       // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      
+
       const currentX = fromX + (toX - fromX) * easeOutQuart;
       const currentY = fromY + (toY - fromY) * easeOutQuart;
-      
+
       setPosition({ x: currentX, y: currentY });
-      
+
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
@@ -160,13 +164,15 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({ piece, from, to, startT
   }, [fromX, fromY, toX, toY, startTime, onComplete]);
 
   const pieceIcon = getPieceIcon(piece);
-
+  const scale = squareSize * 0.9; // Scale down to fit within the square
   return (
     <div
       className="animating-piece"
       style={{
-        left: position.x - 30,
-        top: position.y - 30,
+        left: position.x - scale / 2,
+        top: position.y - scale / 2,
+        width: scale,
+        height: scale,
       }}
     >
       <img
@@ -237,9 +243,9 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
     }),
   }), [piece, file, rank, onDragStart, onDragEnd]);
 
-  // Simple drag preview setup - just connect it immediately
+  // Setup drag preview to prevent native drag behavior
   useEffect(() => {
-    preview(getEmptyImage());
+    preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
   const [{ isOver }, drop] = useDrop(() => ({
@@ -266,6 +272,14 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
 
   const pieceIcon = piece ? getPieceIcon(piece) : null;
 
+  // Show file label on rank 0 (bottom row)
+  const showFileLabel = rank === 0;
+  const fileLabel = showFileLabel ? String.fromCharCode(97 + file) : null; // 'a' = 97
+
+  // Show rank label on file 0 (leftmost column)
+  const showRankLabel = file === 0;
+  const rankLabel = showRankLabel ? (rank + 1).toString() : null;
+
   const attachRef = (node: HTMLDivElement | null) => {
     drag(drop(node));
   };
@@ -287,12 +301,49 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
       {(isValidMove || isValidDropTarget) && (
         <div className={`move-indicator ${isCapture || isDragCapture ? 'capture-indicator' : 'normal-indicator'}`} />
       )}
+      {fileLabel && (
+        <div className={`file-label-inset ${isLight ? 'dark-text' : 'light-text'}`}>
+          {fileLabel}
+        </div>
+      )}
+      {rankLabel && (
+        <div className={`rank-label-inset ${isLight ? 'dark-text' : 'light-text'}`}>
+          {rankLabel}
+        </div>
+      )}
     </div>
   );
 };
 
-export const ChessBoard: React.FC = () => {
+interface ChessBoardProps {
+  size?: number; // Board size in pixels (default: fills container)
+  className?: string;
+}
+
+export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className }) => {
   const chessEngine = useJSChessEngine();
+  const [boardSize, setBoardSize] = useState(size || 512);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  const squareSize = boardSize / 8;
+
+  // Handle responsive sizing when no size prop is provided
+  useEffect(() => {
+    if (size) return; // Don't resize if explicit size is provided
+
+    const handleResize = () => {
+      if (boardRef.current && boardRef.current.parentElement) {
+        const parentWidth = boardRef.current.parentElement.clientWidth;
+        const parentHeight = boardRef.current.parentElement.clientHeight;
+        const availableSize = Math.min(parentWidth, parentHeight) - 40; // Leave some padding
+        setBoardSize(Math.max(256, availableSize)); // Minimum 256px
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [size]);
   const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[]>([]);
   const [dragValidMoves, setDragValidMoves] = useState<Position[]>([]);
@@ -330,10 +381,10 @@ export const ChessBoard: React.FC = () => {
     // First check if the move is valid by checking valid moves
     const piece = chessEngine.getPiece(fromFile, fromRank);
     if (!piece || piece.color !== chessEngine.getCurrentPlayer()) return false;
-    
+
     const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
     const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
-    
+
     if (!isValidMove) return false;
 
     // Check if this is a pawn promotion
@@ -363,31 +414,67 @@ export const ChessBoard: React.FC = () => {
           startTime: Date.now(),
           moveData: { fromFile, fromRank, toFile, toRank },
         });
-        
+
         // Clear selection immediately but don't make the move yet
         setSelectedSquare(null);
         setValidMoves([]);
         setDragValidMoves([]);
-        
+
         return true;
       }
     }
 
+    // Check if this is a capture before making the move
+    const targetSquare = chessEngine.getPiece(toFile, toRank);
+    const isCapture = !!targetSquare;
+    
     // Regular move (immediate)
     const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
     if (success) {
       setSelectedSquare(null);
       setValidMoves([]);
       setDragValidMoves([]);
+      
+      // Play appropriate sound effect
+      if (isCapture) {
+        soundManager.playCaptureSound();
+      } else {
+        soundManager.playMoveSound();
+      }
+      
+      // Check if the move puts the opponent in check
+      const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
+      if (chessEngine.isKingInCheck(opponentColor)) {
+        setTimeout(() => soundManager.playCheckSound(), 200);
+      }
     }
     return success;
   }, [chessEngine]);
 
   const handleAnimationComplete = useCallback(() => {
     if (animatingPiece && chessEngine) {
-      // Execute the move now that animation is complete
+      // Check if this is a capture before making the move
       const { fromFile, fromRank, toFile, toRank } = animatingPiece.moveData;
-      chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
+      const targetSquare = chessEngine.getPiece(toFile, toRank);
+      const isCapture = !!targetSquare;
+      
+      // Execute the move now that animation is complete
+      const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
+      
+      if (success) {
+        // Play appropriate sound effect
+        if (isCapture) {
+          soundManager.playCaptureSound();
+        } else {
+          soundManager.playMoveSound();
+        }
+        
+        // Check if the move puts the opponent in check
+        const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
+        if (chessEngine.isKingInCheck(opponentColor)) {
+          setTimeout(() => soundManager.playCheckSound(), 200);
+        }
+      }
     }
     setAnimatingPiece(null);
   }, [animatingPiece, chessEngine]);
@@ -407,6 +494,15 @@ export const ChessBoard: React.FC = () => {
       setSelectedSquare(null);
       setValidMoves([]);
       setDragValidMoves([]);
+      
+      // Play promotion sound
+      soundManager.playPromotionSound();
+      
+      // Check if the move puts the opponent in check
+      const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
+      if (chessEngine.isKingInCheck(opponentColor)) {
+        setTimeout(() => soundManager.playCheckSound(), 400);
+      }
     }
 
     setPromotionDialog(prev => ({ ...prev, isOpen: false }));
@@ -495,32 +591,28 @@ export const ChessBoard: React.FC = () => {
     return animatingPiece?.from.file === file && animatingPiece?.from.rank === rank;
   }, [animatingPiece]);
 
-  const resetGame = useCallback(() => {
-    if (!chessEngine) return;
-
-    chessEngine.resetGame();
-    setSelectedSquare(null);
-    setValidMoves([]);
-    setDragValidMoves([]);
-  }, [chessEngine]);
 
   if (!chessEngine) {
     return <div>Loading chess engine...</div>;
   }
 
   const boardState = chessEngine.getBoardState();
-  const currentPlayer = chessEngine.getCurrentPlayer();
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <CustomDragLayer />
-      <div className="chess-game">
-        <div className="game-info">
-          <h2>Chess Game</h2>
-          <p>Current Player: {currentPlayer === Color.White ? 'White' : 'Black'}</p>
-          <button onClick={resetGame}>New Game</button>
-        </div>
-        <div className="chess-board">
+    <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
+      <CustomDragLayer squareSize={squareSize} />
+      <div className={`chess-board-container ${className || ''}`}>
+        <div
+          ref={boardRef}
+          className="chess-board"
+          style={{
+            width: boardSize,
+            height: boardSize,
+            gridTemplateColumns: `repeat(8, ${squareSize}px)`,
+            gridTemplateRows: `repeat(8, ${squareSize}px)`,
+            fontSize: Math.max(10, squareSize * 0.12),
+          }}
+        >
           {boardState.map((row, rankIndex) => (
             row.map((piece, fileIndex) => {
               const actualRank = 7 - rankIndex;
@@ -550,6 +642,7 @@ export const ChessBoard: React.FC = () => {
               from={animatingPiece.from}
               to={animatingPiece.to}
               startTime={animatingPiece.startTime}
+              squareSize={squareSize}
               onComplete={handleAnimationComplete}
             />
           )}

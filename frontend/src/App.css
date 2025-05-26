@@ -3,6 +3,19 @@
   min-height: 100vh;
   background-color: #f5f5f5;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.App h1 {
+  color: #333;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.board-container {
+  width: 100%;
+  max-width: 600px;
+  height: 600px;
+  max-height: 80vh;
 }
