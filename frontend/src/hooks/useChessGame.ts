@@ -78,18 +78,17 @@ export function useChessGame({
 
   // Simple move execution - no animation handling
   const makeMove = useCallback((move: Move) => {
-    if (!chessEngine) return false;
+    if (!chessEngine) return null;
 
     const from = { file: move.fromFile, rank: move.fromRank };
     const to = { file: move.toFile, rank: move.toRank };
     const result = chessEngine.makeMove(from, to, move.promotionPiece);
 
-
     if (result.success) {
       notifyPositionChange();
     }
 
-    return result.success;
+    return result;
   }, [chessEngine, notifyPositionChange]);
 
   // Clear pending external move after it's been handled
@@ -158,7 +157,7 @@ export function useChessGame({
       const firstMove = validPreMoves[0];
       const result = makeMove(firstMove);
 
-      if (result) {
+      if (result?.success) {
         // Remove the executed move and keep remaining pre-moves
         setPreMoves(prev => prev.slice(1));
       } else {
