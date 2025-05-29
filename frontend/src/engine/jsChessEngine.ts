@@ -86,11 +86,11 @@ export class JSChessEngine {
 
     // Place pieces for white
     this.board[0][0] = { type: PieceType.Rook, color: Color.White };
-   // this.board[0][1] = { type: PieceType.Knight, color: Color.White };
-   // this.board[0][2] = { type: PieceType.Bishop, color: Color.White };
-   // this.board[0][3] = { type: PieceType.Queen, color: Color.White };
+    this.board[0][1] = { type: PieceType.Knight, color: Color.White };
+    this.board[0][2] = { type: PieceType.Bishop, color: Color.White };
+    this.board[0][3] = { type: PieceType.Queen, color: Color.White };
     this.board[0][4] = { type: PieceType.King, color: Color.White };
-    //this.board[0][5] = { type: PieceType.Bishop, color: Color.White };
+    this.board[0][5] = { type: PieceType.Bishop, color: Color.White };
     this.board[0][6] = { type: PieceType.Knight, color: Color.White };
     this.board[0][7] = { type: PieceType.Rook, color: Color.White };
 
@@ -127,7 +127,7 @@ export class JSChessEngine {
     if (!piece || piece.color !== this.currentPlayer) return [];
 
     const pseudoLegalMoves = this.getValidMovesForPiece(from.file, from.rank, piece, true);
-    
+
     // Filter out moves that would leave the king in check
     return pseudoLegalMoves.filter(to => this.isMoveLegal(from, to));
   }
@@ -140,20 +140,20 @@ export class JSChessEngine {
     // Store original state
     const originalTarget = this.getPiece(to);
     const originalEnPassantTarget = this.enPassantTarget;
-    
+
     // Special handling for castling - already checked in canCastle method
     if (piece.type === PieceType.King && Math.abs(to.file - from.file) === 2) {
       // Castling legality is already verified in addCastlingMoves/canCastle
       return true;
     }
-    
+
     // Special handling for en passant capture
     let capturedEnPassantPawn: Piece | null = null;
     let capturedEnPassantPos: Position | null = null;
-    
-    if (piece.type === PieceType.Pawn && 
-        this.enPassantTarget && 
-        to.file === this.enPassantTarget.file && 
+
+    if (piece.type === PieceType.Pawn &&
+        this.enPassantTarget &&
+        to.file === this.enPassantTarget.file &&
         to.rank === this.enPassantTarget.rank) {
       const direction = piece.color === Color.White ? 1 : -1;
       capturedEnPassantPos = { file: to.file, rank: to.rank - direction };
@@ -171,11 +171,11 @@ export class JSChessEngine {
     // Restore original state
     this.board[from.rank][from.file] = piece;
     this.board[to.rank][to.file] = originalTarget;
-    
+
     if (capturedEnPassantPawn && capturedEnPassantPos) {
       this.board[capturedEnPassantPos.rank][capturedEnPassantPos.file] = capturedEnPassantPawn;
     }
-    
+
     this.enPassantTarget = originalEnPassantTarget;
 
     return isLegal;
@@ -476,8 +476,8 @@ export class JSChessEngine {
       const direction = piece.color === Color.White ? 1 : -1;
 
       // Check for en passant
-      if (this.enPassantTarget && 
-          to.file === this.enPassantTarget.file && 
+      if (this.enPassantTarget &&
+          to.file === this.enPassantTarget.file &&
           to.rank === this.enPassantTarget.rank) {
         type = 'enPassant';
         const capturedPawnRank = to.rank - direction;
@@ -518,7 +518,7 @@ export class JSChessEngine {
   public makeMove(from: Position, to: Position, promotionPiece?: PieceType): MoveResult {
     // First analyze the move to get rich information
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
-    
+
     if (!analysis.valid) {
       return {
         success: false,
@@ -548,10 +548,10 @@ export class JSChessEngine {
       // Handle en passant capture
       const direction = piece.color === Color.White ? 1 : -1;
       const capturedPawnRank = to.rank - direction;
-      
+
       // Remove the captured pawn
       this.board[capturedPawnRank][to.file] = null;
-      
+
       // Move the pawn
       this.board[to.rank][to.file] = piece;
       this.board[from.rank][from.file] = null;
@@ -584,7 +584,7 @@ export class JSChessEngine {
     // Determine check status after move
     const opponentColor = this.currentPlayer;
     let checkStatus: 'none' | 'check' | 'checkmate' | 'stalemate' = 'none';
-    
+
     if (this.isKingInCheck(opponentColor)) {
       // TODO: Implement checkmate/stalemate detection
       checkStatus = 'check';
