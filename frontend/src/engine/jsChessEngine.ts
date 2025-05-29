@@ -433,12 +433,11 @@ export class JSChessEngine {
       }
       // Check for promotion
       else if (to.rank === promotionRank) {
-        if (!promotionPiece) {
-          promotionRequired = true;
-          return { valid: false, promotionRequired: true };
-        }
         type = 'promotion';
         capturedPiece = targetPiece || undefined;
+        if (!promotionPiece) {
+          promotionRequired = true;
+        }
       }
       // Regular pawn move or capture
       else if (targetPiece) {

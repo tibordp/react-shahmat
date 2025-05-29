@@ -535,20 +535,21 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     const validationResult = chessEngine.isValidMove(from, to);
     
     if (!validationResult.valid) {
-      // Check if promotion is required
-      if (validationResult.promotionRequired) {
-        const piece = chessEngine.getPiece(from);
-        setPromotionDialog({
-          isOpen: true,
-          fromFile,
-          fromRank,
-          toFile,
-          toRank,
-          color: piece?.color || Color.White,
-        });
-        return true; // Don't clear selection yet
-      }
       return false;
+    }
+
+    // Check if promotion is required
+    if (validationResult.promotionRequired) {
+      const piece = chessEngine.getPiece(from);
+      setPromotionDialog({
+        isOpen: true,
+        fromFile,
+        fromRank,
+        toFile,
+        toRank,
+        color: piece?.color || Color.White,
+      });
+      return true; // Don't clear selection yet
     }
 
     // If animation requested, start animation and defer the move until completion
