@@ -21,8 +21,8 @@ import { soundManager } from '../utils/soundManager';
 import { calculateBasicPieceMovements } from '../utils/pieceMovements';
 import './ChessBoard.css';
 
-// Constants
-const ANIMATION_DURATION = 300;
+// Constants (animationDuration prop will override this)
+const DEFAULT_ANIMATION_DURATION = 300;
 
 const PIECE_ICONS: { [key: string]: string } = {
   'White_Pawn': whitePawn,
@@ -64,6 +64,7 @@ interface SquareProps {
   isHighlighted: boolean;
   isPreMove: boolean;
   flipped?: boolean; // Whether to flip the board for black perspective
+  showCoordinates?: boolean; // Whether to show rank and file labels
   onSquareClick: (file: number, rank: number) => void;
   onDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
   onDragStart: (file: number, rank: number) => void;
@@ -135,7 +136,7 @@ interface AnimatingPieceProps {
   onComplete: () => void;
 }
 
-const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number }> = ({ piece, from, to, startTime, onComplete, squareSize, flipped }) => {
+const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number; animationDuration: number }> = ({ piece, from, to, startTime, onComplete, squareSize, flipped, animationDuration }) => {
   const effectiveFrom = flipped ? { file: 7 - from.file, rank: 7 - from.rank } : from;
   const effectiveTo = flipped ? { file: 7 - to.file, rank: 7 - to.rank } : to;
 
@@ -150,7 +151,7 @@ const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number }> = (
   useEffect(() => {
     const animate = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+      const progress = Math.min(elapsed / animationDuration, 1);
 
       // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
@@ -293,6 +294,97 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
   );
 };
 
+interface GameEndBadgeProps {
+  kingPosition: Position;
+  squareSize: number;
+  flipped?: boolean;
+  badgeType: 'winner' | 'loser' | 'draw';
+}
+
+const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, flipped, badgeType }) => {
+  // Calculate the king's visual position
+  const effectivePosition = flipped 
+    ? { file: 7 - kingPosition.file, rank: 7 - kingPosition.rank }
+    : kingPosition;
+  
+  const kingX = effectivePosition.file * squareSize;
+  const kingY = (7 - effectivePosition.rank) * squareSize;
+  
+  // Badge size (about 35% of square size for better visibility)
+  const badgeSize = squareSize * 0.35;
+  
+  // Default position: top-right corner of king's square
+  let badgeX = kingX + squareSize - badgeSize / 2;
+  let badgeY = kingY - badgeSize / 2;
+  
+  // Boundary detection - only shift inward just enough to stay within board
+  const boardSize = squareSize * 8;
+  
+  // Check right boundary - shift left just enough
+  if (badgeX + badgeSize > boardSize) {
+    badgeX = boardSize - badgeSize;
+  }
+  
+  // Check top boundary - shift down just enough
+  if (badgeY < 0) {
+    badgeY = 0;
+  }
+  
+  const getBadgeColor = () => {
+    switch (badgeType) {
+      case 'winner': return '#4CAF50';
+      case 'loser': return '#f44336';
+      case 'draw': return '#757575';
+    }
+  };
+  
+  const renderBadgeContent = () => {
+    if (badgeType === 'draw') {
+      return (
+        <span style={{ color: 'white', fontSize: badgeSize * 0.6, fontWeight: 'bold' }}>
+          ½
+        </span>
+      );
+    } else {
+      // Use white king SVG for both winner and loser
+      return (
+        <img
+          src={whiteKing}
+          alt="king"
+          style={{
+            width: badgeSize * 0.7,
+            height: badgeSize * 0.7,
+            filter: 'brightness(0) invert(1)', // Make it white
+            transform: badgeType === 'loser' ? 'rotate(90deg)' : 'none',
+          }}
+        />
+      );
+    }
+  };
+  
+  return (
+    <div
+      className="game-end-badge"
+      style={{
+        position: 'absolute',
+        left: badgeX,
+        top: badgeY,
+        width: badgeSize,
+        height: badgeSize,
+        backgroundColor: getBadgeColor(),
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+        zIndex: 200,
+      }}
+    >
+      {renderBadgeContent()}
+    </div>
+  );
+};
+
 interface ArrowComponentProps {
   fromX: number;
   fromY: number;
@@ -407,7 +499,7 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY,
   );
 };
 
-const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, isHighlighted, isPreMove, onSquareClick, onDrop, onDragStart, onDragEnd, onRightMouseDown, onRightMouseUp, flipped, canMakePreMoves }) => {
+const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, isHighlighted, isPreMove, onSquareClick, onDrop, onDragStart, onDragEnd, onRightMouseDown, onRightMouseUp, flipped, showCoordinates, canMakePreMoves }) => {
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: 'piece',
     item: () => {
@@ -468,11 +560,11 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
   const pieceIcon = piece ? getPieceIcon(piece) : null;
 
   // Show file label on rank 0 (bottom row)
-  const showFileLabel = rank === (flipped ? 7 : 0);
+  const showFileLabel = showCoordinates && rank === (flipped ? 7 : 0);
   const fileLabel = showFileLabel ? String.fromCharCode(97 + file) : null; // 'a' = 97
 
   // Show rank label on file 0 (leftmost column)
-  const showRankLabel = file === (flipped ? 7 : 0);
+  const showRankLabel = showCoordinates && file === (flipped ? 7 : 0);
   const rankLabel = showRankLabel ? (rank + 1).toString() : null;
 
   const attachRef = (node: HTMLDivElement | null) => {
@@ -527,16 +619,28 @@ interface ChessBoardProps extends ChessBoardCallbacks {
   size?: number; // Board size in pixels (default: fills container)
   className?: string;
   flipped?: boolean; // Whether to flip the board for black perspective
-  disablePreMoves?: boolean; // Whether to disable pre-move functionality
+  enablePreMoves?: boolean; // Whether to enable pre-move functionality (default: true)
   autoPromotionPiece?: PieceType; // Auto-promotion piece (Queen, Rook, Bishop, Knight)
+  showCoordinates?: boolean; // Whether to show rank and file labels (default: true)
+  animationDuration?: number; // Animation duration in milliseconds (default: 300)
+  enableAnimations?: boolean; // Whether to enable move animations (default: true)
+  enableSounds?: boolean; // Whether to enable sound effects (default: true)
+  enableArrows?: boolean; // Whether to enable right-click arrows (default: true)
+  enableHighlights?: boolean; // Whether to enable right-click square highlights (default: true)
 }
 
 export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   size,
   className,
   flipped,
-  disablePreMoves = false,
+  enablePreMoves = true,
   autoPromotionPiece,
+  showCoordinates = true,
+  animationDuration = 300,
+  enableAnimations = true,
+  enableSounds = true,
+  enableArrows = true,
+  enableHighlights = true,
   onWhiteMove,
   onBlackMove,
   onError,
@@ -589,6 +693,27 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   const [arrows, setArrows] = useState<Array<{ from: Position; to: Position }>>([]);
   const [arrowStart, setArrowStart] = useState<Position | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<Position[]>([]);
+
+  // Find king positions on the current board
+  const findKingPositions = useCallback(() => {
+    const boardState = chessEngine.getBoardState();
+    const kings: { white?: Position; black?: Position } = {};
+    
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = boardState[7 - rank]?.[file];
+        if (piece?.type === PieceType.King) {
+          if (piece.color === Color.White) {
+            kings.white = { file, rank };
+          } else {
+            kings.black = { file, rank };
+          }
+        }
+      }
+    }
+    
+    return kings;
+  }, [chessEngine]);
 
   // Pre-move squares (both origin and destination to show in red)
   const preMoveSquares = game.preMoves.flatMap(move => [
@@ -647,17 +772,17 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     if (!piece) return [];
 
     // If we can make pre-moves (external player's turn) and pre-moves are enabled, use basic movement patterns
-    if (game.canMakePreMoves && !disablePreMoves) {
+    if (game.canMakePreMoves && enablePreMoves) {
       return calculateBasicPieceMovements(piece, file, rank, visualBoard);
     }
 
     // Otherwise use normal engine calculation which includes all game rules
     return chessEngine.getValidMoves({ file, rank });
-  }, [chessEngine, game.canMakePreMoves, getVisualBoardState, disablePreMoves]);
+  }, [chessEngine, game.canMakePreMoves, getVisualBoardState, enablePreMoves]);
 
   // Shared function to handle pre-move logic
   const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    if (!game.canMakePreMoves || disablePreMoves || !chessEngine) return false;
+    if (!game.canMakePreMoves || !enablePreMoves || !chessEngine) return false;
 
     // Determine human player color
     const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
@@ -713,7 +838,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     }
 
     return true; // Indicates pre-move was handled
-  }, [disablePreMoves, chessEngine, getVisualBoardState, getValidMovesFromVisualBoard, isPawnPromotion, game, autoPromotionPiece]);
+  }, [enablePreMoves, chessEngine, getVisualBoardState, getValidMovesFromVisualBoard, isPawnPromotion, game, autoPromotionPiece]);
 
   const [animatingPieces, setAnimatingPieces] = useState<{
     pieces: Array<{
@@ -798,11 +923,13 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
           setValidMoves([]);
 
           // Play promotion sound
-          soundManager.playPromotionSound();
+          if (enableSounds) {
+            soundManager.playPromotionSound();
 
-          // Check if the move puts the opponent in check
-          if (result.checkStatus === 'check') {
-            setTimeout(() => soundManager.playCheckSound(), 400);
+            // Check if the move puts the opponent in check
+            if (result.checkStatus === 'check') {
+              setTimeout(() => soundManager.playCheckSound(), 400);
+            }
           }
 
           return true;
@@ -866,11 +993,11 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
         // Play sound effects
         if (result.type === 'capture' || result.type === 'enPassant') {
-          soundManager.playCaptureSound();
+          if (enableSounds) soundManager.playCaptureSound();
         } else if (result.type === 'promotion') {
-          soundManager.playPromotionSound();
+          if (enableSounds) soundManager.playPromotionSound();
         } else {
-          soundManager.playMoveSound();
+          if (enableSounds) soundManager.playMoveSound();
         }
 
         if (result.checkStatus === 'check') {
@@ -884,7 +1011,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     }
 
     return false;
-  }, [chessEngine, game, autoPromotionPiece]);
+  }, [chessEngine, game, autoPromotionPiece, enableSounds]);
 
   // Handle pending external moves with animation
   useEffect(() => {
@@ -957,7 +1084,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
       if (result) {
         // Play sound effects - just play move sound for animations
-        soundManager.playMoveSound();
+        if (enableSounds) soundManager.playMoveSound();
 
         const gameState = chessEngine.getGameState();
         if (gameState.isCheck) {
@@ -972,7 +1099,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
       setAnimatingPieces(null);
     }
-  }, [animatingPieces, game, chessEngine]);
+  }, [animatingPieces, game, chessEngine, enableSounds]);
 
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
@@ -1001,7 +1128,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves([]);
 
         // Play promotion sound
-        soundManager.playPromotionSound();
+        if (enableSounds) soundManager.playPromotionSound();
 
         // Check if the move puts the opponent in check
         if (result.checkStatus === 'check') {
@@ -1011,7 +1138,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     }
 
     setPromotionDialog(prev => ({ ...prev, isOpen: false }));
-  }, [chessEngine, promotionDialog, game]);
+  }, [chessEngine, promotionDialog, game, enableSounds]);
 
   const handlePromotionCancel = useCallback(() => {
     setPromotionDialog(prev => ({ ...prev, isOpen: false }));
@@ -1041,7 +1168,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
           setSelectedSquare({ file, rank });
           const moves = getValidMovesFromVisualBoard(file, rank);
           setValidMoves(moves);
-        } else if (!attemptMove(selectedSquare.file, selectedSquare.rank, file, rank, true)) {
+        } else if (!attemptMove(selectedSquare.file, selectedSquare.rank, file, rank, enableAnimations)) {
           // Attempt to move the selected piece to the clicked square
           setSelectedSquare(null);
           setValidMoves([]);
@@ -1054,7 +1181,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       }
     }
     // Handle pre-moves when it's external player's turn (and pre-moves are enabled)
-    else if (game.canMakePreMoves && !disablePreMoves) {
+    else if (game.canMakePreMoves && enablePreMoves) {
       // Determine human player color (opposite of current player when external player is moving)
       const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
 
@@ -1084,7 +1211,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves(moves);
       }
     }
-  }, [chessEngine, selectedSquare, attemptMove, game, getValidMovesFromVisualBoard, getVisualBoardState, disablePreMoves, handlePreMoveAttempt]);
+  }, [chessEngine, selectedSquare, attemptMove, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, handlePreMoveAttempt]);
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
@@ -1105,7 +1232,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       // Execute the full castling move immediately (king is already visually positioned)
       const result = chessEngine.makeMove(from, to);
 
-      if (result.success && result.additionalMoves) {
+      if (result.success && result.additionalMoves && enableAnimations) {
         // Animate the rook visually (move is already executed)
         const rookMove = result.additionalMoves[0];
         setAnimatingPieces({
@@ -1123,7 +1250,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves([]);
 
         // Play sound effects immediately
-        soundManager.playMoveSound();
+        if (enableSounds) soundManager.playMoveSound();
 
         // Check if the move puts the opponent in check
         if (result.checkStatus === 'check') {
@@ -1133,23 +1260,23 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       return;
     }
 
-      // Regular move (non-castling)
-      attemptMove(fromFile, fromRank, toFile, toRank);
+      // Regular move (non-castling) - don't animate drag moves since piece is already positioned
+      attemptMove(fromFile, fromRank, toFile, toRank, false);
     }
     // Handle pre-move drops when it's external player's turn (and pre-moves are enabled)
-    else if (game.canMakePreMoves && !disablePreMoves) {
+    else if (game.canMakePreMoves && enablePreMoves) {
       // Use shared pre-move logic
       handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
       setSelectedSquare(null);
       setValidMoves([]);
     }
-  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, disablePreMoves]);
+  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, enableSounds]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
     // Allow dragging when it's human's turn OR when making pre-moves (and pre-moves are enabled)
-    if (game.canHumanMove || (game.canMakePreMoves && !disablePreMoves)) {
+    if (game.canHumanMove || (game.canMakePreMoves && enablePreMoves)) {
       // Determine which color can be dragged
       let allowedColor: Color;
       if (game.canHumanMove) {
@@ -1177,7 +1304,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       const moves = getValidMovesFromVisualBoard(file, rank);
       setValidMoves(moves);
     }
-  }, [chessEngine, game, getValidMovesFromVisualBoard, getVisualBoardState, disablePreMoves]);
+  }, [chessEngine, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves]);
 
   const handleDragEnd = useCallback((file: number, rank: number) => {
 
@@ -1232,28 +1359,34 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       game.clearPreMoves();
       return; // Don't start arrow creation when clearing pre-moves
     }
-    setArrowStart({ file, rank });
-  }, [game]);
+    
+    // Start arrow creation if arrows are enabled, or set flag for highlights if arrows disabled but highlights enabled
+    if (enableArrows || enableHighlights) {
+      setArrowStart({ file, rank });
+    }
+  }, [game, enableArrows, enableHighlights]);
 
   const handleRightMouseUp = useCallback((file: number, rank: number) => {
     if (arrowStart) {
       if (arrowStart.file === file && arrowStart.rank === rank) {
-        // Same square - toggle square highlight instead of creating arrow
-        setHighlightedSquares(prev => {
-          const existingIndex = prev.findIndex(square =>
-            square.file === file && square.rank === rank
-          );
+        // Same square - toggle square highlight instead of creating arrow (if highlights enabled)
+        if (enableHighlights) {
+          setHighlightedSquares(prev => {
+            const existingIndex = prev.findIndex(square =>
+              square.file === file && square.rank === rank
+            );
 
-          if (existingIndex >= 0) {
-            // Remove existing highlight
-            return prev.filter((_, index) => index !== existingIndex);
-          } else {
-            // Add new highlight
-            return [...prev, { file, rank }];
-          }
-        });
-      } else {
-        // Different square - create or toggle arrow
+            if (existingIndex >= 0) {
+              // Remove existing highlight
+              return prev.filter((_, index) => index !== existingIndex);
+            } else {
+              // Add new highlight
+              return [...prev, { file, rank }];
+            }
+          });
+        }
+      } else if (enableArrows) {
+        // Different square - create or toggle arrow (if arrows enabled)
         const newArrow = { from: arrowStart, to: { file, rank } };
         setArrows(prev => {
           // Check if arrow already exists
@@ -1275,7 +1408,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       }
     }
     setArrowStart(null);
-  }, [arrowStart]);
+  }, [arrowStart, enableArrows, enableHighlights]);
 
 
   if (!chessEngine) {
@@ -1316,6 +1449,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
                   rank={actualRank}
                   piece={piece}
                   flipped={flipped}
+                  showCoordinates={showCoordinates}
                   isSelected={isSquareSelected(actualFile, actualRank)}
                   isValidMove={isValidMoveSquare(actualFile, actualRank)}
                   isCapture={isCapture(actualFile, actualRank)}
@@ -1325,7 +1459,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
                   isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
                   isHighlighted={isHighlighted(actualFile, actualRank)}
                   isPreMove={isPreMoveSquare(actualFile, actualRank)}
-                  canMakePreMoves={game.canMakePreMoves && !disablePreMoves}
+                  canMakePreMoves={game.canMakePreMoves && enablePreMoves}
                   onSquareClick={handleSquareClick}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
@@ -1383,6 +1517,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
               to={animatingPiece.to}
               startTime={animatingPieces.startTime}
               squareSize={squareSize}
+              animationDuration={animationDuration}
               onComplete={index === 0 ? handleAnimationComplete : () => {}} // Only call completion for the first piece
               flipped={flipped}
             />
@@ -1398,6 +1533,67 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
             onSelect={handlePromotion}
             onCancel={handlePromotionCancel}
           />
+
+          {/* Game end badges for checkmate/stalemate */}
+          {(() => {
+            const gameState = chessEngine.getGameState();
+            if (!gameState.isGameOver || !gameState.result) return null;
+            
+            const kingPositions = findKingPositions();
+            const badges = [];
+            
+            if (gameState.result.reason === 'checkmate' && gameState.result.winner !== undefined) {
+              // Checkmate: winner gets crown, loser gets fallen king
+              if (kingPositions.white) {
+                badges.push(
+                  <GameEndBadge
+                    key="white-king"
+                    kingPosition={kingPositions.white}
+                    squareSize={squareSize}
+                    flipped={flipped}
+                    badgeType={gameState.result.winner === Color.White ? 'winner' : 'loser'}
+                  />
+                );
+              }
+              if (kingPositions.black) {
+                badges.push(
+                  <GameEndBadge
+                    key="black-king"
+                    kingPosition={kingPositions.black}
+                    squareSize={squareSize}
+                    flipped={flipped}
+                    badgeType={gameState.result.winner === Color.Black ? 'winner' : 'loser'}
+                  />
+                );
+              }
+            } else if (gameState.result.reason === 'stalemate') {
+              // Stalemate: both kings get draw badge
+              if (kingPositions.white) {
+                badges.push(
+                  <GameEndBadge
+                    key="white-king"
+                    kingPosition={kingPositions.white}
+                    squareSize={squareSize}
+                    flipped={flipped}
+                    badgeType="draw"
+                  />
+                );
+              }
+              if (kingPositions.black) {
+                badges.push(
+                  <GameEndBadge
+                    key="black-king"
+                    kingPosition={kingPositions.black}
+                    squareSize={squareSize}
+                    flipped={flipped}
+                    badgeType="draw"
+                  />
+                );
+              }
+            }
+            
+            return badges;
+          })()}
         </div>
       </div>
     </DndProvider>

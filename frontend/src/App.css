@@ -71,6 +71,61 @@
   background: #d32f2f;
 }
 
+.fen-group {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fen-input {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-family: monospace;
+  min-width: 300px;
+  flex: 1;
+}
+
+.fen-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.load-button {
+  background: #2196F3;
+}
+
+.load-button:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.load-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-button {
+  background: #FF9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.preset-button:hover {
+  background: #F57C00;
+}
+
 .control-checkbox {
   width: 16px;
   height: 16px;
