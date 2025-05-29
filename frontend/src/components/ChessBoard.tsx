@@ -15,7 +15,7 @@ import blackBishop from '../icons/bishop-b.svg';
 import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
-import { useGameStateMachine } from '../hooks/useGameStateMachine';
+import { useChessGame } from '../hooks/useChessGame';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef, Move, ChessError } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
@@ -482,8 +482,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
   const squareSize = boardSize / 8;
 
-  // Initialize state machine
-  const stateMachine = useGameStateMachine({
+  // Initialize clean chess game hook
+  const game = useChessGame({
     chessEngine,
     onWhiteMove,
     onBlackMove,
@@ -526,6 +526,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       toFile: number;
       toRank: number;
       isDragCastling?: boolean;
+      isExternalMove?: boolean;
     };
   } | null>(null);
   const [promotionDialog, setPromotionDialog] = useState<{
@@ -547,8 +548,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   // Add ref methods
   useImperativeHandle(ref, () => ({
     resetGame: () => {
-      chessEngine.resetGame();
-      stateMachine.actions.resetGame();
+      game.resetGame();
       setSelectedSquare(null);
       setValidMoves([]);
       setArrows([]);
@@ -556,9 +556,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       setAnimatingPieces(null);
     },
     setPosition: (fen: string) => {
-      const success = chessEngine.setPosition(fen);
+      const success = game.setPosition(fen);
       if (success) {
-        stateMachine.actions.resetGame();
         setSelectedSquare(null);
         setValidMoves([]);
         setArrows([]);
@@ -568,20 +567,15 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       return success;
     },
     getGameState: () => chessEngine.getGameState(),
-  }), [chessEngine, stateMachine.actions]);
+  }), [game, chessEngine]);
 
-  // Game state change notification
-  useEffect(() => {
-    if (onGameStateChange) {
-      onGameStateChange(chessEngine.getGameState());
-    }
-  }, [chessEngine, onGameStateChange, selectedSquare, animatingPieces]);
 
   const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
     if (!chessEngine) return false;
 
     const from = { file: fromFile, rank: fromRank };
     const to = { file: toFile, rank: toRank };
+    const move = { fromFile, fromRank, toFile, toRank };
 
     // Check if the move is valid and what type it would be
     const validationResult = chessEngine.isValidMove(from, to);
@@ -592,20 +586,21 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
     // Check if promotion is required
     if (validationResult.promotionRequired) {
-      const piece = chessEngine.getPiece(from);
       setPromotionDialog({
         isOpen: true,
         fromFile,
         fromRank,
         toFile,
         toRank,
-        color: piece?.color || Color.White,
+        color: chessEngine.getPiece(from)?.color || Color.White,
       });
-      return true; // Don't clear selection yet
+      return true;
     }
 
-    // If animation requested, start animation and defer the move until completion
+    // Handle animation for human moves
     if (animate) {
+      
+      // Start animation
       const boardState = chessEngine.getBoardState();
       const boardPiece = boardState[7 - fromRank]?.[fromFile];
       if (boardPiece) {
@@ -638,102 +633,15 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
         return true;
       }
-    }
-
-    // Regular move (immediate)
-    const result = chessEngine.makeMove(from, to);
-    if (result.success) {
-      setSelectedSquare(null);
-      setValidMoves([]);
-
-      // Play appropriate sound effect based on move type
-      if (result.type === 'capture' || result.type === 'enPassant') {
-        soundManager.playCaptureSound();
-      } else if (result.type === 'promotion') {
-        soundManager.playPromotionSound();
-      } else {
-        soundManager.playMoveSound();
-      }
-
-      // Check if the move puts the opponent in check
-      if (result.checkStatus === 'check') {
-        setTimeout(() => soundManager.playCheckSound(), 200);
-      }
-    }
-    return result.success;
-  }, [chessEngine]);
-
-  // Automated player callback logic
-  useEffect(() => {
-    const currentPlayer = chessEngine.getCurrentPlayer();
-    const gameState = chessEngine.getGameState();
-    
-    // Don't trigger callbacks if game is over, animation is running, or promotion dialog is open
-    if (gameState.isGameOver || animatingPieces || promotionDialog.isOpen) {
-      return;
-    }
-
-    const callback = currentPlayer === Color.White ? onWhiteMove : onBlackMove;
-    if (callback) {
-      // This player is automated
-      const executeAutomatedMove = async () => {
-        try {
-          // Get the opponent's last move (if any)
-          const opponentMove = chessEngine.getLastMove();
-          
-          const move = await callback(gameState, opponentMove || undefined);
-          const from = { file: move.fromFile, rank: move.fromRank };
-          const to = { file: move.toFile, rank: move.toRank };
-          
-          // Validate and execute the move
-          const validationResult = chessEngine.isValidMove(from, to);
-          if (validationResult.valid) {
-            attemptMove(move.fromFile, move.fromRank, move.toFile, move.toRank, true);
-          } else {
-            const error: ChessError = {
-              type: 'invalid_move',
-              player: currentPlayer,
-              move,
-              message: 'Invalid move returned by callback'
-            };
-            onError?.(error);
-          }
-        } catch (error) {
-          const chessError: ChessError = {
-            type: 'callback_error',
-            player: currentPlayer,
-            message: `Callback error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            originalError: error instanceof Error ? error : undefined
-          };
-          onError?.(chessError);
-        }
-      };
-
-      // Execute immediately since we already checked for blocking conditions
-      executeAutomatedMove();
-    }
-  }, [chessEngine, onWhiteMove, onBlackMove, onError, attemptMove, animatingPieces, promotionDialog.isOpen]);
-
-  const handleAnimationComplete = useCallback(() => {
-    if (animatingPieces && chessEngine) {
-      const { fromFile, fromRank, toFile, toRank, isDragCastling } = animatingPieces.moveData;
-
-      if (isDragCastling) {
-        // For drag castling, move is already executed, just clean up
-        setAnimatingPieces(null);
-        return;
-      }
-
-      // For click-based moves, execute the move now that animation is complete
-      const from = { file: fromFile, rank: fromRank };
-      const to = { file: toFile, rank: toRank };
+    } else {
+      // Immediate move - execute right away
       const result = chessEngine.makeMove(from, to);
-
       if (result.success) {
-        // Play appropriate sound effect based on move type
-        if (result.type === 'castling') {
-          soundManager.playMoveSound();
-        } else if (result.type === 'capture' || result.type === 'enPassant') {
+        setSelectedSquare(null);
+        setValidMoves([]);
+
+        // Play sound effects
+        if (result.type === 'capture' || result.type === 'enPassant') {
           soundManager.playCaptureSound();
         } else if (result.type === 'promotion') {
           soundManager.playPromotionSound();
@@ -741,18 +649,102 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
           soundManager.playMoveSound();
         }
 
-        // Check if the move puts the opponent in check
         if (result.checkStatus === 'check') {
           setTimeout(() => soundManager.playCheckSound(), 200);
         }
+
+        // Execute the move immediately for non-animated moves
+        game.makeMove(move);
+      }
+      return result.success;
+    }
+
+    return false;
+  }, [chessEngine, game]);
+
+  // Handle pending external moves with animation
+  useEffect(() => {
+    if (game.pendingExternalMove && !animatingPieces) {
+      const move = game.pendingExternalMove;
+      
+      // Set up animation for external move
+      const boardState = chessEngine.getBoardState();
+      const boardPiece = boardState[7 - move.fromRank]?.[move.fromFile];
+      
+      if (boardPiece) {
+        const validationResult = chessEngine.isValidMove(
+          { file: move.fromFile, rank: move.fromRank },
+          { file: move.toFile, rank: move.toRank }
+        );
+        
+        const piecesToAnimate = [{
+          piece: boardPiece,
+          from: { file: move.fromFile, rank: move.fromRank },
+          to: { file: move.toFile, rank: move.toRank },
+        }];
+
+        // Add castling rook if needed
+        if (validationResult.additionalMoves) {
+          for (const additionalMove of validationResult.additionalMoves) {
+            piecesToAnimate.push({
+              piece: additionalMove.piece,
+              from: additionalMove.from,
+              to: additionalMove.to,
+            });
+          }
+        }
+
+        setAnimatingPieces({
+          pieces: piecesToAnimate,
+          startTime: Date.now(),
+          moveData: { 
+            fromFile: move.fromFile, 
+            fromRank: move.fromRank, 
+            toFile: move.toFile, 
+            toRank: move.toRank,
+            isExternalMove: true
+          },
+        });
       }
     }
-    setAnimatingPieces(null);
-  }, [animatingPieces, chessEngine]);
+  }, [game.pendingExternalMove, animatingPieces, chessEngine]);
+
+  const handleAnimationComplete = useCallback(() => {
+    if (animatingPieces) {
+      const { isDragCastling, fromFile, fromRank, toFile, toRank, isExternalMove } = animatingPieces.moveData;
+
+      if (isDragCastling) {
+        // For drag castling, move is already executed, just clean up
+        setAnimatingPieces(null);
+        return;
+      }
+
+      // Execute the move now that animation is complete
+      const move = { fromFile, fromRank, toFile, toRank };
+      const result = game.makeMove(move);
+
+      if (result) {
+        // Play sound effects - just play move sound for animations
+        soundManager.playMoveSound();
+
+        const gameState = chessEngine.getGameState();
+        if (gameState.isCheck) {
+          setTimeout(() => soundManager.playCheckSound(), 200);
+        }
+
+        // If this was an external move, clear the pending external move
+        if (isExternalMove) {
+          game.clearPendingExternalMove();
+        }
+      }
+
+      setAnimatingPieces(null);
+    }
+  }, [animatingPieces, game, chessEngine]);
 
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
-
+    
     const from = { file: promotionDialog.fromFile, rank: promotionDialog.fromRank };
     const to = { file: promotionDialog.toFile, rank: promotionDialog.toRank };
     const result = chessEngine.makeMove(from, to, pieceType);
@@ -780,10 +772,17 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   const handleSquareClick = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Check if current player is automated (has a callback)
+    // Check if current player is human (no callback)
     const currentPlayer = chessEngine.getCurrentPlayer();
-    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isAutomated) return; // Don't accept user input for automated players
+    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isCurrentPlayerExternal) {
+      return; // Don't allow input for external players
+    }
+
+    // Only allow human input when it's human turn
+    if (!game.canHumanMove) {
+      return;
+    }
 
     // Clear arrows and highlights on any left click
     setArrows([]);
@@ -813,15 +812,22 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       const moves = chessEngine.getValidMoves({ file, rank });
       setValidMoves(moves);
     }
-  }, [chessEngine, selectedSquare, attemptMove, onWhiteMove, onBlackMove]);
+  }, [chessEngine, selectedSquare, attemptMove, game.canHumanMove, onWhiteMove, onBlackMove]);
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
 
-    // Check if current player is automated (has a callback)
+    // Check if current player is human (no callback)
     const currentPlayer = chessEngine.getCurrentPlayer();
-    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isAutomated) return; // Don't accept user input for automated players
+    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isCurrentPlayerExternal) {
+      return; // Don't allow input for external players
+    }
+
+    // Only allow human input when it's human turn
+    if (!game.canHumanMove) {
+      return;
+    }
 
     const from = { file: fromFile, rank: fromRank };
     const to = { file: toFile, rank: toRank };
@@ -866,15 +872,22 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
     // Regular move (non-castling)
     attemptMove(fromFile, fromRank, toFile, toRank);
-  }, [chessEngine, attemptMove, onWhiteMove, onBlackMove]);
+  }, [chessEngine, attemptMove, game.canHumanMove, onWhiteMove, onBlackMove]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Check if current player is automated (has a callback)
+    // Check if current player is human (no callback)
     const currentPlayer = chessEngine.getCurrentPlayer();
-    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isAutomated) return; // Don't accept user input for automated players
+    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isCurrentPlayerExternal) {
+      return; // Don't allow input for external players
+    }
+
+    // Only allow human input when it's human turn
+    if (!game.canHumanMove) {
+      return;
+    }
 
     // Clear arrows, highlights, and any existing selection indicators when starting to drag
     setArrows([]);
@@ -883,7 +896,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
     const moves = chessEngine.getValidMoves({ file, rank });
     setValidMoves(moves);
-  }, [chessEngine, onWhiteMove, onBlackMove]);
+  }, [chessEngine, game.canHumanMove, onWhiteMove, onBlackMove]);
 
   const handleDragEnd = useCallback((file: number, rank: number) => {
 
