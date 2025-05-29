@@ -18,19 +18,27 @@ function App() {
   const [enableHighlights, setEnableHighlights] = React.useState(true);
   const chessBoardRef = React.useRef<ChessBoardRef>(null);
 
-  const handleQuoteUnquoteAiMove = React.useCallback(async (gameState: GameState, opponentMove?: Move): Promise<Move> => {
-    // Add a small delay to simulate thinking time
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Pick a random legal move (includes all promotion options)
-    const validMoves = gameState.validMoves;
-    if (validMoves.length === 0) {
-      throw new Error('No legal moves available');
+  const handlePositionChange = React.useCallback((gameState: GameState, lastMove?: Move) => {
+    // Determine if current player is AI
+    const currentPlayerIsAi = gameState.currentPlayer === 0 ? whiteAi : blackAi;
+    console.log('Position changed:', gameState, 'Last move:', lastMove);
+    if (currentPlayerIsAi && !gameState.isGameOver && chessBoardRef.current) {
+      // Add a small delay to simulate thinking time
+      setTimeout(async () => {
+        try {
+          // Pick a random legal move (includes all promotion options)
+          const validMoves = gameState.validMoves;
+          if (validMoves.length > 0) {
+            const randomIndex = Math.floor(Math.random() * validMoves.length);
+            const move = validMoves[randomIndex];
+            chessBoardRef.current?.executeExternalMove(move);
+          }
+        } catch (error) {
+          console.error('AI move error:', error);
+        }
+      }, 50);
     }
-
-    const randomIndex = Math.floor(Math.random() * validMoves.length);
-    return validMoves[randomIndex];
-  }, []);
+  }, [whiteAi, blackAi]);
 
   const handleError = React.useCallback((error: ChessError) => {
     console.error('Chess engine error:', error);
@@ -251,8 +259,9 @@ function App() {
         <ChessBoard
           ref={chessBoardRef}
           flipped={flipped}
-          onBlackMove={blackAi ? handleQuoteUnquoteAiMove : undefined}
-          onWhiteMove={whiteAi ? handleQuoteUnquoteAiMove : undefined}
+          whiteIsHuman={!whiteAi}
+          blackIsHuman={!blackAi}
+          onPositionChange={handlePositionChange}
           onError={handleError}
           enablePreMoves={enablePreMoves}
           autoPromotionPiece={autoPromotionPiece}

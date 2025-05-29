@@ -83,6 +83,7 @@ export interface ChessBoardRef {
   resetGame: () => void;
   setPosition: (fen: string) => boolean;
   getGameState: () => GameState;
+  executeExternalMove: (move: Move) => boolean;
 }
 
 export class JSChessEngine {
@@ -561,8 +562,8 @@ export class JSChessEngine {
 
   public makeMove(from: Position, to: Position, promotionPiece?: PieceType): MoveResult {
     // First analyze the move to get rich information
+    console.log(`Making move from ${from.file},${from.rank} to ${to.file},${to.rank} with promotion: ${promotionPiece}`);
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
-
     if (!analysis.valid) {
       return {
         success: false,
@@ -633,7 +634,7 @@ export class JSChessEngine {
 
     // Switch players and update fullmove number
     this.currentPlayer = this.currentPlayer === Color.White ? Color.Black : Color.White;
-    
+
     // Increment fullmove number after black's move
     if (this.currentPlayer === Color.White) {
       this.fullmoveNumber++;
@@ -736,7 +737,7 @@ export class JSChessEngine {
             const from = { file, rank };
             const to = { file: move.file, rank: move.rank };
             const validation = this.isValidMove(from, to);
-            
+
             if (validation.promotionRequired) {
               // Generate all four promotion options
               const promotionPieces = [PieceType.Queen, PieceType.Rook, PieceType.Bishop, PieceType.Knight];
@@ -769,7 +770,7 @@ export class JSChessEngine {
     // Check game over conditions
     const isGameOver = validMoves.length === 0;
     let result: GameResult | undefined;
-    
+
     if (isGameOver) {
       if (this.isKingInCheck(this.currentPlayer)) {
         // Checkmate
@@ -852,7 +853,7 @@ export class JSChessEngine {
   private generateFEN(): string {
     // Simple FEN generation (position only, not full FEN with castling rights etc.)
     let fen = '';
-    
+
     for (let rank = 7; rank >= 0; rank--) {
       let emptySquares = 0;
       for (let file = 0; file < 8; file++) {
@@ -878,7 +879,7 @@ export class JSChessEngine {
 
     // Add current player
     fen += ` ${this.currentPlayer === Color.White ? 'w' : 'b'}`;
-    
+
     // Add castling rights
     let castling = '';
     if (this.castlingRights.whiteKingSide) castling += 'K';
@@ -886,7 +887,7 @@ export class JSChessEngine {
     if (this.castlingRights.blackKingSide) castling += 'k';
     if (this.castlingRights.blackQueenSide) castling += 'q';
     fen += ` ${castling || '-'}`;
-    
+
     // Add en passant target square
     if (this.enPassantTarget) {
       const fileChar = String.fromCharCode(97 + this.enPassantTarget.file); // 'a' + file
@@ -895,7 +896,7 @@ export class JSChessEngine {
     } else {
       fen += ' -';
     }
-    
+
     // Add halfmove clock and fullmove number
     fen += ` ${this.halfmoveClock} ${this.fullmoveNumber}`;
 
@@ -912,23 +913,23 @@ export class JSChessEngine {
     try {
       const parts = fen.split(' ');
       if (parts.length < 4) return false; // Need at least position, color, castling, en passant
-      
+
       const position = parts[0];
       const activeColor = parts[1];
       const castlingRights = parts[2];
       const enPassant = parts[3];
       const halfmove = parts[4] ? parseInt(parts[4]) : 0;
       const fullmove = parts[5] ? parseInt(parts[5]) : 1;
-      
+
       // Clear board
       this.board = this.createEmptyBoard();
-      
+
       // Parse board position
       const ranks = position.split('/');
       for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
         const rank = ranks[rankIndex];
         let fileIndex = 0;
-        
+
         for (const char of rank) {
           if (char >= '1' && char <= '8') {
             // Empty squares
@@ -943,10 +944,10 @@ export class JSChessEngine {
           }
         }
       }
-      
+
       // Set active color
       this.currentPlayer = activeColor === 'w' ? Color.White : Color.Black;
-      
+
       // Parse castling rights
       this.castlingRights = {
         whiteKingSide: castlingRights.includes('K'),
@@ -954,7 +955,7 @@ export class JSChessEngine {
         blackKingSide: castlingRights.includes('k'),
         blackQueenSide: castlingRights.includes('q'),
       };
-      
+
       // Parse en passant target
       if (enPassant !== '-') {
         const file = enPassant.charCodeAt(0) - 97; // 'a' = 97
@@ -963,15 +964,15 @@ export class JSChessEngine {
       } else {
         this.enPassantTarget = null;
       }
-      
+
       // Set move counters
       this.halfmoveClock = halfmove;
       this.fullmoveNumber = fullmove;
-      
+
       // Clear move history and last move when setting position
       this.lastMove = null;
       this.moveHistory = [];
-      
+
       return true;
     } catch {
       return false;
@@ -981,7 +982,7 @@ export class JSChessEngine {
   private fenCharToPiece(char: string): Piece | null {
     const lowerChar = char.toLowerCase();
     const color = char === lowerChar ? Color.Black : Color.White;
-    
+
     switch (lowerChar) {
       case 'p': return { type: PieceType.Pawn, color };
       case 'r': return { type: PieceType.Rook, color };

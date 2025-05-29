@@ -16,7 +16,7 @@ import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
 import { useChessGame } from '../hooks/useChessGame';
-import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef } from '../engine/jsChessEngine';
+import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef, GameState, Move } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
 import { calculateBasicPieceMovements } from '../utils/pieceMovements';
 import './ChessBoard.css';
@@ -615,10 +615,12 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
   );
 };
 
-interface ChessBoardProps extends ChessBoardCallbacks {
+interface ChessBoardProps {
   size?: number; // Board size in pixels (default: fills container)
   className?: string;
   flipped?: boolean; // Whether to flip the board for black perspective
+  whiteIsHuman?: boolean; // Whether white player is human (default: true)
+  blackIsHuman?: boolean; // Whether black player is human (default: true)
   enablePreMoves?: boolean; // Whether to enable pre-move functionality (default: true)
   autoPromotionPiece?: PieceType; // Auto-promotion piece (Queen, Rook, Bishop, Knight)
   showCoordinates?: boolean; // Whether to show rank and file labels (default: true)
@@ -627,12 +629,16 @@ interface ChessBoardProps extends ChessBoardCallbacks {
   enableSounds?: boolean; // Whether to enable sound effects (default: true)
   enableArrows?: boolean; // Whether to enable right-click arrows (default: true)
   enableHighlights?: boolean; // Whether to enable right-click square highlights (default: true)
+  onPositionChange?: (gameState: GameState, lastMove?: Move) => void; // Called when position changes
+  onError?: ChessBoardCallbacks['onError']; // Called on errors
 }
 
 export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   size,
   className,
   flipped,
+  whiteIsHuman = true,
+  blackIsHuman = true,
   enablePreMoves = true,
   autoPromotionPiece,
   showCoordinates = true,
@@ -641,10 +647,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   enableSounds = true,
   enableArrows = true,
   enableHighlights = true,
-  onWhiteMove,
-  onBlackMove,
-  onError,
-  onGameStateChange
+  onPositionChange,
+  onError
 }, ref) => {
   const chessEngine = useJSChessEngine();
   const [boardSize, setBoardSize] = useState(size || 512);
@@ -655,11 +659,12 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   // Initialize clean chess game hook
   const game = useChessGame({
     chessEngine,
-    onWhiteMove,
-    onBlackMove,
+    whiteIsHuman,
+    blackIsHuman,
+    onPositionChange,
     onError,
-    onGameStateChange,
   });
+
 
   // Handle responsive sizing when no size prop is provided
   useEffect(() => {
@@ -897,6 +902,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       return success;
     },
     getGameState: () => chessEngine.getGameState(),
+    executeExternalMove: (move: Move) => game.executeExternalMove(move),
   }), [game, chessEngine]);
 
 
@@ -986,29 +992,21 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         return true;
       }
     } else {
-      // Immediate move - execute right away
-      const result = chessEngine.makeMove(from, to);
-      if (result.success) {
+      // Immediate move - execute through game hook
+      const result = game.makeMove(move);
+      if (result) {
         setSelectedSquare(null);
         setValidMoves([]);
 
-        // Play sound effects
-        if (result.type === 'capture' || result.type === 'enPassant') {
-          if (enableSounds) soundManager.playCaptureSound();
-        } else if (result.type === 'promotion') {
-          if (enableSounds) soundManager.playPromotionSound();
-        } else {
-          if (enableSounds) soundManager.playMoveSound();
-        }
-
-        if (result.checkStatus === 'check') {
+        // Play sound effects - for immediate moves we need to check what type it was
+        if (enableSounds) soundManager.playMoveSound();
+        
+        const gameState = chessEngine.getGameState();
+        if (gameState.isCheck) {
           setTimeout(() => soundManager.playCheckSound(), 200);
         }
-
-        // Execute the move immediately for non-animated moves
-        game.makeMove(move);
       }
-      return result.success;
+      return result;
     }
 
     return false;
