@@ -1,3 +1,8 @@
+/* ==========================================================================
+   Demo Application Styles
+   ========================================================================== */
+
+/* Main App Layout */
 .App {
   text-align: center;
   height: 100vh;
@@ -18,7 +23,19 @@
   flex-shrink: 0;
 }
 
-/* Control Panel Styling */
+.board-container {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   Control Panel Styles
+   ========================================================================== */
+
 .controls-panel {
   background: white;
   border-radius: 12px;
@@ -47,6 +64,7 @@
   font-size: 14px;
 }
 
+/* Button Styles */
 .control-button {
   background: #4CAF50;
   color: white;
@@ -71,6 +89,74 @@
   background: #d32f2f;
 }
 
+.load-button {
+  background: #2196F3;
+}
+
+.load-button:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.load-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.preset-button {
+  background: #FF9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.preset-button:hover {
+  background: #F57C00;
+}
+
+/* Input Styles */
+.control-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Base select styles */
+.control-select,
+.control-select-small {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.control-select:focus,
+.control-select-small:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.control-select {
+  min-width: 160px;
+}
+
+.control-select-small {
+  min-width: 120px;
+}
+
+.control-select-small:disabled {
+  background: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+}
+
+/* FEN Input Section */
 .fen-group {
   flex-wrap: wrap;
   gap: 8px;
@@ -92,67 +178,8 @@
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
-.load-button {
-  background: #2196F3;
-}
-
-.load-button:hover:not(:disabled) {
-  background: #1976D2;
-}
-
-.load-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
 .preset-buttons {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.preset-button {
-  background: #FF9800;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.preset-button:hover {
-  background: #F57C00;
-}
-
-.control-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-.control-select {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-  min-width: 160px;
-}
-
-.control-select:focus {
-  outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-}
-
-.board-container {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }

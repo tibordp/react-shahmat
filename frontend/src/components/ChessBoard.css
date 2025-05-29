@@ -1,3 +1,8 @@
+/* ==========================================================================
+   Chess Board Component Styles
+   ========================================================================== */
+
+/* Board Container & Grid */
 .chess-board-container {
   display: flex;
   justify-content: center;
@@ -7,19 +12,16 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-
 .chess-board {
   display: grid;
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   position: relative;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
 }
 
+/* Square Styles */
 .square {
   display: flex;
   align-items: center;
@@ -30,6 +32,7 @@
   transition: all 0.2s ease;
 }
 
+/* Square Color Variants */
 .square.light {
   background-color: #f0d9b5;
 }
@@ -38,12 +41,14 @@
   background-color: #b58863;
 }
 
-
-.square.last-move.light, .square.selected.light {
+/* Square State Styles */
+.square.last-move.light, 
+.square.selected.light {
   background-color: #ffb765;
 }
 
-.square.last-move.dark, .square.selected.dark {
+.square.last-move.dark, 
+.square.selected.dark {
   background-color: #e59a43;
 }
 
@@ -63,7 +68,7 @@
   background-color: #b91c1c;
 }
 
-
+/* Move Indicators */
 .move-indicator {
   position: absolute;
   pointer-events: none;
@@ -92,42 +97,16 @@
   transform: translate(-50%, -50%);
 }
 
+/* Drop Target Indicator Styles */
 .square.drop-target .normal-indicator {
-  background-color:rgba(112, 112, 112, 0.6);
+  background-color: rgba(112, 112, 112, 0.6);
 }
 
 .square.drop-target .capture-indicator {
   border: 0.8cqmin solid rgba(112, 112, 112, 0.6);
 }
 
-@keyframes pulse {
-  0% { opacity: 0.8; }
-  100% { opacity: 1; }
-}
-
-@keyframes pulse-indicator {
-  0% { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(1.2); opacity: 1; }
-}
-
-.piece {
-  width: 95%;
-  height: 95%;
-  cursor: grab;
-  transition: all 0.2s ease;
-  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
-  position: relative;
-  z-index: 2;
-  object-fit: contain;
-  -webkit-user-drag: none;
-  -khtml-user-drag: none;
-  -moz-user-drag: none;
-  -o-user-drag: none;
-  user-drag: none;
-  pointer-events: auto;
-}
-
-/* Inset labels */
+/* Coordinate Labels */
 .file-label-inset {
   position: absolute;
   bottom: 0.5cqmin;
@@ -156,6 +135,21 @@
   color: #b58863;
 }
 
+/* Piece Styles */
+.piece {
+  width: 95%;
+  height: 95%;
+  cursor: grab;
+  transition: all 0.2s ease;
+  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
+  position: relative;
+  z-index: 2;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: auto;
+}
+
 .piece:hover {
   filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
 }
@@ -164,7 +158,7 @@
   cursor: grabbing;
 }
 
-/* Animating piece styles */
+/* Animation Styles */
 .animating-piece {
   position: absolute;
   pointer-events: none;
@@ -178,7 +172,7 @@
   object-fit: contain;
 }
 
-/* Custom drag layer for piece preview */
+/* Drag and Drop Styles */
 .custom-drag-layer {
   position: fixed;
   pointer-events: none;
@@ -205,7 +199,7 @@
   object-fit: contain;
 }
 
-/* Promotion dialog styles */
+/* Promotion Dialog Styles */
 .promotion-dialog {
   display: flex;
   flex-direction: column;
@@ -240,4 +234,3 @@
   height: 95%;
   object-fit: contain;
 }
-
