@@ -864,15 +864,11 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       to: Position;
     }>;
     startTime: number;
-    moveData: {
-      fromFile: number;
-      fromRank: number;
-      toFile: number;
-      toRank: number;
-      isDragCastling?: boolean;
-      isExternalMove?: boolean;
-    };
+    moveId: string; // Unique identifier for this animation
   } | null>(null);
+
+  // Store completed animations to allow for interruption
+  const animationCompleteRef = useRef<(() => void) | null>(null);
 
   // Shared function to handle pre-move logic
   const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
@@ -992,6 +988,18 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   }), [game, chessEngine]);
 
 
+  // Helper function to interrupt current animation if needed
+  const interruptAnimation = useCallback(() => {
+    if (animatingPieces) {
+      // Cancel any ongoing animation
+      if (animationCompleteRef.current) {
+        animationCompleteRef.current();
+        animationCompleteRef.current = null;
+      }
+      setAnimatingPieces(null);
+    }
+  }, [animatingPieces]);
+
   const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
     if (!chessEngine) return false;
 
@@ -1016,6 +1024,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         if (result?.success) {
           setSelectedSquare(null);
           setValidMoves([]);
+          // Play sound immediately
           playMoveSound(result);
           return true;
         }
@@ -1033,148 +1042,130 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       }
     }
 
-    // Handle animation for human moves
-    if (animate) {
+    // NEW ARCHITECTURE: Get piece information BEFORE making move for animation
+    const boardState = chessEngine.getBoardState();
+    const movingPiece = boardState[7 - fromRank]?.[fromFile];
+    const preMoveValidation = chessEngine.isValidMove(from, to);
 
-      // Start animation
-      const boardState = chessEngine.getBoardState();
-      const boardPiece = boardState[7 - fromRank]?.[fromFile];
-      if (boardPiece) {
-        const piecesToAnimate = [{
-          piece: boardPiece,
-          from: { file: fromFile, rank: fromRank },
-          to: { file: toFile, rank: toRank },
-        }];
-
-        // Add any additional moves (like castling rook) from validation result
-        if (validationResult.additionalMoves) {
-          for (const additionalMove of validationResult.additionalMoves) {
-            piecesToAnimate.push({
-              piece: additionalMove.piece,
-              from: additionalMove.from,
-              to: additionalMove.to,
-            });
-          }
-        }
-
-        setAnimatingPieces({
-          pieces: piecesToAnimate,
-          startTime: Date.now(),
-          moveData: { fromFile, fromRank, toFile, toRank },
-        });
-
-        // Clear selection immediately but don't make the move yet
-        setSelectedSquare(null);
-        setValidMoves([]);
-
-        return true;
-      }
-    } else {
-      // Immediate move - execute through game hook
-      const result = game.makeMove(move);
-      if (result?.success) {
-        setSelectedSquare(null);
-        setValidMoves([]);
-        playMoveSound(result);
-      }
-      return result?.success || false;
+    // Execute move immediately
+    const result = game.makeMove(move);
+    if (!result?.success) {
+      return false;
     }
 
-    return false;
-  }, [chessEngine, game, autoPromotionPiece, playMoveSound, handleInvalidMoveInCheck]);
+    // Clear selection and play sound immediately
+    setSelectedSquare(null);
+    setValidMoves([]);
+    playMoveSound(result);
 
-  // Handle pending external moves with animation
+    // Handle animation after move execution (purely visual)
+    if (animate && enableAnimations && movingPiece) {
+      // Interrupt any current animation
+      interruptAnimation();
+      
+      const piecesToAnimate = [{
+        piece: movingPiece,
+        from: { file: fromFile, rank: fromRank },
+        to: { file: toFile, rank: toRank },
+      }];
+
+      // Add any additional moves (like castling rook) from validation result
+      if (preMoveValidation.additionalMoves) {
+        for (const additionalMove of preMoveValidation.additionalMoves) {
+          piecesToAnimate.push({
+            piece: additionalMove.piece,
+            from: additionalMove.from,
+            to: additionalMove.to,
+          });
+        }
+      }
+
+      const moveId = `${Date.now()}-${Math.random()}`;
+      setAnimatingPieces({
+        pieces: piecesToAnimate,
+        startTime: Date.now(),
+        moveId,
+      });
+    }
+
+    return true;
+  }, [chessEngine, game, autoPromotionPiece, playMoveSound, handleInvalidMoveInCheck, enableAnimations, interruptAnimation]);
+
+  // Handle pending external moves with immediate execution
   useEffect(() => {
-    if (game.pendingExternalMove && !animatingPieces) {
+    if (game.pendingExternalMove) {
       const move = game.pendingExternalMove;
 
-      if (!enableAnimations) {
-        // Execute move immediately without animation
-        const result = game.makeMove(move);
-        if (result?.success) {
-          playMoveSound(result);
-          game.clearPendingExternalMove();
-        }
-        return;
-      }
-
-      // Set up animation for external move
+      // NEW ARCHITECTURE: Get piece information BEFORE making move
       const boardState = chessEngine.getBoardState();
       const boardPiece = boardState[7 - move.fromRank]?.[move.fromFile];
+      
+      // Get validation info for animation setup
+      const validationResult = chessEngine.isValidMove(
+        { file: move.fromFile, rank: move.fromRank },
+        { file: move.toFile, rank: move.toRank },
+        move.promotionPiece
+      );
 
-      if (boardPiece) {
-        const validationResult = chessEngine.isValidMove(
-          { file: move.fromFile, rank: move.fromRank },
-          { file: move.toFile, rank: move.toRank },
-          move.promotionPiece
-        );
+      // Execute move immediately
+      const result = game.makeMove(move);
+      if (result?.success) {
+        // Play sound immediately
+        playMoveSound(result);
+        
+        // Clear pending move
+        game.clearPendingExternalMove();
 
-        // For promotion moves, animate to the promoted piece
-        const animationPiece = move.promotionPiece
-          ? { type: move.promotionPiece, color: boardPiece.color }
-          : boardPiece;
+        // Handle animation after move execution (purely visual)
+        if (enableAnimations && boardPiece) {
+          // Interrupt any current animation
+          interruptAnimation();
 
-        const piecesToAnimate = [{
-          piece: animationPiece,
-          from: { file: move.fromFile, rank: move.fromRank },
-          to: { file: move.toFile, rank: move.toRank },
-        }];
+          // For promotion moves, animate to the promoted piece
+          const animationPiece = move.promotionPiece
+            ? { type: move.promotionPiece, color: boardPiece.color }
+            : boardPiece;
 
-        // Add castling rook if needed
-        if (validationResult.additionalMoves) {
-          for (const additionalMove of validationResult.additionalMoves) {
-            piecesToAnimate.push({
-              piece: additionalMove.piece,
-              from: additionalMove.from,
-              to: additionalMove.to,
-            });
+          const piecesToAnimate = [{
+            piece: animationPiece,
+            from: { file: move.fromFile, rank: move.fromRank },
+            to: { file: move.toFile, rank: move.toRank },
+          }];
+
+          // Add castling rook if needed
+          if (validationResult.additionalMoves) {
+            for (const additionalMove of validationResult.additionalMoves) {
+              piecesToAnimate.push({
+                piece: additionalMove.piece,
+                from: additionalMove.from,
+                to: additionalMove.to,
+              });
+            }
           }
-        }
 
-        setAnimatingPieces({
-          pieces: piecesToAnimate,
-          startTime: Date.now(),
-          moveData: {
-            fromFile: move.fromFile,
-            fromRank: move.fromRank,
-            toFile: move.toFile,
-            toRank: move.toRank,
-            isExternalMove: true
-          },
-        });
+          const moveId = `${Date.now()}-${Math.random()}`;
+          setAnimatingPieces({
+            pieces: piecesToAnimate,
+            startTime: Date.now(),
+            moveId,
+          });
+        }
       }
     }
-  }, [game.pendingExternalMove, animatingPieces, chessEngine, enableAnimations, game, playMoveSound]);
+  }, [game.pendingExternalMove, chessEngine, enableAnimations, game, playMoveSound, interruptAnimation]);
 
   const handleAnimationComplete = useCallback(() => {
+    // Animation is now purely visual - just clean up
+    setAnimatingPieces(null);
+    animationCompleteRef.current = null;
+  }, []);
+
+  // Set up the animation completion reference when animation starts
+  useEffect(() => {
     if (animatingPieces) {
-      const { isDragCastling, fromFile, fromRank, toFile, toRank, isExternalMove } = animatingPieces.moveData;
-
-      if (isDragCastling) {
-        // For drag castling, move is already executed, just clean up
-        setAnimatingPieces(null);
-        return;
-      }
-
-      // Execute the move now that animation is complete
-      const move = isExternalMove && game.pendingExternalMove
-        ? game.pendingExternalMove
-        : { fromFile, fromRank, toFile, toRank };
-      const result = game.makeMove(move);
-
-      if (result?.success) {
-        // Play sound effects based on move result
-        playMoveSound(result);
-
-        // If this was an external move, clear the pending external move
-        if (isExternalMove) {
-          game.clearPendingExternalMove();
-        }
-      }
-
-      setAnimatingPieces(null);
+      animationCompleteRef.current = handleAnimationComplete;
     }
-  }, [animatingPieces, game, playMoveSound]);
+  }, [animatingPieces, handleAnimationComplete]);
 
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
@@ -1211,6 +1202,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       if (result?.success) {
         setSelectedSquare(null);
         setValidMoves([]);
+        // Play sound immediately
         playMoveSound(result);
       }
     }
@@ -1315,25 +1307,29 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       const move = { fromFile, fromRank, toFile, toRank };
       const result = game.makeMove(move);
 
-      if (result?.success && validationResult.additionalMoves && enableAnimations) {
-        // Animate the rook visually (move is already executed)
-        const rookMove = validationResult.additionalMoves[0];
-        setAnimatingPieces({
-          pieces: [{
-            piece: rookMove.piece,
-            from: rookMove.from,
-            to: rookMove.to,
-          }],
-          startTime: Date.now(),
-          moveData: { fromFile, fromRank, toFile, toRank, isDragCastling: true },
-        });
-
-        // Clear selection
+      if (result?.success) {
+        // Clear selection and play sound immediately
         setSelectedSquare(null);
         setValidMoves([]);
-
-        // Play sound effects immediately
         playMoveSound(result);
+
+        // Animate the rook visually if animations enabled (move is already executed)
+        if (validationResult.additionalMoves && enableAnimations) {
+          // Interrupt any current animation
+          interruptAnimation();
+          
+          const rookMove = validationResult.additionalMoves[0];
+          const moveId = `${Date.now()}-${Math.random()}`;
+          setAnimatingPieces({
+            pieces: [{
+              piece: rookMove.piece,
+              from: rookMove.from,
+              to: rookMove.to,
+            }],
+            startTime: Date.now(),
+            moveId,
+          });
+        }
       }
       return;
     }
@@ -1348,7 +1344,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       setSelectedSquare(null);
       setValidMoves([]);
     }
-  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, playMoveSound, animatingPieces, enableAnimations, handleInvalidMoveInCheck]);
+  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, playMoveSound, animatingPieces, enableAnimations, handleInvalidMoveInCheck, interruptAnimation]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
@@ -1404,9 +1400,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   }, [animatingPieces]);
 
   const isAnimatingTo = useCallback((file: number, rank: number) => {
-    // For drag castling, hide the piece at destination during animation
-    return (animatingPieces?.moveData.isDragCastling &&
-           animatingPieces?.pieces.some(p => p.to.file === file && p.to.rank === rank)) || false;
+    // Hide pieces at animation destination squares
+    return animatingPieces?.pieces.some(p => p.to.file === file && p.to.rank === rank) || false;
   }, [animatingPieces]);
 
   const isLastMoveFrom = useCallback((file: number, rank: number) => {
