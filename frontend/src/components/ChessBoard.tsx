@@ -16,8 +16,7 @@ import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
 import { useChessGame } from '../hooks/useChessGame';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef, Move, ChessError } from '../engine/jsChessEngine';
+import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
 import './ChessBoard.css';
 
@@ -674,11 +673,17 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       if (boardPiece) {
         const validationResult = chessEngine.isValidMove(
           { file: move.fromFile, rank: move.fromRank },
-          { file: move.toFile, rank: move.toRank }
+          { file: move.toFile, rank: move.toRank },
+          move.promotionPiece
         );
         
+        // For promotion moves, animate to the promoted piece
+        const animationPiece = move.promotionPiece 
+          ? { type: move.promotionPiece, color: boardPiece.color }
+          : boardPiece;
+          
         const piecesToAnimate = [{
-          piece: boardPiece,
+          piece: animationPiece,
           from: { file: move.fromFile, rank: move.fromRank },
           to: { file: move.toFile, rank: move.toRank },
         }];
@@ -720,7 +725,9 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       }
 
       // Execute the move now that animation is complete
-      const move = { fromFile, fromRank, toFile, toRank };
+      const move = isExternalMove && game.pendingExternalMove 
+        ? game.pendingExternalMove 
+        : { fromFile, fromRank, toFile, toRank };
       const result = game.makeMove(move);
 
       if (result) {
@@ -772,13 +779,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   const handleSquareClick = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Check if current player is human (no callback)
-    const currentPlayer = chessEngine.getCurrentPlayer();
-    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isCurrentPlayerExternal) {
-      return; // Don't allow input for external players
-    }
-
     // Only allow human input when it's human turn
     if (!game.canHumanMove) {
       return;
@@ -791,7 +791,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     const boardState = chessEngine.getBoardState();
     const piece = boardState[7 - rank]?.[file];
 
-    console.log(`Square clicked: file=${file}, rank=${rank}, piece=${piece ? piece.type : 'none'}`);
 
     if (selectedSquare) {
       // Try to make a move
@@ -812,17 +811,10 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       const moves = chessEngine.getValidMoves({ file, rank });
       setValidMoves(moves);
     }
-  }, [chessEngine, selectedSquare, attemptMove, game.canHumanMove, onWhiteMove, onBlackMove]);
+  }, [chessEngine, selectedSquare, attemptMove, game.canHumanMove]);
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
-
-    // Check if current player is human (no callback)
-    const currentPlayer = chessEngine.getCurrentPlayer();
-    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isCurrentPlayerExternal) {
-      return; // Don't allow input for external players
-    }
 
     // Only allow human input when it's human turn
     if (!game.canHumanMove) {
@@ -872,17 +864,10 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
     // Regular move (non-castling)
     attemptMove(fromFile, fromRank, toFile, toRank);
-  }, [chessEngine, attemptMove, game.canHumanMove, onWhiteMove, onBlackMove]);
+  }, [chessEngine, attemptMove, game.canHumanMove]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
-
-    // Check if current player is human (no callback)
-    const currentPlayer = chessEngine.getCurrentPlayer();
-    const isCurrentPlayerExternal = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
-    if (isCurrentPlayerExternal) {
-      return; // Don't allow input for external players
-    }
 
     // Only allow human input when it's human turn
     if (!game.canHumanMove) {
@@ -896,7 +881,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
     const moves = chessEngine.getValidMoves({ file, rank });
     setValidMoves(moves);
-  }, [chessEngine, game.canHumanMove, onWhiteMove, onBlackMove]);
+  }, [chessEngine, game.canHumanMove]);
 
   const handleDragEnd = useCallback((file: number, rank: number) => {
 

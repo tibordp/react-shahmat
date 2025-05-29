@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { JSChessEngine, Piece, Position, PieceType, Color, Move, MoveResult, ValidMoveResult, GameState } from '../engine/jsChessEngine';
 
-interface ChessEngineAPI {
+export interface ChessEngineAPI {
   getBoardState: () => (Piece | null)[][];
   getCurrentPlayer: () => Color;
   getValidMoves: (from: Position) => Position[];

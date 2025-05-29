@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Color, Move, ChessError, ChessBoardCallbacks } from '../engine/jsChessEngine';
+import { ChessEngineAPI } from './useJSChessEngine';
 
 interface UseChessGameProps {
-  chessEngine: any;
+  chessEngine: ChessEngineAPI;
   onWhiteMove?: ChessBoardCallbacks['onWhiteMove'];
   onBlackMove?: ChessBoardCallbacks['onBlackMove'];
   onError?: ChessBoardCallbacks['onError'];
@@ -66,7 +67,7 @@ export function useChessGame({
         // Validate move
         const from = { file: move.fromFile, rank: move.fromRank };
         const to = { file: move.toFile, rank: move.toRank };
-        const validationResult = chessEngine.isValidMove(from, to);
+        const validationResult = chessEngine.isValidMove(from, to, move.promotionPiece);
         
         if (validationResult.valid) {
           // Set the pending external move for ChessBoard to animate
@@ -102,7 +103,7 @@ export function useChessGame({
 
     const from = { file: move.fromFile, rank: move.fromRank };
     const to = { file: move.toFile, rank: move.toRank };
-    const result = chessEngine.makeMove(from, to);
+    const result = chessEngine.makeMove(from, to, move.promotionPiece);
     
     return result.success;
   }, [chessEngine]);

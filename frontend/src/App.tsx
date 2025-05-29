@@ -1,7 +1,7 @@
 import React from 'react';
 import './App.css';
 import { ChessBoard } from './components/ChessBoard';
-import { GameState, Move } from './engine/jsChessEngine';
+import { GameState, Move, ChessError } from './engine/jsChessEngine';
 
 function App() {
   const [flipped, setFlipped] = React.useState(false);
@@ -10,7 +10,7 @@ function App() {
     // Add a small delay to simulate thinking time
     await new Promise(resolve => setTimeout(resolve, 1));
 
-    // Pick a random legal move
+    // Pick a random legal move (includes all promotion options)
     const validMoves = gameState.validMoves;
     if (validMoves.length === 0) {
       throw new Error('No legal moves available');
@@ -20,7 +20,7 @@ function App() {
     return validMoves[randomIndex];
   }, []);
 
-  const handleError = React.useCallback((error: any) => {
+  const handleError = React.useCallback((error: ChessError) => {
     console.error('Chess engine error:', error);
   }, []);
 

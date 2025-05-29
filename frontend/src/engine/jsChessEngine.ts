@@ -27,6 +27,7 @@ export interface Move {
   fromRank: number;
   toFile: number;
   toRank: number;
+  promotionPiece?: PieceType; // For pawn promotion moves
 }
 
 export interface MoveResult {
@@ -732,12 +733,31 @@ export class JSChessEngine {
         if (piece && piece.color === this.currentPlayer) {
           const pieceMoves = this.getValidMoves({ file, rank });
           for (const move of pieceMoves) {
-            validMoves.push({
-              fromFile: file,
-              fromRank: rank,
-              toFile: move.file,
-              toRank: move.rank
-            });
+            const from = { file, rank };
+            const to = { file: move.file, rank: move.rank };
+            const validation = this.isValidMove(from, to);
+            
+            if (validation.promotionRequired) {
+              // Generate all four promotion options
+              const promotionPieces = [PieceType.Queen, PieceType.Rook, PieceType.Bishop, PieceType.Knight];
+              for (const promotionPiece of promotionPieces) {
+                validMoves.push({
+                  fromFile: file,
+                  fromRank: rank,
+                  toFile: move.file,
+                  toRank: move.rank,
+                  promotionPiece
+                });
+              }
+            } else {
+              // Regular move
+              validMoves.push({
+                fromFile: file,
+                fromRank: rank,
+                toFile: move.file,
+                toRank: move.rank
+              });
+            }
           }
         }
       }
