@@ -1,121 +1,46 @@
-# Shahist - Online Chess Game
+# Getting Started with Create React App
 
-A modern chess game implementation with a React frontend and a Rust chess engine compiled to WebAssembly.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Features
+## Available Scripts
 
-- **React Frontend**: Built with TypeScript and Create React App
-- **Rust Chess Engine**: High-performance chess logic compiled to WebAssembly
-- **Drag & Drop Interface**: Intuitive piece movement with React DnD
-- **Real-time Validation**: Move validation handled by the Rust engine
-- **Responsive Design**: Works on desktop and mobile devices
-- **Modern UI**: Clean, polished design with smooth animations
+In the project directory, you can run:
 
-## Project Structure
+### `npm start`
 
-```
-shahist/
-├── frontend/           # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChessBoard.tsx
-│   │   │   └── ChessBoard.css
-│   │   ├── chess-engine/  # Generated WASM bindings
-│   │   └── ...
-│   └── ...
-├── chess-engine/       # Rust chess engine
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── chess.rs    # Core chess logic
-│   │   └── utils.rs
-│   ├── Cargo.toml
-│   └── pkg/           # Generated WASM package
-└── README.md
-```
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-## Development
+The page will reload if you make edits.\
+You will also see any lint errors in the console.
 
-### Prerequisites
+### `npm test`
 
-- Node.js (v14 or later)
-- Rust (latest stable)
-- wasm-pack
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### Setup
+### `npm run build`
 
-1. **Build the chess engine:**
-   ```bash
-   cd chess-engine
-   wasm-pack build --target web
-   ```
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-2. **Start the frontend:**
-   ```bash
-   cd frontend
-   npm install
-   npm start
-   ```
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-3. **Access the game:**
-   Open http://localhost:3000 in your browser
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-### Building for Production
+### `npm run eject`
 
-```bash
-# Build the chess engine
-cd chess-engine
-wasm-pack build --target web
+**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
 
-# Build the frontend
-cd ../frontend
-npm run build
-```
+If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-## Architecture
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
 
-### Chess Engine (Rust)
+You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
 
-The chess engine is implemented in Rust and provides:
+## Learn More
 
-- Complete chess rule implementation
-- Move validation and generation
-- Board state management
-- WebAssembly bindings for JavaScript interop
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-Key components:
-- `ChessBoard`: Main game state and logic
-- `Piece`: Piece types and colors
-- `Position`: Board coordinates (file/rank)
-- `Move`: Move representation with optional promotion
-
-### Frontend (React)
-
-The frontend provides:
-
-- Interactive chess board component
-- Drag & drop piece movement
-- Visual feedback for valid moves
-- Game controls (new game, current player display)
-- Responsive design for mobile devices
-
-## Game Features
-
-- **Standard Chess Rules**: Full implementation of chess rules
-- **Move Validation**: All moves are validated by the engine
-- **Visual Feedback**: Highlighted squares show valid moves
-- **Drag & Drop**: Intuitive piece movement
-- **Click to Move**: Alternative movement method
-- **New Game**: Reset board to starting position
-- **Turn Indicator**: Shows current player
-
-## Browser Compatibility
-
-The game works in all modern browsers that support WebAssembly:
-- Chrome 57+
-- Firefox 52+
-- Safari 11+
-- Edge 16+
-
-## License
-
-This project is open source and available under the MIT License.
+To learn React, check out the [React documentation](https://reactjs.org/).
