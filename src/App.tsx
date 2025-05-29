@@ -5,6 +5,7 @@ import { GameState, Move, ChessError, PieceType, ChessBoardRef } from './engine/
 
 function App() {
   const [flipped, setFlipped] = React.useState(false);
+  const [controlsOpen, setControlsOpen] = React.useState(false);
   const [enablePreMoves, setEnablePreMoves] = React.useState(true);
   const [blackAi, setBlackAi] = React.useState(true);
   const [whiteAi, setWhiteAi] = React.useState(false);
@@ -69,7 +70,14 @@ function App() {
 
   return (
     <div className="App">
-      <div className="controls-panel">
+      <button 
+        className="mobile-menu-toggle"
+        onClick={() => setControlsOpen(!controlsOpen)}
+        aria-label="Toggle controls"
+      >
+        ☰
+      </button>
+      <div className={`controls-panel ${controlsOpen ? 'controls-open' : ''}`}>
         <div className="control-group">
           <label htmlFor="flipBoard">Board Orientation:</label>
           <button
@@ -263,6 +271,7 @@ function App() {
           <label htmlFor="enableHighlights">Enable Highlights</label>
         </div>
       </div>
+      {controlsOpen && <div className="controls-overlay" onClick={() => setControlsOpen(false)} />}
 
       <div className="board-container">
         <ChessBoard
