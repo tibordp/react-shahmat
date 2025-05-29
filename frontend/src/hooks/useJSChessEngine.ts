@@ -1,16 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import { JSChessEngine, Piece, Position, PieceType, Color, Move } from '../engine/jsChessEngine';
+import { JSChessEngine, Piece, Position, PieceType, Color, Move, MoveResult, ValidMoveResult } from '../engine/jsChessEngine';
 
 interface ChessEngineAPI {
   getBoardState: () => (Piece | null)[][];
   getCurrentPlayer: () => Color;
-  getValidMoves: (file: number, rank: number) => Position[];
-  getPiece: (file: number, rank: number) => Piece | null;
-  makeMove: (fromFile: number, fromRank: number, toFile: number, toRank: number, promotionPiece?: PieceType) => boolean;
-  isPawnPromotion: (fromFile: number, fromRank: number, toFile: number, toRank: number) => boolean;
+  getValidMoves: (from: Position) => Position[];
+  getPiece: (position: Position) => Piece | null;
+  makeMove: (from: Position, to: Position, promotionPiece?: PieceType) => MoveResult;
+  isValidMove: (from: Position, to: Position, promotionPiece?: PieceType) => ValidMoveResult;
   isKingInCheck: (color: Color) => boolean;
-  isCastlingMove: (fromFile: number, fromRank: number, toFile: number, toRank: number) => boolean;
-  getCastlingRookMove: (fromFile: number, fromRank: number, toFile: number, toRank: number) => { fromFile: number; fromRank: number; toFile: number; toRank: number } | null;
   getLastMove: () => Move | null;
   resetGame: () => void;
 }
@@ -37,36 +35,28 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     return engine.getCurrentPlayer();
   }, [engine]);
 
-  const getValidMoves = useCallback((file: number, rank: number): Position[] => {
-    return engine.getValidMoves(file, rank);
+  const getValidMoves = useCallback((from: Position): Position[] => {
+    return engine.getValidMoves(from);
   }, [engine]);
 
-  const getPiece = useCallback((file: number, rank: number): Piece | null => {
-    return engine.getPiece(file, rank);
+  const getPiece = useCallback((position: Position): Piece | null => {
+    return engine.getPiece(position);
   }, [engine]);
 
-  const makeMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, promotionPiece?: PieceType): boolean => {
-    const success = engine.makeMove(fromFile, fromRank, toFile, toRank, promotionPiece);
-    if (success) {
+  const makeMove = useCallback((from: Position, to: Position, promotionPiece?: PieceType): MoveResult => {
+    const result = engine.makeMove(from, to, promotionPiece);
+    if (result.success) {
       triggerUpdate();
     }
-    return success;
+    return result;
   }, [engine, triggerUpdate]);
 
-  const isPawnPromotion = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    return engine.isPawnPromotion(fromFile, fromRank, toFile, toRank);
+  const isValidMove = useCallback((from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult => {
+    return engine.isValidMove(from, to, promotionPiece);
   }, [engine]);
 
   const isKingInCheck = useCallback((color: Color): boolean => {
     return engine.isKingInCheck(color);
-  }, [engine]);
-
-  const isCastlingMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    return engine.isCastlingMove(fromFile, fromRank, toFile, toRank);
-  }, [engine]);
-
-  const getCastlingRookMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
-    return engine.getCastlingRookMove(fromFile, fromRank, toFile, toRank);
   }, [engine]);
 
   const getLastMove = useCallback((): Move | null => {
@@ -89,10 +79,8 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getValidMoves,
     getPiece,
     makeMove,
-    isPawnPromotion,
+    isValidMove,
     isKingInCheck,
-    isCastlingMove,
-    getCastlingRookMove,
     getLastMove,
     resetGame
   };

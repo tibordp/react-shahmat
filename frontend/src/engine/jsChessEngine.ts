@@ -29,6 +29,24 @@ export interface Move {
   toRank: number;
 }
 
+export interface MoveResult {
+  success: boolean;
+  type?: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
+  capturedPiece?: Piece;
+  additionalMoves?: Array<{from: Position, to: Position, piece: Piece}>; // For castling rook move
+  promotionRequired?: boolean; // When success=false due to missing promotion piece
+  checkStatus?: 'none' | 'check' | 'checkmate' | 'stalemate';
+}
+
+export interface ValidMoveResult {
+  valid: boolean;
+  type?: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
+  capturedPiece?: Piece;
+  additionalMoves?: Array<{from: Position, to: Position, piece: Piece}>; // For castling rook move
+  promotionRequired?: boolean; // If move requires promotion piece
+  resultingCheckStatus?: 'none' | 'check' | 'checkmate' | 'stalemate'; // Game state after this move
+}
+
 export class JSChessEngine {
   private board: (Piece | null)[][];
   private currentPlayer: Color;
@@ -98,16 +116,17 @@ export class JSChessEngine {
     return this.currentPlayer;
   }
 
-  public getPiece(file: number, rank: number): Piece | null {
+  public getPiece(position: Position): Piece | null {
+    const { file, rank } = position;
     if (file < 0 || file > 7 || rank < 0 || rank > 7) return null;
     return this.board[rank][file];
   }
 
-  public getValidMoves(file: number, rank: number): Position[] {
-    const piece = this.getPiece(file, rank);
+  public getValidMoves(from: Position): Position[] {
+    const piece = this.getPiece(from);
     if (!piece || piece.color !== this.currentPlayer) return [];
 
-    return this.getValidMovesForPiece(file, rank, piece, true);
+    return this.getValidMovesForPiece(from.file, from.rank, piece, true);
   }
 
   private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
@@ -116,13 +135,13 @@ export class JSChessEngine {
 
     // Forward move
     const newRank = from.rank + direction;
-    if (this.isInBounds(from.file, newRank) && !this.getPiece(from.file, newRank)) {
+    if (this.isInBounds(from.file, newRank) && !this.getPiece({ file: from.file, rank: newRank })) {
       moves.push({ file: from.file, rank: newRank });
 
       // Double forward from starting position
       if (from.rank === startRank) {
         const doubleRank = newRank + direction;
-        if (this.isInBounds(from.file, doubleRank) && !this.getPiece(from.file, doubleRank)) {
+        if (this.isInBounds(from.file, doubleRank) && !this.getPiece({ file: from.file, rank: doubleRank })) {
           moves.push({ file: from.file, rank: doubleRank });
         }
       }
@@ -132,7 +151,7 @@ export class JSChessEngine {
     for (const fileOffset of [-1, 1]) {
       const newFile = from.file + fileOffset;
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece(newFile, newRank);
+        const target = this.getPiece({ file: newFile, rank: newRank });
         if (target && target.color !== color) {
           moves.push({ file: newFile, rank: newRank });
         }
@@ -176,7 +195,7 @@ export class JSChessEngine {
       const newRank = from.rank + rankOffset;
 
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece(newFile, newRank);
+        const target = this.getPiece({ file: newFile, rank: newRank });
         if (!target || target.color !== color) {
           moves.push({ file: newFile, rank: newRank });
         }
@@ -195,7 +214,7 @@ export class JSChessEngine {
       const newRank = from.rank + rankOffset;
 
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece(newFile, newRank);
+        const target = this.getPiece({ file: newFile, rank: newRank });
         if (!target || target.color !== color) {
           moves.push({ file: newFile, rank: newRank });
         }
@@ -211,7 +230,7 @@ export class JSChessEngine {
     let rank = from.rank + rankDir;
 
     while (this.isInBounds(file, rank)) {
-      const target = this.getPiece(file, rank);
+      const target = this.getPiece({ file, rank });
 
       if (!target) {
         moves.push({ file, rank });
@@ -260,7 +279,7 @@ export class JSChessEngine {
     const direction = kingSide ? 1 : -1;
 
     // Check if rook is in position
-    const rook = this.getPiece(rookFile, rank);
+    const rook = this.getPiece({ file: rookFile, rank });
     if (!rook || rook.type !== PieceType.Rook || rook.color !== color) {
       return false;
     }
@@ -269,7 +288,7 @@ export class JSChessEngine {
     const start = Math.min(kingFile, rookFile) + 1;
     const end = Math.max(kingFile, rookFile);
     for (let file = start; file < end; file++) {
-      if (this.getPiece(file, rank)) {
+      if (this.getPiece({ file, rank })) {
         return false;
       }
     }
@@ -349,7 +368,7 @@ export class JSChessEngine {
           const newRank = from.rank + rankOffset;
 
           if (this.isInBounds(newFile, newRank)) {
-            const target = this.getPiece(newFile, newRank);
+            const target = this.getPiece({ file: newFile, rank: newRank });
             if (!target || target.color !== piece.color) {
               moves.push({ file: newFile, rank: newRank });
             }
@@ -366,95 +385,167 @@ export class JSChessEngine {
     return moves;
   }
 
-  public makeMove(fromFile: number, fromRank: number, toFile: number, toRank: number, promotionPiece?: PieceType): boolean {
-    const piece = this.getPiece(fromFile, fromRank);
-    if (!piece || piece.color !== this.currentPlayer) return false;
+  private analyzeMoveType(from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult {
+    const piece = this.getPiece(from);
+    if (!piece || piece.color !== this.currentPlayer) {
+      return { valid: false };
+    }
 
-    const validMoves = this.getValidMoves(fromFile, fromRank);
-    const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
+    const validMoves = this.getValidMoves(from);
+    const isValidMove = validMoves.some(move => move.file === to.file && move.rank === to.rank);
 
-    if (!isValidMove) return false;
+    if (!isValidMove) {
+      return { valid: false };
+    }
 
-    // Clear en passant target from previous turn
-    const previousEnPassantTarget = this.enPassantTarget;
-    this.enPassantTarget = null;
+    const targetPiece = this.getPiece(to);
+    let type: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion' = 'normal';
+    let capturedPiece: Piece | undefined;
+    let additionalMoves: Array<{from: Position, to: Position, piece: Piece}> = [];
+    let promotionRequired = false;
 
-    // Handle castling
-    if (piece.type === PieceType.King && Math.abs(toFile - fromFile) === 2) {
-      // This is a castling move
-      const kingSide = toFile > fromFile;
+    // Determine move type
+    if (piece.type === PieceType.King && Math.abs(to.file - from.file) === 2) {
+      // Castling
+      type = 'castling';
+      const kingSide = to.file > from.file;
       const rookFromFile = kingSide ? 7 : 0;
       const rookToFile = kingSide ? 5 : 3;
-      const rank = fromRank;
-
-      // Move the king
-      this.board[toRank][toFile] = piece;
-      this.board[fromRank][fromFile] = null;
-
-      // Move the rook
-      const rook = this.board[rank][rookFromFile];
-      this.board[rank][rookToFile] = rook;
-      this.board[rank][rookFromFile] = null;
-
-      // Update castling rights
-      this.updateCastlingRights(fromFile, fromRank, piece);
-    }
-    // Handle pawn moves
-    else if (piece.type === PieceType.Pawn) {
+      const rook = this.getPiece({ file: rookFromFile, rank: from.rank });
+      if (rook) {
+        additionalMoves.push({
+          from: { file: rookFromFile, rank: from.rank },
+          to: { file: rookToFile, rank: from.rank },
+          piece: rook
+        });
+      }
+    } else if (piece.type === PieceType.Pawn) {
       const promotionRank = piece.color === Color.White ? 7 : 0;
       const direction = piece.color === Color.White ? 1 : -1;
 
-      // Check for en passant capture
-      if (previousEnPassantTarget &&
-          toFile === previousEnPassantTarget.file &&
-          toRank === previousEnPassantTarget.rank) {
-        // En passant capture - remove the captured pawn
-        const capturedPawnRank = toRank - direction;
-        this.board[capturedPawnRank][toFile] = null;
+      // Check for en passant
+      if (this.enPassantTarget && 
+          to.file === this.enPassantTarget.file && 
+          to.rank === this.enPassantTarget.rank) {
+        type = 'enPassant';
+        const capturedPawnRank = to.rank - direction;
+        capturedPiece = this.getPiece({ file: to.file, rank: capturedPawnRank }) || undefined;
       }
-
-      // Check for double pawn move (sets en passant target)
-      if (Math.abs(toRank - fromRank) === 2) {
-        this.enPassantTarget = { file: toFile, rank: fromRank + direction };
-      }
-
-      // Check if this is a promotion
-      if (toRank === promotionRank) {
+      // Check for promotion
+      else if (to.rank === promotionRank) {
         if (!promotionPiece) {
-          // Return false to indicate promotion is needed
-          return false;
+          promotionRequired = true;
+          return { valid: false, promotionRequired: true };
         }
-        // Promote the pawn
-        this.board[toRank][toFile] = { type: promotionPiece, color: piece.color };
-      } else {
-        // Regular pawn move
-        this.board[toRank][toFile] = piece;
+        type = 'promotion';
+        capturedPiece = targetPiece || undefined;
       }
-      this.board[fromRank][fromFile] = null;
+      // Regular pawn move or capture
+      else if (targetPiece) {
+        type = 'capture';
+        capturedPiece = targetPiece;
+      }
+    } else if (targetPiece) {
+      // Regular capture
+      type = 'capture';
+      capturedPiece = targetPiece;
+    }
+
+    return {
+      valid: true,
+      type,
+      capturedPiece,
+      additionalMoves,
+      promotionRequired
+    };
+  }
+
+  public isValidMove(from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult {
+    return this.analyzeMoveType(from, to, promotionPiece);
+  }
+
+  public makeMove(from: Position, to: Position, promotionPiece?: PieceType): MoveResult {
+    // First analyze the move to get rich information
+    const analysis = this.analyzeMoveType(from, to, promotionPiece);
+    
+    if (!analysis.valid) {
+      return {
+        success: false,
+        promotionRequired: analysis.promotionRequired
+      };
+    }
+
+    const piece = this.getPiece(from)!; // We know it exists from analysis
+    const { type, capturedPiece, additionalMoves } = analysis;
+
+    // Clear en passant target from previous turn
+    this.enPassantTarget = null;
+
+    // Execute the move based on type
+    if (type === 'castling') {
+      // Handle castling
+      this.board[to.rank][to.file] = piece;
+      this.board[from.rank][from.file] = null;
+
+      // Move the rook (from additionalMoves)
+      const rookMove = additionalMoves![0];
+      this.board[rookMove.to.rank][rookMove.to.file] = rookMove.piece;
+      this.board[rookMove.from.rank][rookMove.from.file] = null;
+
+      this.updateCastlingRights(from.file, from.rank, piece);
+    } else if (type === 'enPassant') {
+      // Handle en passant capture
+      const direction = piece.color === Color.White ? 1 : -1;
+      const capturedPawnRank = to.rank - direction;
+      
+      // Remove the captured pawn
+      this.board[capturedPawnRank][to.file] = null;
+      
+      // Move the pawn
+      this.board[to.rank][to.file] = piece;
+      this.board[from.rank][from.file] = null;
+    } else if (type === 'promotion') {
+      // Handle pawn promotion
+      this.board[to.rank][to.file] = { type: promotionPiece!, color: piece.color };
+      this.board[from.rank][from.file] = null;
     } else {
-      // Regular piece move
-      this.board[toRank][toFile] = piece;
-      this.board[fromRank][fromFile] = null;
+      // Handle normal moves and captures
+      // Check for double pawn move (sets en passant target)
+      if (piece.type === PieceType.Pawn && Math.abs(to.rank - from.rank) === 2) {
+        const direction = piece.color === Color.White ? 1 : -1;
+        this.enPassantTarget = { file: to.file, rank: from.rank + direction };
+      }
+
+      // Regular move or capture
+      this.board[to.rank][to.file] = piece;
+      this.board[from.rank][from.file] = null;
 
       // Update castling rights for king and rook moves
-      this.updateCastlingRights(fromFile, fromRank, piece);
+      this.updateCastlingRights(from.file, from.rank, piece);
     }
 
     // Record the move
-    this.lastMove = { fromFile, fromRank, toFile, toRank };
+    this.lastMove = { fromFile: from.file, fromRank: from.rank, toFile: to.file, toRank: to.rank };
 
     // Switch players
     this.currentPlayer = this.currentPlayer === Color.White ? Color.Black : Color.White;
 
-    return true;
-  }
+    // Determine check status after move
+    const opponentColor = this.currentPlayer;
+    let checkStatus: 'none' | 'check' | 'checkmate' | 'stalemate' = 'none';
+    
+    if (this.isKingInCheck(opponentColor)) {
+      // TODO: Implement checkmate/stalemate detection
+      checkStatus = 'check';
+    }
 
-  public isPawnPromotion(fromFile: number, fromRank: number, toFile: number, toRank: number): boolean {
-    const piece = this.getPiece(fromFile, fromRank);
-    if (!piece || piece.type !== PieceType.Pawn) return false;
-
-    const promotionRank = piece.color === Color.White ? 7 : 0;
-    return toRank === promotionRank;
+    return {
+      success: true,
+      type,
+      capturedPiece,
+      additionalMoves,
+      checkStatus
+    };
   }
 
   public isKingInCheck(color: Color): boolean {
@@ -479,7 +570,7 @@ export class JSChessEngine {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
         if (piece && piece.color === enemyColor) {
-          const moves = this.getValidMoves(file, rank);
+          const moves = this.getValidMoves({ file, rank });
           if (moves.some(move => move.file === kingPosition!.file && move.rank === kingPosition!.rank)) {
             return true;
           }
@@ -518,28 +609,6 @@ export class JSChessEngine {
         }
       }
     }
-  }
-
-  public isCastlingMove(fromFile: number, fromRank: number, toFile: number, toRank: number): boolean {
-    const piece = this.getPiece(fromFile, fromRank);
-    return piece?.type === PieceType.King && Math.abs(toFile - fromFile) === 2;
-  }
-
-  public getCastlingRookMove(fromFile: number, fromRank: number, toFile: number, toRank: number): { fromFile: number; fromRank: number; toFile: number; toRank: number } | null {
-    if (!this.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
-      return null;
-    }
-
-    const kingSide = toFile > fromFile;
-    const rookFromFile = kingSide ? 7 : 0;
-    const rookToFile = kingSide ? 5 : 3;
-
-    return {
-      fromFile: rookFromFile,
-      fromRank: fromRank,
-      toFile: rookToFile,
-      toRank: fromRank,
-    };
   }
 
   public getLastMove(): Move | null {

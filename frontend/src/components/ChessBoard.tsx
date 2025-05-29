@@ -528,28 +528,27 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
     if (!chessEngine) return false;
 
-    // First check if the move is valid by checking valid moves
-    const piece = chessEngine.getPiece(fromFile, fromRank);
-    if (!piece || piece.color !== chessEngine.getCurrentPlayer()) return false;
+    const from = { file: fromFile, rank: fromRank };
+    const to = { file: toFile, rank: toRank };
 
-    const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
-    const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
-
-    if (!isValidMove) return false;
-
-    // Check if this is a pawn promotion
-    if (chessEngine.isPawnPromotion(fromFile, fromRank, toFile, toRank)) {
-      const boardState = chessEngine.getBoardState();
-      const boardPiece = boardState[7 - fromRank]?.[fromFile];
-      setPromotionDialog({
-        isOpen: true,
-        fromFile,
-        fromRank,
-        toFile,
-        toRank,
-        color: boardPiece?.color || Color.White,
-      });
-      return true; // Don't clear selection yet
+    // Check if the move is valid and what type it would be
+    const validationResult = chessEngine.isValidMove(from, to);
+    
+    if (!validationResult.valid) {
+      // Check if promotion is required
+      if (validationResult.promotionRequired) {
+        const piece = chessEngine.getPiece(from);
+        setPromotionDialog({
+          isOpen: true,
+          fromFile,
+          fromRank,
+          toFile,
+          toRank,
+          color: piece?.color || Color.White,
+        });
+        return true; // Don't clear selection yet
+      }
+      return false;
     }
 
     // If animation requested, start animation and defer the move until completion
@@ -563,18 +562,14 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
           to: { file: toFile, rank: toRank },
         }];
 
-        // Check if this is a castling move and add rook animation
-        if (chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
-          const rookMove = chessEngine.getCastlingRookMove(fromFile, fromRank, toFile, toRank);
-          if (rookMove) {
-            const rookPiece = boardState[7 - rookMove.fromRank]?.[rookMove.fromFile];
-            if (rookPiece) {
-              piecesToAnimate.push({
-                piece: rookPiece,
-                from: { file: rookMove.fromFile, rank: rookMove.fromRank },
-                to: { file: rookMove.toFile, rank: rookMove.toRank },
-              });
-            }
+        // Add any additional moves (like castling rook) from validation result
+        if (validationResult.additionalMoves) {
+          for (const additionalMove of validationResult.additionalMoves) {
+            piecesToAnimate.push({
+              piece: additionalMove.piece,
+              from: additionalMove.from,
+              to: additionalMove.to,
+            });
           }
         }
 
@@ -592,30 +587,27 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       }
     }
 
-    // Check if this is a capture before making the move
-    const targetSquare = chessEngine.getPiece(toFile, toRank);
-    const isCapture = !!targetSquare;
-
     // Regular move (immediate)
-    const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
-    if (success) {
+    const result = chessEngine.makeMove(from, to);
+    if (result.success) {
       setSelectedSquare(null);
       setValidMoves([]);
 
-      // Play appropriate sound effect
-      if (isCapture) {
+      // Play appropriate sound effect based on move type
+      if (result.type === 'capture' || result.type === 'enPassant') {
         soundManager.playCaptureSound();
+      } else if (result.type === 'promotion') {
+        soundManager.playPromotionSound();
       } else {
         soundManager.playMoveSound();
       }
 
       // Check if the move puts the opponent in check
-      const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
-      if (chessEngine.isKingInCheck(opponentColor)) {
+      if (result.checkStatus === 'check') {
         setTimeout(() => soundManager.playCheckSound(), 200);
       }
     }
-    return success;
+    return result.success;
   }, [chessEngine]);
 
   const handleAnimationComplete = useCallback(() => {
@@ -629,25 +621,24 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       }
 
       // For click-based moves, execute the move now that animation is complete
-      const targetSquare = chessEngine.getPiece(toFile, toRank);
-      const isCapture = !!targetSquare;
-      const isCastling = chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank);
+      const from = { file: fromFile, rank: fromRank };
+      const to = { file: toFile, rank: toRank };
+      const result = chessEngine.makeMove(from, to);
 
-      const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
-
-      if (success) {
-        // Play appropriate sound effect
-        if (isCastling) {
+      if (result.success) {
+        // Play appropriate sound effect based on move type
+        if (result.type === 'castling') {
           soundManager.playMoveSound();
-        } else if (isCapture) {
+        } else if (result.type === 'capture' || result.type === 'enPassant') {
           soundManager.playCaptureSound();
+        } else if (result.type === 'promotion') {
+          soundManager.playPromotionSound();
         } else {
           soundManager.playMoveSound();
         }
 
         // Check if the move puts the opponent in check
-        const opponentColor = chessEngine.getCurrentPlayer();
-        if (chessEngine.isKingInCheck(opponentColor)) {
+        if (result.checkStatus === 'check') {
           setTimeout(() => soundManager.playCheckSound(), 200);
         }
       }
@@ -658,15 +649,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
 
-    const success = chessEngine.makeMove(
-      promotionDialog.fromFile,
-      promotionDialog.fromRank,
-      promotionDialog.toFile,
-      promotionDialog.toRank,
-      pieceType
-    );
+    const from = { file: promotionDialog.fromFile, rank: promotionDialog.fromRank };
+    const to = { file: promotionDialog.toFile, rank: promotionDialog.toRank };
+    const result = chessEngine.makeMove(from, to, pieceType);
 
-    if (success) {
+    if (result.success) {
       setSelectedSquare(null);
       setValidMoves([]);
 
@@ -674,8 +661,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       soundManager.playPromotionSound();
 
       // Check if the move puts the opponent in check
-      const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
-      if (chessEngine.isKingInCheck(opponentColor)) {
+      if (result.checkStatus === 'check') {
         setTimeout(() => soundManager.playCheckSound(), 400);
       }
     }
@@ -705,7 +691,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       } else if (piece && piece.color === chessEngine.getCurrentPlayer()) {
         // Clicking on a different piece of the same player - switch selection
         setSelectedSquare({ file, rank });
-        const moves = chessEngine.getValidMoves(file, rank);
+        const moves = chessEngine.getValidMoves({ file, rank });
         setValidMoves(moves);
       } else if (!attemptMove(selectedSquare.file, selectedSquare.rank, file, rank, true)) {
         // Attempt to move the selected piece to the clicked square
@@ -715,7 +701,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     } else if (piece && piece.color === chessEngine.getCurrentPlayer()) {
       // Select a piece and show valid moves
       setSelectedSquare({ file, rank });
-      const moves = chessEngine.getValidMoves(file, rank);
+      const moves = chessEngine.getValidMoves({ file, rank });
       setValidMoves(moves);
     }
   }, [chessEngine, selectedSquare, attemptMove]);
@@ -723,55 +709,45 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
 
+    const from = { file: fromFile, rank: fromRank };
+    const to = { file: toFile, rank: toRank };
+
+    // Check if this is a valid move and what type
+    const validationResult = chessEngine.isValidMove(from, to);
+    
+    if (!validationResult.valid) return;
+
     // For castling moves during drag, handle specially
-    if (chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
-      // Check if this is a valid move first
-      const piece = chessEngine.getPiece(fromFile, fromRank);
-      if (!piece || piece.color !== chessEngine.getCurrentPlayer()) return;
+    if (validationResult.type === 'castling') {
+      // Execute the full castling move immediately (king is already visually positioned)
+      const result = chessEngine.makeMove(from, to);
 
-      const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
-      const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
+      if (result.success && result.additionalMoves) {
+        // Animate the rook visually (move is already executed)
+        const rookMove = result.additionalMoves[0];
+        setAnimatingPieces({
+          pieces: [{
+            piece: rookMove.piece,
+            from: rookMove.from,
+            to: rookMove.to,
+          }],
+          startTime: Date.now(),
+          moveData: { fromFile, fromRank, toFile, toRank, isDragCastling: true },
+        });
 
-      if (!isValidMove) return;
+        // Clear selection
+        setSelectedSquare(null);
+        setValidMoves([]);
 
-      // Get the rook move for animation
-      const rookMove = chessEngine.getCastlingRookMove(fromFile, fromRank, toFile, toRank);
-      if (rookMove) {
-        const boardState = chessEngine.getBoardState();
-        const rookPiece = boardState[7 - rookMove.fromRank]?.[rookMove.fromFile];
+        // Play sound effects immediately
+        soundManager.playMoveSound();
 
-        if (rookPiece) {
-          // Execute the full castling move immediately (king is already visually positioned)
-          const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
-
-          if (success) {
-            // Animate the rook visually (move is already executed)
-            setAnimatingPieces({
-              pieces: [{
-                piece: rookPiece,
-                from: { file: rookMove.fromFile, rank: rookMove.fromRank },
-                to: { file: rookMove.toFile, rank: rookMove.toRank },
-              }],
-              startTime: Date.now(),
-              moveData: { fromFile, fromRank, toFile, toRank, isDragCastling: true },
-            });
-
-            // Clear selection
-            setSelectedSquare(null);
-            setValidMoves([]);
-
-            // Play sound effects immediately
-            soundManager.playMoveSound();
-
-            // Check if the move puts the opponent in check
-            const opponentColor = chessEngine.getCurrentPlayer();
-            if (chessEngine.isKingInCheck(opponentColor)) {
-              setTimeout(() => soundManager.playCheckSound(), 200);
-            }
-          }
-          return;
+        // Check if the move puts the opponent in check
+        if (result.checkStatus === 'check') {
+          setTimeout(() => soundManager.playCheckSound(), 200);
         }
       }
+      return;
     }
 
     // Regular move (non-castling)
@@ -786,7 +762,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     setHighlightedSquares([]);
     setSelectedSquare({ file, rank });
 
-    const moves = chessEngine.getValidMoves(file, rank);
+    const moves = chessEngine.getValidMoves({ file, rank });
     setValidMoves(moves);
   }, [chessEngine]);
 
