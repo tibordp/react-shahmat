@@ -42,6 +42,10 @@
   background-color: #eebc6b;
 }
 
+.square.last-move {
+  background-color: #eebc6b;
+}
+
 .move-indicator {
   position: absolute;
   pointer-events: none;

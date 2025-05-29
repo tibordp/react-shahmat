@@ -22,15 +22,36 @@ export interface Position {
   rank: number; // 0-7
 }
 
+export interface Move {
+  fromFile: number;
+  fromRank: number;
+  toFile: number;
+  toRank: number;
+}
+
 export class JSChessEngine {
   private board: (Piece | null)[][];
   private currentPlayer: Color;
   private enPassantTarget: Position | null; // Square where en passant capture can happen
+  private lastMove: Move | null; // Track the last move made
+  private castlingRights: {
+    whiteKingSide: boolean;
+    whiteQueenSide: boolean;
+    blackKingSide: boolean;
+    blackQueenSide: boolean;
+  };
 
   constructor() {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
     this.enPassantTarget = null;
+    this.lastMove = null;
+    this.castlingRights = {
+      whiteKingSide: true,
+      whiteQueenSide: true,
+      blackKingSide: true,
+      blackQueenSide: true,
+    };
     this.setupInitialPosition();
   }
 
@@ -47,11 +68,11 @@ export class JSChessEngine {
 
     // Place pieces for white
     this.board[0][0] = { type: PieceType.Rook, color: Color.White };
-    this.board[0][1] = { type: PieceType.Knight, color: Color.White };
-    this.board[0][2] = { type: PieceType.Bishop, color: Color.White };
-    this.board[0][3] = { type: PieceType.Queen, color: Color.White };
+   // this.board[0][1] = { type: PieceType.Knight, color: Color.White };
+   // this.board[0][2] = { type: PieceType.Bishop, color: Color.White };
+   // this.board[0][3] = { type: PieceType.Queen, color: Color.White };
     this.board[0][4] = { type: PieceType.King, color: Color.White };
-    this.board[0][5] = { type: PieceType.Bishop, color: Color.White };
+    //this.board[0][5] = { type: PieceType.Bishop, color: Color.White };
     this.board[0][6] = { type: PieceType.Knight, color: Color.White };
     this.board[0][7] = { type: PieceType.Rook, color: Color.White };
 
@@ -68,7 +89,7 @@ export class JSChessEngine {
 
   public getBoardState(): (Piece | null)[][] {
     // Return a deep copy to prevent external modification
-    return this.board.map(row => row.map(piece => 
+    return this.board.map(row => row.map(piece =>
       piece ? { ...piece } : null
     ));
   }
@@ -86,31 +107,7 @@ export class JSChessEngine {
     const piece = this.getPiece(file, rank);
     if (!piece || piece.color !== this.currentPlayer) return [];
 
-    const moves: Position[] = [];
-    const from = { file, rank };
-
-    switch (piece.type) {
-      case PieceType.Pawn:
-        this.addPawnMoves(from, piece.color, moves);
-        break;
-      case PieceType.Rook:
-        this.addRookMoves(from, piece.color, moves);
-        break;
-      case PieceType.Knight:
-        this.addKnightMoves(from, piece.color, moves);
-        break;
-      case PieceType.Bishop:
-        this.addBishopMoves(from, piece.color, moves);
-        break;
-      case PieceType.Queen:
-        this.addQueenMoves(from, piece.color, moves);
-        break;
-      case PieceType.King:
-        this.addKingMoves(from, piece.color, moves);
-        break;
-    }
-
-    return moves;
+    return this.getValidMovesForPiece(file, rank, piece, true);
   }
 
   private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
@@ -140,8 +137,8 @@ export class JSChessEngine {
           moves.push({ file: newFile, rank: newRank });
         }
         // En passant capture
-        else if (this.enPassantTarget && 
-                 this.enPassantTarget.file === newFile && 
+        else if (this.enPassantTarget &&
+                 this.enPassantTarget.file === newFile &&
                  this.enPassantTarget.rank === newRank) {
           moves.push({ file: newFile, rank: newRank });
         }
@@ -204,6 +201,9 @@ export class JSChessEngine {
         }
       }
     }
+
+    // Add castling moves
+    this.addCastlingMoves(from, color, moves);
   }
 
   private addSlidingMoves(from: Position, color: Color, fileDir: number, rankDir: number, moves: Position[]): void {
@@ -212,7 +212,7 @@ export class JSChessEngine {
 
     while (this.isInBounds(file, rank)) {
       const target = this.getPiece(file, rank);
-      
+
       if (!target) {
         moves.push({ file, rank });
       } else {
@@ -231,38 +231,193 @@ export class JSChessEngine {
     return file >= 0 && file <= 7 && rank >= 0 && rank <= 7;
   }
 
+  private addCastlingMoves(from: Position, color: Color, moves: Position[]): void {
+    // Can only castle if king is on its starting square and not in check
+    const startRank = color === Color.White ? 0 : 7;
+    if (from.file !== 4 || from.rank !== startRank || this.isKingInCheck(color)) {
+      return;
+    }
+
+    // Check king-side castling
+    if (color === Color.White ? this.castlingRights.whiteKingSide : this.castlingRights.blackKingSide) {
+      if (this.canCastle(color, true)) {
+        moves.push({ file: 6, rank: startRank });
+      }
+    }
+
+    // Check queen-side castling
+    if (color === Color.White ? this.castlingRights.whiteQueenSide : this.castlingRights.blackQueenSide) {
+      if (this.canCastle(color, false)) {
+        moves.push({ file: 2, rank: startRank });
+      }
+    }
+  }
+
+  private canCastle(color: Color, kingSide: boolean): boolean {
+    const rank = color === Color.White ? 0 : 7;
+    const kingFile = 4;
+    const rookFile = kingSide ? 7 : 0;
+    const direction = kingSide ? 1 : -1;
+
+    // Check if rook is in position
+    const rook = this.getPiece(rookFile, rank);
+    if (!rook || rook.type !== PieceType.Rook || rook.color !== color) {
+      return false;
+    }
+
+    // Check if squares between king and rook are empty
+    const start = Math.min(kingFile, rookFile) + 1;
+    const end = Math.max(kingFile, rookFile);
+    for (let file = start; file < end; file++) {
+      if (this.getPiece(file, rank)) {
+        return false;
+      }
+    }
+
+    // Check if king passes through or ends up in check
+    for (let i = 0; i <= 2; i++) {
+      const testFile = kingFile + (i * direction);
+      if (testFile < 0 || testFile > 7) continue;
+
+      // Temporarily move king to test square
+      const originalPiece = this.board[rank][testFile];
+      this.board[rank][testFile] = this.board[rank][kingFile];
+      if (testFile !== kingFile) {
+        this.board[rank][kingFile] = null;
+      }
+
+      const inCheck = this.isKingInCheckAt(color, testFile, rank);
+
+      // Restore board
+      this.board[rank][kingFile] = this.board[rank][testFile];
+      this.board[rank][testFile] = originalPiece;
+
+      if (inCheck) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private isKingInCheckAt(color: Color, file: number, rank: number): boolean {
+    // Check if any enemy piece can attack the given position
+    const enemyColor = color === Color.White ? Color.Black : Color.White;
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const piece = this.board[r][f];
+        if (piece && piece.color === enemyColor) {
+          const moves = this.getValidMovesForPiece(f, r, piece, false); // Don't include castling to avoid recursion
+          if (moves.some(move => move.file === file && move.rank === rank)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private getValidMovesForPiece(file: number, rank: number, piece: Piece, includeCastling: boolean = true): Position[] {
+    const moves: Position[] = [];
+    const from = { file, rank };
+
+    switch (piece.type) {
+      case PieceType.Pawn:
+        this.addPawnMoves(from, piece.color, moves);
+        break;
+      case PieceType.Rook:
+        this.addRookMoves(from, piece.color, moves);
+        break;
+      case PieceType.Knight:
+        this.addKnightMoves(from, piece.color, moves);
+        break;
+      case PieceType.Bishop:
+        this.addBishopMoves(from, piece.color, moves);
+        break;
+      case PieceType.Queen:
+        this.addQueenMoves(from, piece.color, moves);
+        break;
+      case PieceType.King:
+        // Add basic king moves
+        const kingMoves = [
+          [1, 0], [-1, 0], [0, 1], [0, -1],
+          [1, 1], [1, -1], [-1, 1], [-1, -1]
+        ];
+
+        for (const [fileOffset, rankOffset] of kingMoves) {
+          const newFile = from.file + fileOffset;
+          const newRank = from.rank + rankOffset;
+
+          if (this.isInBounds(newFile, newRank)) {
+            const target = this.getPiece(newFile, newRank);
+            if (!target || target.color !== piece.color) {
+              moves.push({ file: newFile, rank: newRank });
+            }
+          }
+        }
+
+        // Add castling moves only if requested
+        if (includeCastling) {
+          this.addCastlingMoves(from, piece.color, moves);
+        }
+        break;
+    }
+
+    return moves;
+  }
+
   public makeMove(fromFile: number, fromRank: number, toFile: number, toRank: number, promotionPiece?: PieceType): boolean {
     const piece = this.getPiece(fromFile, fromRank);
     if (!piece || piece.color !== this.currentPlayer) return false;
 
     const validMoves = this.getValidMoves(fromFile, fromRank);
     const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
-    
+
     if (!isValidMove) return false;
 
     // Clear en passant target from previous turn
     const previousEnPassantTarget = this.enPassantTarget;
     this.enPassantTarget = null;
 
+    // Handle castling
+    if (piece.type === PieceType.King && Math.abs(toFile - fromFile) === 2) {
+      // This is a castling move
+      const kingSide = toFile > fromFile;
+      const rookFromFile = kingSide ? 7 : 0;
+      const rookToFile = kingSide ? 5 : 3;
+      const rank = fromRank;
+
+      // Move the king
+      this.board[toRank][toFile] = piece;
+      this.board[fromRank][fromFile] = null;
+
+      // Move the rook
+      const rook = this.board[rank][rookFromFile];
+      this.board[rank][rookToFile] = rook;
+      this.board[rank][rookFromFile] = null;
+
+      // Update castling rights
+      this.updateCastlingRights(fromFile, fromRank, piece);
+    }
     // Handle pawn moves
-    if (piece.type === PieceType.Pawn) {
+    else if (piece.type === PieceType.Pawn) {
       const promotionRank = piece.color === Color.White ? 7 : 0;
       const direction = piece.color === Color.White ? 1 : -1;
-      
+
       // Check for en passant capture
-      if (previousEnPassantTarget && 
-          toFile === previousEnPassantTarget.file && 
+      if (previousEnPassantTarget &&
+          toFile === previousEnPassantTarget.file &&
           toRank === previousEnPassantTarget.rank) {
         // En passant capture - remove the captured pawn
         const capturedPawnRank = toRank - direction;
         this.board[capturedPawnRank][toFile] = null;
       }
-      
+
       // Check for double pawn move (sets en passant target)
       if (Math.abs(toRank - fromRank) === 2) {
         this.enPassantTarget = { file: toFile, rank: fromRank + direction };
       }
-      
+
       // Check if this is a promotion
       if (toRank === promotionRank) {
         if (!promotionPiece) {
@@ -280,7 +435,13 @@ export class JSChessEngine {
       // Regular piece move
       this.board[toRank][toFile] = piece;
       this.board[fromRank][fromFile] = null;
+
+      // Update castling rights for king and rook moves
+      this.updateCastlingRights(fromFile, fromRank, piece);
     }
+
+    // Record the move
+    this.lastMove = { fromFile, fromRank, toFile, toRank };
 
     // Switch players
     this.currentPlayer = this.currentPlayer === Color.White ? Color.Black : Color.White;
@@ -291,7 +452,7 @@ export class JSChessEngine {
   public isPawnPromotion(fromFile: number, fromRank: number, toFile: number, toRank: number): boolean {
     const piece = this.getPiece(fromFile, fromRank);
     if (!piece || piece.type !== PieceType.Pawn) return false;
-    
+
     const promotionRank = piece.color === Color.White ? 7 : 0;
     return toRank === promotionRank;
   }
@@ -329,10 +490,74 @@ export class JSChessEngine {
     return false;
   }
 
+  private updateCastlingRights(fromFile: number, fromRank: number, piece: Piece): void {
+    // If king moves, lose all castling rights for that color
+    if (piece.type === PieceType.King) {
+      if (piece.color === Color.White) {
+        this.castlingRights.whiteKingSide = false;
+        this.castlingRights.whiteQueenSide = false;
+      } else {
+        this.castlingRights.blackKingSide = false;
+        this.castlingRights.blackQueenSide = false;
+      }
+    }
+
+    // If rook moves from starting position, lose castling rights for that side
+    if (piece.type === PieceType.Rook) {
+      if (piece.color === Color.White && fromRank === 0) {
+        if (fromFile === 0) {
+          this.castlingRights.whiteQueenSide = false;
+        } else if (fromFile === 7) {
+          this.castlingRights.whiteKingSide = false;
+        }
+      } else if (piece.color === Color.Black && fromRank === 7) {
+        if (fromFile === 0) {
+          this.castlingRights.blackQueenSide = false;
+        } else if (fromFile === 7) {
+          this.castlingRights.blackKingSide = false;
+        }
+      }
+    }
+  }
+
+  public isCastlingMove(fromFile: number, fromRank: number, toFile: number, toRank: number): boolean {
+    const piece = this.getPiece(fromFile, fromRank);
+    return piece?.type === PieceType.King && Math.abs(toFile - fromFile) === 2;
+  }
+
+  public getCastlingRookMove(fromFile: number, fromRank: number, toFile: number, toRank: number): { fromFile: number; fromRank: number; toFile: number; toRank: number } | null {
+    if (!this.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
+      return null;
+    }
+
+    const kingSide = toFile > fromFile;
+    const rookFromFile = kingSide ? 7 : 0;
+    const rookToFile = kingSide ? 5 : 3;
+
+    return {
+      fromFile: rookFromFile,
+      fromRank: fromRank,
+      toFile: rookToFile,
+      toRank: fromRank,
+    };
+  }
+
+  public getLastMove(): Move | null {
+    return this.lastMove;
+  }
+
+
   public resetGame(): void {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
     this.enPassantTarget = null;
+    this.lastMove = null;
+    this.castlingRights = {
+      whiteKingSide: true,
+      whiteQueenSide: true,
+      blackKingSide: true,
+      blackQueenSide: true,
+    };
     this.setupInitialPosition();
   }
 }

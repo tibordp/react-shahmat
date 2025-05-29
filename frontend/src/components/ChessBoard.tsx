@@ -56,6 +56,9 @@ interface SquareProps {
   isValidMove: boolean;
   isCapture: boolean;
   isAnimatingFrom: boolean;
+  isAnimatingTo: boolean;
+  isLastMoveFrom: boolean;
+  isLastMoveTo: boolean;
   flipped?: boolean; // Whether to flip the board for black perspective
   onSquareClick: (file: number, rank: number) => void;
   onDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
@@ -227,7 +230,7 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, onSele
   );
 };
 
-const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, onSquareClick, onDrop, onDragStart, onDragEnd, flipped }) => {
+const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, onSquareClick, onDrop, onDragStart, onDragEnd, flipped }) => {
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: 'piece',
     item: () => {
@@ -273,6 +276,10 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
     squareClass += ' drop-target';
   }
 
+  if (isLastMoveFrom || isLastMoveTo) {
+    squareClass += ' last-move';
+  }
+
   const pieceIcon = piece ? getPieceIcon(piece) : null;
 
   // Show file label on rank 0 (bottom row)
@@ -298,7 +305,7 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
           src={pieceIcon}
           alt="chess piece"
           className="piece"
-          style={{ display: isDragging || isAnimatingFrom ? 'none' : 'block' }}
+          style={{ display: isDragging || isAnimatingFrom || isAnimatingTo ? 'none' : 'block' }}
         />
       )}
       {(isValidMove) && (
@@ -350,16 +357,19 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   }, [size]);
   const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[]>([]);
-  const [animatingPiece, setAnimatingPiece] = useState<{
-    piece: Piece;
-    from: Position;
-    to: Position;
+  const [animatingPieces, setAnimatingPieces] = useState<{
+    pieces: Array<{
+      piece: Piece;
+      from: Position;
+      to: Position;
+    }>;
     startTime: number;
     moveData: {
       fromFile: number;
       fromRank: number;
       toFile: number;
       toRank: number;
+      isDragCastling?: boolean;
     };
   } | null>(null);
   const [promotionDialog, setPromotionDialog] = useState<{
@@ -410,10 +420,29 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       const boardState = chessEngine.getBoardState();
       const boardPiece = boardState[7 - fromRank]?.[fromFile];
       if (boardPiece) {
-        setAnimatingPiece({
+        const piecesToAnimate = [{
           piece: boardPiece,
           from: { file: fromFile, rank: fromRank },
           to: { file: toFile, rank: toRank },
+        }];
+
+        // Check if this is a castling move and add rook animation
+        if (chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
+          const rookMove = chessEngine.getCastlingRookMove(fromFile, fromRank, toFile, toRank);
+          if (rookMove) {
+            const rookPiece = boardState[7 - rookMove.fromRank]?.[rookMove.fromFile];
+            if (rookPiece) {
+              piecesToAnimate.push({
+                piece: rookPiece,
+                from: { file: rookMove.fromFile, rank: rookMove.fromRank },
+                to: { file: rookMove.toFile, rank: rookMove.toRank },
+              });
+            }
+          }
+        }
+
+        setAnimatingPieces({
+          pieces: piecesToAnimate,
           startTime: Date.now(),
           moveData: { fromFile, fromRank, toFile, toRank },
         });
@@ -453,32 +482,41 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   }, [chessEngine]);
 
   const handleAnimationComplete = useCallback(() => {
-    if (animatingPiece && chessEngine) {
-      // Check if this is a capture before making the move
-      const { fromFile, fromRank, toFile, toRank } = animatingPiece.moveData;
+    if (animatingPieces && chessEngine) {
+      const { fromFile, fromRank, toFile, toRank, isDragCastling } = animatingPieces.moveData;
+      
+      if (isDragCastling) {
+        // For drag castling, move is already executed, just clean up
+        setAnimatingPieces(null);
+        return;
+      }
+      
+      // For click-based moves, execute the move now that animation is complete
       const targetSquare = chessEngine.getPiece(toFile, toRank);
       const isCapture = !!targetSquare;
-
-      // Execute the move now that animation is complete
+      const isCastling = chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank);
+      
       const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
 
       if (success) {
         // Play appropriate sound effect
-        if (isCapture) {
+        if (isCastling) {
+          soundManager.playMoveSound();
+        } else if (isCapture) {
           soundManager.playCaptureSound();
         } else {
           soundManager.playMoveSound();
         }
 
         // Check if the move puts the opponent in check
-        const opponentColor = chessEngine.getCurrentPlayer(); // Current player switched after move
+        const opponentColor = chessEngine.getCurrentPlayer();
         if (chessEngine.isKingInCheck(opponentColor)) {
           setTimeout(() => soundManager.playCheckSound(), 200);
         }
       }
     }
-    setAnimatingPiece(null);
-  }, [animatingPiece, chessEngine]);
+    setAnimatingPieces(null);
+  }, [animatingPieces, chessEngine]);
 
   const handlePromotion = useCallback((pieceType: PieceType) => {
     if (!chessEngine) return;
@@ -543,6 +581,59 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
+    
+    // For castling moves during drag, handle specially
+    if (chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
+      // Check if this is a valid move first
+      const piece = chessEngine.getPiece(fromFile, fromRank);
+      if (!piece || piece.color !== chessEngine.getCurrentPlayer()) return;
+
+      const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
+      const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
+      
+      if (!isValidMove) return;
+
+      // Get the rook move for animation
+      const rookMove = chessEngine.getCastlingRookMove(fromFile, fromRank, toFile, toRank);
+      if (rookMove) {
+        const boardState = chessEngine.getBoardState();
+        const rookPiece = boardState[7 - rookMove.fromRank]?.[rookMove.fromFile];
+        
+        if (rookPiece) {
+          // Execute the full castling move immediately (king is already visually positioned)
+          const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
+          
+          if (success) {
+            // Animate the rook visually (move is already executed)
+            setAnimatingPieces({
+              pieces: [{
+                piece: rookPiece,
+                from: { file: rookMove.fromFile, rank: rookMove.fromRank },
+                to: { file: rookMove.toFile, rank: rookMove.toRank },
+              }],
+              startTime: Date.now(),
+              moveData: { fromFile, fromRank, toFile, toRank, isDragCastling: true },
+            });
+
+            // Clear selection
+            setSelectedSquare(null);
+            setValidMoves([]);
+
+            // Play sound effects immediately
+            soundManager.playMoveSound();
+
+            // Check if the move puts the opponent in check
+            const opponentColor = chessEngine.getCurrentPlayer();
+            if (chessEngine.isKingInCheck(opponentColor)) {
+              setTimeout(() => soundManager.playCheckSound(), 200);
+            }
+          }
+          return;
+        }
+      }
+    }
+    
+    // Regular move (non-castling)
     attemptMove(fromFile, fromRank, toFile, toRank);
   }, [chessEngine, attemptMove]);
 
@@ -576,8 +667,24 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   }, [chessEngine, isValidMoveSquare]);
 
   const isAnimatingFrom = useCallback((file: number, rank: number) => {
-    return animatingPiece?.from.file === file && animatingPiece?.from.rank === rank;
-  }, [animatingPiece]);
+    return animatingPieces?.pieces.some(p => p.from.file === file && p.from.rank === rank) || false;
+  }, [animatingPieces]);
+
+  const isAnimatingTo = useCallback((file: number, rank: number) => {
+    // For drag castling, hide the piece at destination during animation
+    return (animatingPieces?.moveData.isDragCastling && 
+           animatingPieces?.pieces.some(p => p.to.file === file && p.to.rank === rank)) || false;
+  }, [animatingPieces]);
+
+  const isLastMoveFrom = useCallback((file: number, rank: number) => {
+    const lastMove = chessEngine.getLastMove();
+    return lastMove ? lastMove.fromFile === file && lastMove.fromRank === rank : false;
+  }, [chessEngine]);
+
+  const isLastMoveTo = useCallback((file: number, rank: number) => {
+    const lastMove = chessEngine.getLastMove();
+    return lastMove ? lastMove.toFile === file && lastMove.toRank === rank : false;
+  }, [chessEngine]);
 
 
   if (!chessEngine) {
@@ -622,6 +729,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
                   isValidMove={isValidMoveSquare(actualFile, actualRank)}
                   isCapture={isCapture(actualFile, actualRank)}
                   isAnimatingFrom={isAnimatingFrom(actualFile, actualRank)}
+                  isAnimatingTo={isAnimatingTo(actualFile, actualRank)}
+                  isLastMoveFrom={isLastMoveFrom(actualFile, actualRank)}
+                  isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
                   onSquareClick={handleSquareClick}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
@@ -630,17 +740,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
               );
             })
           ))}
-          {animatingPiece && (
+          {animatingPieces && animatingPieces.pieces.map((animatingPiece, index) => (
             <AnimatingPiece
+              key={`${animatingPiece.from.file}-${animatingPiece.from.rank}-${index}`}
               piece={animatingPiece.piece}
               from={animatingPiece.from}
               to={animatingPiece.to}
-              startTime={animatingPiece.startTime}
+              startTime={animatingPieces.startTime}
               squareSize={squareSize}
-              onComplete={handleAnimationComplete}
+              onComplete={index === 0 ? handleAnimationComplete : () => {}} // Only call completion for the first piece
               flipped={flipped}
             />
-          )}
+          ))}
         </div>
         <PromotionDialog
           isOpen={promotionDialog.isOpen}
