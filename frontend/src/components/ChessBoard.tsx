@@ -872,8 +872,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
   // Shared function to handle pre-move logic
   const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    // Allow pre-moves when it's external player's turn OR during external move animation
-    if (!(game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) || !enablePreMoves || !chessEngine) return false;
+    // Allow pre-moves when it's external player's turn OR during any animation
+    if (!(game.canMakePreMoves || animatingPieces) || !enablePreMoves || !chessEngine) return false;
 
     const visualBoardState = getVisualBoardState();
     const piece = visualBoardState[7 - fromRank]?.[fromFile];
@@ -1091,68 +1091,58 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     return true;
   }, [chessEngine, game, autoPromotionPiece, playMoveSound, handleInvalidMoveInCheck, enableAnimations, interruptAnimation]);
 
-  // Handle pending external moves with immediate execution
+  // Handle external move animations - moves are already executed immediately by executeExternalMove
   useEffect(() => {
-    if (game.pendingExternalMove) {
-      const move = game.pendingExternalMove;
+    if (game.lastExternalMove && enableAnimations) {
+      const moveData = game.lastExternalMove;
+      const move = moveData.move;
 
-      // NEW ARCHITECTURE: Get piece information BEFORE making move
+      // Get board state for animation - we need to get the piece that just moved
+      // Since the move is already executed, we get the piece at the destination
       const boardState = chessEngine.getBoardState();
-      const boardPiece = boardState[7 - move.fromRank]?.[move.fromFile];
+      const movedPiece = boardState[7 - move.toRank]?.[move.toFile];
       
-      // Get validation info for animation setup
-      const validationResult = chessEngine.isValidMove(
-        { file: move.fromFile, rank: move.fromRank },
-        { file: move.toFile, rank: move.toRank },
-        move.promotionPiece
-      );
+      if (movedPiece) {
+        // Interrupt any current animation
+        interruptAnimation();
 
-      // Execute move immediately
-      const result = game.makeMove(move);
-      if (result?.success) {
-        // Play sound immediately
-        playMoveSound(result);
-        
-        // Clear pending move
-        game.clearPendingExternalMove();
+        // For promotion moves, the piece at destination is already the promoted piece
+        const piecesToAnimate = [{
+          piece: movedPiece,
+          from: { file: move.fromFile, rank: move.fromRank },
+          to: { file: move.toFile, rank: move.toRank },
+        }];
 
-        // Handle animation after move execution (purely visual)
-        if (enableAnimations && boardPiece) {
-          // Interrupt any current animation
-          interruptAnimation();
-
-          // For promotion moves, animate to the promoted piece
-          const animationPiece = move.promotionPiece
-            ? { type: move.promotionPiece, color: boardPiece.color }
-            : boardPiece;
-
-          const piecesToAnimate = [{
-            piece: animationPiece,
-            from: { file: move.fromFile, rank: move.fromRank },
-            to: { file: move.toFile, rank: move.toRank },
-          }];
-
-          // Add castling rook if needed
-          if (validationResult.additionalMoves) {
-            for (const additionalMove of validationResult.additionalMoves) {
-              piecesToAnimate.push({
-                piece: additionalMove.piece,
-                from: additionalMove.from,
-                to: additionalMove.to,
-              });
-            }
+        // For castling, we need to also animate the rook
+        // We can detect this by checking if this was a king move of 2 squares
+        if (movedPiece.type === PieceType.King && Math.abs(move.toFile - move.fromFile) === 2) {
+          // This is castling - find the rook that also moved
+          const isKingsideCastling = move.toFile > move.fromFile;
+          const rookFromFile = isKingsideCastling ? 7 : 0;
+          const rookToFile = isKingsideCastling ? move.toFile - 1 : move.toFile + 1;
+          const rookPiece = boardState[7 - move.toRank]?.[rookToFile];
+          
+          if (rookPiece && rookPiece.type === PieceType.Rook) {
+            piecesToAnimate.push({
+              piece: rookPiece,
+              from: { file: rookFromFile, rank: move.fromRank },
+              to: { file: rookToFile, rank: move.toRank },
+            });
           }
-
-          const moveId = `${Date.now()}-${Math.random()}`;
-          setAnimatingPieces({
-            pieces: piecesToAnimate,
-            startTime: Date.now(),
-            moveId,
-          });
         }
+
+        const moveId = `${Date.now()}-${Math.random()}`;
+        setAnimatingPieces({
+          pieces: piecesToAnimate,
+          startTime: Date.now(),
+          moveId,
+        });
       }
+      
+      // Clear the external move after handling animation
+      game.clearLastExternalMove();
     }
-  }, [game.pendingExternalMove, chessEngine, enableAnimations, game, playMoveSound, interruptAnimation]);
+  }, [game.lastExternalMove, chessEngine, enableAnimations, game, interruptAnimation]);
 
   const handleAnimationComplete = useCallback(() => {
     // Animation is now purely visual - just clean up
@@ -1251,8 +1241,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves(moves);
       }
     }
-    // Handle pre-moves when it's external player's turn OR during external move animation (and pre-moves are enabled)
-    else if ((game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) && enablePreMoves) {
+    // Handle pre-moves when it's external player's turn OR during any animation (and pre-moves are enabled)
+    else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
       // Determine human player color (opposite of current player)
       const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
 
@@ -1337,8 +1327,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       // Regular move (non-castling) - don't animate drag moves since piece is already positioned
       attemptMove(fromFile, fromRank, toFile, toRank, false);
     }
-    // Handle pre-move drops when it's external player's turn OR during external move animation (and pre-moves are enabled)
-    else if ((game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) && enablePreMoves) {
+    // Handle pre-move drops when it's external player's turn OR during any animation (and pre-moves are enabled)
+    else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
       // Use shared pre-move logic
       handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
       setSelectedSquare(null);
@@ -1349,7 +1339,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Allow dragging when it's human's turn OR when making pre-moves OR during external move animation (and pre-moves are enabled)
+    // Allow dragging when it's human's turn OR when making pre-moves OR during any animation (and pre-moves are enabled)
     if (game.canHumanMove || enablePreMoves) {
       // Use visual board state to account for pre-moves
       const visualBoardState = getVisualBoardState();

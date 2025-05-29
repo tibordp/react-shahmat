@@ -17,7 +17,11 @@ export function useChessGame({
   onPositionChange,
   onError,
 }: UseChessGameProps) {
-  const [pendingExternalMove, setPendingExternalMove] = useState<Move | null>(null);
+  // Track last external move for animation purposes
+  const [lastExternalMove, setLastExternalMove] = useState<{
+    move: Move;
+    timestamp: number;
+  } | null>(null);
   const [preMoves, setPreMoves] = useState<Move[]>([]);
   const isProcessingExternal = useRef(false);
   const lastProcessedTurn = useRef<string>('');
@@ -51,31 +55,6 @@ export function useChessGame({
     }
   }, [chessEngine, onPositionChange, notifyPositionChange]);
 
-  // External move execution via ref method
-  const executeExternalMove = useCallback((move: Move) => {
-    if (!chessEngine) return false;
-
-    // Validate move
-    const from = { file: move.fromFile, rank: move.fromRank };
-    const to = { file: move.toFile, rank: move.toRank };
-    const validationResult = chessEngine.isValidMove(from, to, move.promotionPiece);
-
-    if (validationResult.valid) {
-      // Set the pending external move for ChessBoard to animate
-      setPendingExternalMove(move);
-      return true;
-    } else {
-      const error: ChessError = {
-        type: 'invalid_move',
-        player: currentPlayer!,
-        move,
-        message: 'Invalid move from external player'
-      };
-      onError?.(error);
-      return false;
-    }
-  }, [chessEngine, currentPlayer, onError]);
-
   // Simple move execution - no animation handling
   const makeMove = useCallback((move: Move) => {
     if (!chessEngine) return null;
@@ -91,16 +70,48 @@ export function useChessGame({
     return result;
   }, [chessEngine, notifyPositionChange]);
 
-  // Clear pending external move after it's been handled
-  const clearPendingExternalMove = useCallback(() => {
-    setPendingExternalMove(null);
-    isProcessingExternal.current = false;
+  // External move execution via ref method - now executes immediately
+  const executeExternalMove = useCallback((move: Move) => {
+    if (!chessEngine) return false;
+
+    // Validate move
+    const from = { file: move.fromFile, rank: move.fromRank };
+    const to = { file: move.toFile, rank: move.toRank };
+    const validationResult = chessEngine.isValidMove(from, to, move.promotionPiece);
+
+    if (validationResult.valid) {
+      // Execute move immediately
+      const result = makeMove(move);
+      if (result?.success) {
+        // Track this move for animation
+        setLastExternalMove({
+          move,
+          timestamp: Date.now()
+        });
+        return true;
+      }
+      return false;
+    } else {
+      const error: ChessError = {
+        type: 'invalid_move',
+        player: currentPlayer!,
+        move,
+        message: 'Invalid move from external player'
+      };
+      onError?.(error);
+      return false;
+    }
+  }, [chessEngine, currentPlayer, onError, makeMove]);
+
+  // Clear last external move after animation is handled
+  const clearLastExternalMove = useCallback(() => {
+    setLastExternalMove(null);
   }, []);
 
   // Game control functions
   const resetGame = useCallback(() => {
     chessEngine?.resetGame();
-    setPendingExternalMove(null);
+    setLastExternalMove(null);
     isProcessingExternal.current = false;
     lastProcessedTurn.current = '';
     // Notify about the reset position
@@ -110,7 +121,7 @@ export function useChessGame({
   const setPosition = useCallback((fen: string) => {
     const success = chessEngine?.setPosition(fen);
     if (success) {
-      setPendingExternalMove(null);
+      setLastExternalMove(null);
       setPreMoves([]);
       isProcessingExternal.current = false;
       lastProcessedTurn.current = '';
@@ -179,7 +190,7 @@ export function useChessGame({
     canHumanMove,
     canMakePreMoves,
     isExternalTurn: !isGameOver && isCurrentPlayerExternal,
-    pendingExternalMove,
+    lastExternalMove,
     preMoves,
 
     // Actions
@@ -187,7 +198,7 @@ export function useChessGame({
     executeExternalMove,
     addPreMove,
     clearPreMoves,
-    clearPendingExternalMove,
+    clearLastExternalMove,
     resetGame,
     setPosition,
 
