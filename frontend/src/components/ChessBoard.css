@@ -55,6 +55,14 @@
   background-color: #e55555;
 }
 
+.square.pre-move.light {
+  background-color: #dc2626;
+}
+
+.square.pre-move.dark {
+  background-color: #b91c1c;
+}
+
 
 .move-indicator {
   position: absolute;

@@ -18,6 +18,7 @@ export function useChessGame({
   onGameStateChange,
 }: UseChessGameProps) {
   const [pendingExternalMove, setPendingExternalMove] = useState<Move | null>(null);
+  const [preMoves, setPreMoves] = useState<Move[]>([]);
   const isProcessingExternal = useRef(false);
   const lastProcessedTurn = useRef<string>('');
 
@@ -31,6 +32,7 @@ export function useChessGame({
   
   // Simple state calculation
   const canHumanMove = !isGameOver && !isCurrentPlayerExternal;
+  const canMakePreMoves = !isGameOver && isCurrentPlayerExternal;
 
   // Notify about game state changes
   useEffect(() => {
@@ -126,20 +128,79 @@ export function useChessGame({
     const success = chessEngine?.setPosition(fen);
     if (success) {
       setPendingExternalMove(null);
+      setPreMoves([]);
       isProcessingExternal.current = false;
       lastProcessedTurn.current = '';
     }
     return success || false;
   }, [chessEngine]);
 
+  // Pre-move management
+  const addPreMove = useCallback((move: Move) => {
+    setPreMoves(prev => [...prev, move]);
+  }, []);
+
+  const clearPreMoves = useCallback(() => {
+    setPreMoves([]);
+  }, []);
+
+  const validateAndExecutePreMoves = useCallback(() => {
+    if (preMoves.length === 0 || !chessEngine) return;
+
+    // Validate each pre-move in sequence on a simulated board state
+    let currentBoardState = chessEngine;
+    const validPreMoves: Move[] = [];
+
+    for (const preMove of preMoves) {
+      const from = { file: preMove.fromFile, rank: preMove.fromRank };
+      const to = { file: preMove.toFile, rank: preMove.toRank };
+      
+      const validation = currentBoardState.isValidMove(from, to, preMove.promotionPiece);
+      if (!validation.valid) {
+        // If any pre-move is invalid, clear all and stop
+        setPreMoves([]);
+        return;
+      }
+      
+      validPreMoves.push(preMove);
+      // For now, just validate the first move - full simulation would require board cloning
+      break;
+    }
+
+    // Execute the first valid pre-move
+    if (validPreMoves.length > 0) {
+      const firstMove = validPreMoves[0];
+      const result = makeMove(firstMove);
+      
+      if (result) {
+        // Remove the executed move and keep remaining pre-moves
+        setPreMoves(prev => prev.slice(1));
+      } else {
+        // If execution failed, clear all pre-moves
+        setPreMoves([]);
+      }
+    }
+  }, [preMoves, chessEngine, makeMove]);
+
+  // Execute pre-moves when it becomes human's turn
+  useEffect(() => {
+    if (canHumanMove && preMoves.length > 0) {
+      validateAndExecutePreMoves();
+    }
+  }, [canHumanMove, preMoves.length, validateAndExecutePreMoves]);
+
   return {
     // State
     canHumanMove,
+    canMakePreMoves,
     isExternalTurn: !isGameOver && isCurrentPlayerExternal,
     pendingExternalMove,
+    preMoves,
     
     // Actions
     makeMove,
+    addPreMove,
+    clearPreMoves,
     clearPendingExternalMove,
     resetGame,
     setPosition,
