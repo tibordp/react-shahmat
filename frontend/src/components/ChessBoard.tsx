@@ -22,7 +22,7 @@ import { calculateBasicPieceMovements } from '../utils/pieceMovements';
 import './ChessBoard.css';
 
 // Constants (animationDuration prop will override this)
-const DEFAULT_ANIMATION_DURATION = 300;
+// const DEFAULT_ANIMATION_DURATION = 300; // Currently unused
 
 const PIECE_ICONS: { [key: string]: string } = {
   'White_Pawn': whitePawn,
@@ -175,7 +175,7 @@ const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number; anima
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [fromX, fromY, toX, toY, startTime, onComplete]);
+  }, [fromX, fromY, toX, toY, startTime, onComplete, animationDuration]);
 
   const pieceIcon = getPieceIcon(piece);
   const scale = squareSize * 0.95; // Scale down to fit within the square
@@ -782,9 +782,10 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
 
   // Shared function to handle pre-move logic
   const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    if (!game.canMakePreMoves || !enablePreMoves || !chessEngine) return false;
+    // Allow pre-moves when it's external player's turn OR during external move animation
+    if (!(game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) || !enablePreMoves || !chessEngine) return false;
 
-    // Determine human player color
+    // Determine human player color (opposite of current player)
     const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
     const visualBoardState = getVisualBoardState();
     const piece = visualBoardState[7 - fromRank]?.[fromFile];
@@ -1180,9 +1181,9 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves(moves);
       }
     }
-    // Handle pre-moves when it's external player's turn (and pre-moves are enabled)
-    else if (game.canMakePreMoves && enablePreMoves) {
-      // Determine human player color (opposite of current player when external player is moving)
+    // Handle pre-moves when it's external player's turn OR during external move animation (and pre-moves are enabled)
+    else if ((game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) && enablePreMoves) {
+      // Determine human player color (opposite of current player)
       const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
 
       if (selectedSquare) {
@@ -1211,7 +1212,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         setValidMoves(moves);
       }
     }
-  }, [chessEngine, selectedSquare, attemptMove, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, handlePreMoveAttempt]);
+  }, [chessEngine, selectedSquare, attemptMove, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, handlePreMoveAttempt, animatingPieces, enableAnimations]);
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
@@ -1263,26 +1264,26 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       // Regular move (non-castling) - don't animate drag moves since piece is already positioned
       attemptMove(fromFile, fromRank, toFile, toRank, false);
     }
-    // Handle pre-move drops when it's external player's turn (and pre-moves are enabled)
-    else if (game.canMakePreMoves && enablePreMoves) {
+    // Handle pre-move drops when it's external player's turn OR during external move animation (and pre-moves are enabled)
+    else if ((game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) && enablePreMoves) {
       // Use shared pre-move logic
       handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
       setSelectedSquare(null);
       setValidMoves([]);
     }
-  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, enableSounds]);
+  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, enableSounds, animatingPieces, enableAnimations]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Allow dragging when it's human's turn OR when making pre-moves (and pre-moves are enabled)
-    if (game.canHumanMove || (game.canMakePreMoves && enablePreMoves)) {
+    // Allow dragging when it's human's turn OR when making pre-moves OR during external move animation (and pre-moves are enabled)
+    if (game.canHumanMove || ((game.canMakePreMoves || (game.pendingExternalMove && animatingPieces)) && enablePreMoves)) {
       // Determine which color can be dragged
       let allowedColor: Color;
       if (game.canHumanMove) {
         allowedColor = chessEngine.getCurrentPlayer();
       } else {
-        // Pre-moves: allow human player color (opposite of current external player)
+        // Pre-moves: determine human player color (opposite of current player)
         allowedColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
       }
 
@@ -1304,7 +1305,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       const moves = getValidMovesFromVisualBoard(file, rank);
       setValidMoves(moves);
     }
-  }, [chessEngine, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves]);
+  }, [chessEngine, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, animatingPieces]);
 
   const handleDragEnd = useCallback((file: number, rank: number) => {
 
@@ -1459,7 +1460,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
                   isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
                   isHighlighted={isHighlighted(actualFile, actualRank)}
                   isPreMove={isPreMoveSquare(actualFile, actualRank)}
-                  canMakePreMoves={game.canMakePreMoves && enablePreMoves}
+                  canMakePreMoves={(game.canMakePreMoves || (!!game.pendingExternalMove && !!animatingPieces)) && enablePreMoves}
                   onSquareClick={handleSquareClick}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
