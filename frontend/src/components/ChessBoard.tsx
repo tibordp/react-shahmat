@@ -303,33 +303,33 @@ interface GameEndBadgeProps {
 
 const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, flipped, badgeType }) => {
   // Calculate the king's visual position
-  const effectivePosition = flipped 
+  const effectivePosition = flipped
     ? { file: 7 - kingPosition.file, rank: 7 - kingPosition.rank }
     : kingPosition;
-  
+
   const kingX = effectivePosition.file * squareSize;
   const kingY = (7 - effectivePosition.rank) * squareSize;
-  
-  // Badge size (about 35% of square size for better visibility)
-  const badgeSize = squareSize * 0.35;
-  
+
+  // Badge size (about 40% of square size for better visibility)
+  const badgeSize = squareSize * 0.5  ;
+
   // Default position: top-right corner of king's square
   let badgeX = kingX + squareSize - badgeSize / 2;
   let badgeY = kingY - badgeSize / 2;
-  
+
   // Boundary detection - only shift inward just enough to stay within board
   const boardSize = squareSize * 8;
-  
+
   // Check right boundary - shift left just enough
   if (badgeX + badgeSize > boardSize) {
     badgeX = boardSize - badgeSize;
   }
-  
+
   // Check top boundary - shift down just enough
   if (badgeY < 0) {
     badgeY = 0;
   }
-  
+
   const getBadgeColor = () => {
     switch (badgeType) {
       case 'winner': return '#4CAF50';
@@ -337,7 +337,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
       case 'draw': return '#757575';
     }
   };
-  
+
   const renderBadgeContent = () => {
     if (badgeType === 'draw') {
       return (
@@ -361,7 +361,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
       );
     }
   };
-  
+
   return (
     <div
       className="game-end-badge"
@@ -698,7 +698,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
   const findKingPositions = useCallback(() => {
     const boardState = chessEngine.getBoardState();
     const kings: { white?: Position; black?: Position } = {};
-    
+
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = boardState[7 - rank]?.[file];
@@ -711,7 +711,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
         }
       }
     }
-    
+
     return kings;
   }, [chessEngine]);
 
@@ -1360,7 +1360,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
       game.clearPreMoves();
       return; // Don't start arrow creation when clearing pre-moves
     }
-    
+
     // Start arrow creation if arrows are enabled, or set flag for highlights if arrows disabled but highlights enabled
     if (enableArrows || enableHighlights) {
       setArrowStart({ file, rank });
@@ -1539,10 +1539,10 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
           {(() => {
             const gameState = chessEngine.getGameState();
             if (!gameState.isGameOver || !gameState.result) return null;
-            
+
             const kingPositions = findKingPositions();
             const badges = [];
-            
+
             if (gameState.result.reason === 'checkmate' && gameState.result.winner !== undefined) {
               // Checkmate: winner gets crown, loser gets fallen king
               if (kingPositions.white) {
@@ -1592,7 +1592,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
                 );
               }
             }
-            
+
             return badges;
           })()}
         </div>
