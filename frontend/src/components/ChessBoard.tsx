@@ -785,6 +785,23 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     return chessEngine.getValidMoves({ file, rank });
   }, [chessEngine, game.canMakePreMoves, getVisualBoardState, enablePreMoves]);
 
+  const [animatingPieces, setAnimatingPieces] = useState<{
+    pieces: Array<{
+      piece: Piece;
+      from: Position;
+      to: Position;
+    }>;
+    startTime: number;
+    moveData: {
+      fromFile: number;
+      fromRank: number;
+      toFile: number;
+      toRank: number;
+      isDragCastling?: boolean;
+      isExternalMove?: boolean;
+    };
+  } | null>(null);
+
   // Shared function to handle pre-move logic
   const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
     // Allow pre-moves when it's external player's turn OR during external move animation
@@ -844,24 +861,8 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
     }
 
     return true; // Indicates pre-move was handled
-  }, [enablePreMoves, chessEngine, getVisualBoardState, getValidMovesFromVisualBoard, isPawnPromotion, game, autoPromotionPiece]);
+  }, [enablePreMoves, chessEngine, getVisualBoardState, getValidMovesFromVisualBoard, isPawnPromotion, game, autoPromotionPiece, animatingPieces]);
 
-  const [animatingPieces, setAnimatingPieces] = useState<{
-    pieces: Array<{
-      piece: Piece;
-      from: Position;
-      to: Position;
-    }>;
-    startTime: number;
-    moveData: {
-      fromFile: number;
-      fromRank: number;
-      toFile: number;
-      toRank: number;
-      isDragCastling?: boolean;
-      isExternalMove?: boolean;
-    };
-  } | null>(null);
   const [promotionDialog, setPromotionDialog] = useState<{
     isOpen: boolean;
     fromFile: number;

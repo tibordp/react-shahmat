@@ -36,7 +36,7 @@ function App() {
         } catch (error) {
           console.error('AI move error:', error);
         }
-      }, 50);
+      }, 1000);
     }
   }, [whiteAi, blackAi]);
 
