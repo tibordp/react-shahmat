@@ -6,6 +6,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
 }
 
 .App h1 {
@@ -15,7 +16,7 @@
 
 .board-container {
   width: 100%;
-  max-width: 600px;
-  height: 600px;
+  max-width: 1200px;
+  height: 1200px;
   max-height: 80vh;
 }

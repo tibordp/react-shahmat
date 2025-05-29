@@ -39,7 +39,7 @@
 }
 
 .square.selected {
-  background-color: rgba(181, 136, 99, 0.8) !important;
+  background-color: #eebc6b;
 }
 
 .move-indicator {
@@ -59,13 +59,14 @@
 }
 
 .capture-indicator {
-  width: 80%;
-  height: 80%;
+  width: 75%;
+  height: 75%;
   border-radius: 50%;
   background-color: transparent;
-  border: 4px solid rgba(112, 112, 112, 0.4);
+  border: 0.8cqmin solid rgba(112, 112, 112, 0.4);
   left: 50%;
   top: 50%;
+  z-index: 10;
   transform: translate(-50%, -50%);
 }
 
@@ -74,7 +75,7 @@
 }
 
 .square.drop-target .capture-indicator {
-  border: 4px solid rgba(112, 112, 112, 0.6);
+  border: 0.8cqmin solid rgba(112, 112, 112, 0.6);
 }
 
 @keyframes pulse {
@@ -88,8 +89,8 @@
 }
 
 .piece {
-  width: 90%;
-  height: 90%;
+  width: 95%;
+  height: 95%;
   cursor: grab;
   transition: all 0.2s ease;
   filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
@@ -107,22 +108,22 @@
 /* Inset labels */
 .file-label-inset {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
+  bottom: 0.5cqmin;
+  right: 0.5cqmin;
   font-weight: bold;
   pointer-events: none;
   z-index: 1;
-  font-size: 1.2em;
+  font-size: max(2cqmin, 0.5rem);
 }
 
 .rank-label-inset {
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 0.5cqmin;
+  left: 0.5cqmin;
   font-weight: bold;
   pointer-events: none;
   z-index: 1;
-  font-size: 1.2em;
+  font-size: max(2cqmin, 0.5rem);
 }
 
 .light-text {
@@ -151,7 +152,7 @@
 .animating-piece-img {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
   object-fit: contain;
 }
 

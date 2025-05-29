@@ -1,0 +1,1 @@
+/home/tibordp/src/shahist/chess-engine/target/wasm32-unknown-unknown/release/chess_engine.wasm: /home/tibordp/src/shahist/chess-engine/src/chess.rs /home/tibordp/src/shahist/chess-engine/src/lib.rs /home/tibordp/src/shahist/chess-engine/src/utils.rs
