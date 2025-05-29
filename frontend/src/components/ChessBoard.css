@@ -38,13 +38,23 @@
   background-color: #b58863;
 }
 
-.square.selected {
-  background-color: #eebc6b;
+
+.square.last-move.light, .square.selected.light {
+  background-color: #ffb765;
 }
 
-.square.last-move {
-  background-color: #eebc6b;
+.square.last-move.dark, .square.selected.dark {
+  background-color: #e59a43;
 }
+
+.square.highlighted.light {
+  background-color: #ff6b6b;
+}
+
+.square.highlighted.dark {
+  background-color: #e55555;
+}
+
 
 .move-indicator {
   position: absolute;

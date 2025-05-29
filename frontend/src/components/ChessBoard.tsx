@@ -59,11 +59,14 @@ interface SquareProps {
   isAnimatingTo: boolean;
   isLastMoveFrom: boolean;
   isLastMoveTo: boolean;
+  isHighlighted: boolean;
   flipped?: boolean; // Whether to flip the board for black perspective
   onSquareClick: (file: number, rank: number) => void;
   onDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
   onDragStart: (file: number, rank: number) => void;
   onDragEnd: (file: number, rank: number) => void;
+  onRightMouseDown: (file: number, rank: number) => void;
+  onRightMouseUp: (file: number, rank: number) => void;
 }
 
 interface DragItem {
@@ -230,7 +233,121 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, onSele
   );
 };
 
-const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, onSquareClick, onDrop, onDragStart, onDragEnd, flipped }) => {
+interface ArrowComponentProps {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  isKnightMove: boolean;
+  squareSize: number;
+}
+
+const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY, isKnightMove, squareSize }) => {
+  const arrowHeadSize = Math.max(15, squareSize * 0.4);
+  const strokeWidth = Math.max(8, squareSize * 0.2);
+  const color = "rgba(0, 200, 0, 0.5)";
+  const markerId = `arrowhead-${Math.random().toString(36).substr(2, 9)}`;
+  const shortenAmount = arrowHeadSize * 0.75;
+  const edgeOffset = squareSize * 0.35; // 10% from edge towards center
+
+  // Common marker definition
+  const marker = (
+    <marker
+      id={markerId}
+      markerWidth={2}
+      markerHeight={3}
+      refX={0}
+      refY={1.2}
+      orient="auto"
+      markerUnits="strokeWidth"
+    >
+      <polygon
+        points={`0,0 0,2.4, 1.5,1.2`}
+        fill={color}
+      />
+    </marker>
+  );
+
+  let pathElement;
+
+  if (isKnightMove) {
+    // Create a right-angled path for knight moves (long leg first, then short leg)
+    const deltaFile = Math.abs(toX - fromX);
+    const deltaRank = Math.abs(toY - fromY);
+    const isHorizontalLonger = deltaFile > deltaRank;
+
+    let cornerX, cornerY;
+    if (isHorizontalLonger) {
+      cornerX = toX;
+      cornerY = fromY;
+    } else {
+      cornerX = fromX;
+      cornerY = toY;
+    }
+
+    // Adjust start point
+    let adjustedFromX = fromX;
+    let adjustedFromY = fromY;
+    if (isHorizontalLonger) {
+      adjustedFromX = fromX > cornerX ? fromX - edgeOffset : fromX + edgeOffset;
+    } else {
+      adjustedFromY = fromY > cornerY ? fromY - edgeOffset : fromY + edgeOffset;
+    }
+
+    // Adjust end point
+    let adjustedToX = toX;
+    let adjustedToY = toY;
+    if (isHorizontalLonger) {
+      adjustedToY = toY > cornerY ? toY - shortenAmount : toY + shortenAmount;
+    } else {
+      adjustedToX = toX > cornerX ? toX - shortenAmount : toX + shortenAmount;
+    }
+
+    pathElement = (
+      <path
+        d={`M ${adjustedFromX} ${adjustedFromY} L ${cornerX} ${cornerY} L ${adjustedToX} ${adjustedToY}`}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeLinecap="butt"
+        strokeLinejoin="miter"
+        markerEnd={`url(#${markerId})`}
+      />
+    );
+  } else {
+    // Straight arrow
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+
+    const adjustedFromX = fromX + (dx / length) * edgeOffset;
+    const adjustedFromY = fromY + (dy / length) * edgeOffset;
+    const adjustedToX = toX - (dx / length) * shortenAmount;
+    const adjustedToY = toY - (dy / length) * shortenAmount;
+
+    pathElement = (
+      <line
+        x1={adjustedFromX}
+        y1={adjustedFromY}
+        x2={adjustedToX}
+        y2={adjustedToY}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="butt"
+        markerEnd={`url(#${markerId})`}
+      />
+    );
+  }
+
+  return (
+    <g>
+      <defs>{marker}</defs>
+      {pathElement}
+    </g>
+  );
+};
+
+const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, isHighlighted, onSquareClick, onDrop, onDragStart, onDragEnd, onRightMouseDown, onRightMouseUp, flipped }) => {
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: 'piece',
     item: () => {
@@ -280,6 +397,10 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
     squareClass += ' last-move';
   }
 
+  if (isHighlighted) {
+    squareClass += ' highlighted';
+  }
+
   const pieceIcon = piece ? getPieceIcon(piece) : null;
 
   // Show file label on rank 0 (bottom row)
@@ -299,6 +420,19 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
       ref={attachRef}
       className={squareClass}
       onClick={() => onSquareClick(file, rank)}
+      onMouseDown={(e) => {
+        if (e.button === 2) { // Right mouse button
+          e.preventDefault();
+          onRightMouseDown(file, rank);
+        }
+      }}
+      onMouseUp={(e) => {
+        if (e.button === 2) { // Right mouse button
+          e.preventDefault();
+          onRightMouseUp(file, rank);
+        }
+      }}
+      onContextMenu={(e) => e.preventDefault()} // Prevent context menu
     >
       {pieceIcon && (
         <img
@@ -357,6 +491,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   }, [size]);
   const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[]>([]);
+  const [arrows, setArrows] = useState<Array<{ from: Position; to: Position }>>([]);
+  const [arrowStart, setArrowStart] = useState<Position | null>(null);
+  const [highlightedSquares, setHighlightedSquares] = useState<Position[]>([]);
   const [animatingPieces, setAnimatingPieces] = useState<{
     pieces: Array<{
       piece: Piece;
@@ -484,18 +621,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handleAnimationComplete = useCallback(() => {
     if (animatingPieces && chessEngine) {
       const { fromFile, fromRank, toFile, toRank, isDragCastling } = animatingPieces.moveData;
-      
+
       if (isDragCastling) {
         // For drag castling, move is already executed, just clean up
         setAnimatingPieces(null);
         return;
       }
-      
+
       // For click-based moves, execute the move now that animation is complete
       const targetSquare = chessEngine.getPiece(toFile, toRank);
       const isCapture = !!targetSquare;
       const isCastling = chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank);
-      
+
       const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
 
       if (success) {
@@ -553,6 +690,10 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handleSquareClick = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
+    // Clear arrows and highlights on any left click
+    setArrows([]);
+    setHighlightedSquares([]);
+
     const boardState = chessEngine.getBoardState();
     const piece = boardState[7 - rank]?.[file];
 
@@ -581,7 +722,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
-    
+
     // For castling moves during drag, handle specially
     if (chessEngine.isCastlingMove(fromFile, fromRank, toFile, toRank)) {
       // Check if this is a valid move first
@@ -590,7 +731,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
       const validMoves = chessEngine.getValidMoves(fromFile, fromRank);
       const isValidMove = validMoves.some(move => move.file === toFile && move.rank === toRank);
-      
+
       if (!isValidMove) return;
 
       // Get the rook move for animation
@@ -598,11 +739,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       if (rookMove) {
         const boardState = chessEngine.getBoardState();
         const rookPiece = boardState[7 - rookMove.fromRank]?.[rookMove.fromFile];
-        
+
         if (rookPiece) {
           // Execute the full castling move immediately (king is already visually positioned)
           const success = chessEngine.makeMove(fromFile, fromRank, toFile, toRank);
-          
+
           if (success) {
             // Animate the rook visually (move is already executed)
             setAnimatingPieces({
@@ -632,7 +773,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
         }
       }
     }
-    
+
     // Regular move (non-castling)
     attemptMove(fromFile, fromRank, toFile, toRank);
   }, [chessEngine, attemptMove]);
@@ -640,7 +781,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
-    // Clear any existing selection indicators when starting to drag
+    // Clear arrows, highlights, and any existing selection indicators when starting to drag
+    setArrows([]);
+    setHighlightedSquares([]);
     setSelectedSquare({ file, rank });
 
     const moves = chessEngine.getValidMoves(file, rank);
@@ -672,7 +815,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
   const isAnimatingTo = useCallback((file: number, rank: number) => {
     // For drag castling, hide the piece at destination during animation
-    return (animatingPieces?.moveData.isDragCastling && 
+    return (animatingPieces?.moveData.isDragCastling &&
            animatingPieces?.pieces.some(p => p.to.file === file && p.to.rank === rank)) || false;
   }, [animatingPieces]);
 
@@ -685,6 +828,56 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     const lastMove = chessEngine.getLastMove();
     return lastMove ? lastMove.toFile === file && lastMove.toRank === rank : false;
   }, [chessEngine]);
+
+  const isHighlighted = useCallback((file: number, rank: number) => {
+    return highlightedSquares.some(square => square.file === file && square.rank === rank);
+  }, [highlightedSquares]);
+
+  const handleRightMouseDown = useCallback((file: number, rank: number) => {
+    setArrowStart({ file, rank });
+  }, []);
+
+  const handleRightMouseUp = useCallback((file: number, rank: number) => {
+    if (arrowStart) {
+      if (arrowStart.file === file && arrowStart.rank === rank) {
+        // Same square - toggle square highlight instead of creating arrow
+        setHighlightedSquares(prev => {
+          const existingIndex = prev.findIndex(square => 
+            square.file === file && square.rank === rank
+          );
+          
+          if (existingIndex >= 0) {
+            // Remove existing highlight
+            return prev.filter((_, index) => index !== existingIndex);
+          } else {
+            // Add new highlight
+            return [...prev, { file, rank }];
+          }
+        });
+      } else {
+        // Different square - create or toggle arrow
+        const newArrow = { from: arrowStart, to: { file, rank } };
+        setArrows(prev => {
+          // Check if arrow already exists
+          const existingIndex = prev.findIndex(arrow =>
+            arrow.from.file === newArrow.from.file &&
+            arrow.from.rank === newArrow.from.rank &&
+            arrow.to.file === newArrow.to.file &&
+            arrow.to.rank === newArrow.to.rank
+          );
+
+          if (existingIndex >= 0) {
+            // Remove existing arrow
+            return prev.filter((_, index) => index !== existingIndex);
+          } else {
+            // Add new arrow
+            return [...prev, newArrow];
+          }
+        });
+      }
+    }
+    setArrowStart(null);
+  }, [arrowStart]);
 
 
   if (!chessEngine) {
@@ -732,14 +925,56 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
                   isAnimatingTo={isAnimatingTo(actualFile, actualRank)}
                   isLastMoveFrom={isLastMoveFrom(actualFile, actualRank)}
                   isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
+                  isHighlighted={isHighlighted(actualFile, actualRank)}
                   onSquareClick={handleSquareClick}
                   onDrop={handleDrop}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onRightMouseDown={handleRightMouseDown}
+                  onRightMouseUp={handleRightMouseUp}
                 />
               );
             })
           ))}
+
+          {/* Arrow overlay */}
+          <svg
+            className="arrow-overlay"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: boardSize,
+              height: boardSize,
+              pointerEvents: 'none',
+              zIndex: 100,
+            }}
+          >
+            {arrows.map((arrow, index) => {
+              const fromX = (flipped ? 7 - arrow.from.file : arrow.from.file) * squareSize + squareSize / 2;
+              const fromY = (flipped ? arrow.from.rank : 7 - arrow.from.rank) * squareSize + squareSize / 2;
+              const toX = (flipped ? 7 - arrow.to.file : arrow.to.file) * squareSize + squareSize / 2;
+              const toY = (flipped ? arrow.to.rank : 7 - arrow.to.rank) * squareSize + squareSize / 2;
+
+              // Check if this is a knight move
+              const deltaFile = Math.abs(arrow.to.file - arrow.from.file);
+              const deltaRank = Math.abs(arrow.to.rank - arrow.from.rank);
+              const isKnightMove = (deltaFile === 2 && deltaRank === 1) || (deltaFile === 1 && deltaRank === 2);
+
+              return (
+                <ArrowComponent
+                  key={`arrow-${index}`}
+                  fromX={fromX}
+                  fromY={fromY}
+                  toX={toX}
+                  toY={toY}
+                  isKnightMove={isKnightMove}
+                  squareSize={squareSize}
+                />
+              );
+            })}
+          </svg>
+
           {animatingPieces && animatingPieces.pieces.map((animatingPiece, index) => (
             <AnimatingPiece
               key={`${animatingPiece.from.file}-${animatingPiece.from.rank}-${index}`}
