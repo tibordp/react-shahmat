@@ -61,8 +61,6 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Chess Board Demo</h1>
-
       <div className="controls-panel">
         <div className="control-group">
           <label htmlFor="flipBoard">Board Orientation:</label>
@@ -143,7 +141,7 @@ function App() {
             placeholder="Enter FEN string..."
             className="fen-input"
           />
-          <button 
+          <button
             className="control-button load-button"
             onClick={handleLoadPosition}
             disabled={!fenInput.trim()}
@@ -155,7 +153,7 @@ function App() {
         <div className="control-group">
           <label>Test Positions:</label>
           <div className="preset-buttons">
-            <button 
+            <button
               className="preset-button"
               onClick={() => handleLoadPreset(
                 'rnb1kbnr/pppp1ppp/4p3/8/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3',
@@ -164,7 +162,7 @@ function App() {
             >
               Checkmate
             </button>
-            <button 
+            <button
               className="preset-button"
               onClick={() => handleLoadPreset(
                 '5bnr/4p1pq/4Qpkr/7p/2P4P/8/PP1PPPP1/RNB1KBNR b KQ - 0 10',
