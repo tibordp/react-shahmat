@@ -126,7 +126,59 @@ export class JSChessEngine {
     const piece = this.getPiece(from);
     if (!piece || piece.color !== this.currentPlayer) return [];
 
-    return this.getValidMovesForPiece(from.file, from.rank, piece, true);
+    const pseudoLegalMoves = this.getValidMovesForPiece(from.file, from.rank, piece, true);
+    
+    // Filter out moves that would leave the king in check
+    return pseudoLegalMoves.filter(to => this.isMoveLegal(from, to));
+  }
+
+  private isMoveLegal(from: Position, to: Position): boolean {
+    // Simulate the move and check if king would be in check
+    const piece = this.getPiece(from);
+    if (!piece) return false;
+
+    // Store original state
+    const originalTarget = this.getPiece(to);
+    const originalEnPassantTarget = this.enPassantTarget;
+    
+    // Special handling for castling - already checked in canCastle method
+    if (piece.type === PieceType.King && Math.abs(to.file - from.file) === 2) {
+      // Castling legality is already verified in addCastlingMoves/canCastle
+      return true;
+    }
+    
+    // Special handling for en passant capture
+    let capturedEnPassantPawn: Piece | null = null;
+    let capturedEnPassantPos: Position | null = null;
+    
+    if (piece.type === PieceType.Pawn && 
+        this.enPassantTarget && 
+        to.file === this.enPassantTarget.file && 
+        to.rank === this.enPassantTarget.rank) {
+      const direction = piece.color === Color.White ? 1 : -1;
+      capturedEnPassantPos = { file: to.file, rank: to.rank - direction };
+      capturedEnPassantPawn = this.getPiece(capturedEnPassantPos);
+      this.board[capturedEnPassantPos.rank][capturedEnPassantPos.file] = null;
+    }
+
+    // Make the move temporarily
+    this.board[to.rank][to.file] = piece;
+    this.board[from.rank][from.file] = null;
+
+    // Check if king is in check after this move
+    const isLegal = !this.isKingInCheck(piece.color);
+
+    // Restore original state
+    this.board[from.rank][from.file] = piece;
+    this.board[to.rank][to.file] = originalTarget;
+    
+    if (capturedEnPassantPawn && capturedEnPassantPos) {
+      this.board[capturedEnPassantPos.rank][capturedEnPassantPos.file] = capturedEnPassantPawn;
+    }
+    
+    this.enPassantTarget = originalEnPassantTarget;
+
+    return isLegal;
   }
 
   private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
@@ -569,7 +621,7 @@ export class JSChessEngine {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
         if (piece && piece.color === enemyColor) {
-          const moves = this.getValidMoves({ file, rank });
+          const moves = this.getValidMovesForPiece(file, rank, piece, false); // Use raw moves to avoid circular dependency
           if (moves.some(move => move.file === kingPosition!.file && move.rank === kingPosition!.rank)) {
             return true;
           }
