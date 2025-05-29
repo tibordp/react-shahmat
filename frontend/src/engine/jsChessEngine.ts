@@ -47,11 +47,51 @@ export interface ValidMoveResult {
   resultingCheckStatus?: 'none' | 'check' | 'checkmate' | 'stalemate'; // Game state after this move
 }
 
+export interface GameState {
+  fen: string;
+  currentPlayer: Color;
+  validMoves: Move[];
+  isCheck: boolean;
+  isGameOver: boolean;
+  result?: GameResult;
+  moveHistory: Move[];
+  capturedPieces: { white: Piece[]; black: Piece[] };
+}
+
+export interface GameResult {
+  winner?: Color;
+  reason: 'checkmate' | 'stalemate' | 'draw' | 'resignation' | 'timeout';
+}
+
+export interface ChessError {
+  type: 'invalid_move' | 'callback_error' | 'timeout';
+  player: Color;
+  move?: Move;
+  message: string;
+  originalError?: Error;
+}
+
+export interface ChessBoardCallbacks {
+  onWhiteMove?: (gameState: GameState, opponentMove?: Move) => Promise<Move>;
+  onBlackMove?: (gameState: GameState, opponentMove?: Move) => Promise<Move>;
+  onError?: (error: ChessError) => void;
+  onGameStateChange?: (gameState: GameState) => void;
+}
+
+export interface ChessBoardRef {
+  resetGame: () => void;
+  setPosition: (fen: string) => boolean;
+  getGameState: () => GameState;
+}
+
 export class JSChessEngine {
   private board: (Piece | null)[][];
   private currentPlayer: Color;
   private enPassantTarget: Position | null; // Square where en passant capture can happen
   private lastMove: Move | null; // Track the last move made
+  private moveHistory: Move[]; // Track all moves made
+  private halfmoveClock: number; // Moves since last capture or pawn move (for 50-move rule)
+  private fullmoveNumber: number; // Increments after Black's move
   private castlingRights: {
     whiteKingSide: boolean;
     whiteQueenSide: boolean;
@@ -64,6 +104,9 @@ export class JSChessEngine {
     this.currentPlayer = Color.White;
     this.enPassantTarget = null;
     this.lastMove = null;
+    this.moveHistory = [];
+    this.halfmoveClock = 0;
+    this.fullmoveNumber = 1;
     this.castlingRights = {
       whiteKingSide: true,
       whiteQueenSide: true,
@@ -575,11 +618,25 @@ export class JSChessEngine {
       this.updateCastlingRights(from.file, from.rank, piece);
     }
 
-    // Record the move
-    this.lastMove = { fromFile: from.file, fromRank: from.rank, toFile: to.file, toRank: to.rank };
+    // Update halfmove clock (resets on capture or pawn move)
+    if (piece.type === PieceType.Pawn || capturedPiece || type === 'capture' || type === 'enPassant') {
+      this.halfmoveClock = 0;
+    } else {
+      this.halfmoveClock++;
+    }
 
-    // Switch players
+    // Record the move
+    const moveRecord = { fromFile: from.file, fromRank: from.rank, toFile: to.file, toRank: to.rank };
+    this.lastMove = moveRecord;
+    this.moveHistory.push(moveRecord);
+
+    // Switch players and update fullmove number
     this.currentPlayer = this.currentPlayer === Color.White ? Color.Black : Color.White;
+    
+    // Increment fullmove number after black's move
+    if (this.currentPlayer === Color.White) {
+      this.fullmoveNumber++;
+    }
 
     // Determine check status after move
     const opponentColor = this.currentPlayer;
@@ -666,12 +723,264 @@ export class JSChessEngine {
     return this.lastMove;
   }
 
+  public getGameState(): GameState {
+    // Get all valid moves for current player
+    const validMoves: Move[] = [];
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece && piece.color === this.currentPlayer) {
+          const pieceMoves = this.getValidMoves({ file, rank });
+          for (const move of pieceMoves) {
+            validMoves.push({
+              fromFile: file,
+              fromRank: rank,
+              toFile: move.file,
+              toRank: move.rank
+            });
+          }
+        }
+      }
+    }
+
+    // Calculate captured pieces
+    const capturedPieces = this.getCapturedPieces();
+
+    // Check game over conditions
+    const isGameOver = validMoves.length === 0;
+    let result: GameResult | undefined;
+    
+    if (isGameOver) {
+      if (this.isKingInCheck(this.currentPlayer)) {
+        // Checkmate
+        result = {
+          winner: this.currentPlayer === Color.White ? Color.Black : Color.White,
+          reason: 'checkmate'
+        };
+      } else {
+        // Stalemate
+        result = { reason: 'stalemate' };
+      }
+    }
+
+    return {
+      fen: this.generateFEN(),
+      currentPlayer: this.currentPlayer,
+      validMoves,
+      isCheck: this.isKingInCheck(this.currentPlayer),
+      isGameOver,
+      result,
+      moveHistory: this.moveHistory || [],
+      capturedPieces
+    };
+  }
+
+  private getCapturedPieces(): { white: Piece[]; black: Piece[] } {
+    // Calculate what pieces should be on the board vs what actually are
+    const initialPieces = {
+      white: [
+        { type: PieceType.King, count: 1 },
+        { type: PieceType.Queen, count: 1 },
+        { type: PieceType.Rook, count: 2 },
+        { type: PieceType.Bishop, count: 2 },
+        { type: PieceType.Knight, count: 2 },
+        { type: PieceType.Pawn, count: 8 }
+      ],
+      black: [
+        { type: PieceType.King, count: 1 },
+        { type: PieceType.Queen, count: 1 },
+        { type: PieceType.Rook, count: 2 },
+        { type: PieceType.Bishop, count: 2 },
+        { type: PieceType.Knight, count: 2 },
+        { type: PieceType.Pawn, count: 8 }
+      ]
+    };
+
+    // Count current pieces
+    const currentPieces = { white: {} as any, black: {} as any };
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece) {
+          const color = piece.color === Color.White ? 'white' : 'black';
+          currentPieces[color][piece.type] = (currentPieces[color][piece.type] || 0) + 1;
+        }
+      }
+    }
+
+    // Calculate captured pieces
+    const capturedWhite: Piece[] = [];
+    const capturedBlack: Piece[] = [];
+
+    for (const { type, count } of initialPieces.white) {
+      const remaining = currentPieces.white[type] || 0;
+      for (let i = 0; i < count - remaining; i++) {
+        capturedWhite.push({ type, color: Color.White });
+      }
+    }
+
+    for (const { type, count } of initialPieces.black) {
+      const remaining = currentPieces.black[type] || 0;
+      for (let i = 0; i < count - remaining; i++) {
+        capturedBlack.push({ type, color: Color.Black });
+      }
+    }
+
+    return { white: capturedWhite, black: capturedBlack };
+  }
+
+  private generateFEN(): string {
+    // Simple FEN generation (position only, not full FEN with castling rights etc.)
+    let fen = '';
+    
+    for (let rank = 7; rank >= 0; rank--) {
+      let emptySquares = 0;
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece) {
+          if (emptySquares > 0) {
+            fen += emptySquares.toString();
+            emptySquares = 0;
+          }
+          const pieceChar = this.pieceToFENChar(piece);
+          fen += pieceChar;
+        } else {
+          emptySquares++;
+        }
+      }
+      if (emptySquares > 0) {
+        fen += emptySquares.toString();
+      }
+      if (rank > 0) {
+        fen += '/';
+      }
+    }
+
+    // Add current player
+    fen += ` ${this.currentPlayer === Color.White ? 'w' : 'b'}`;
+    
+    // Add castling rights
+    let castling = '';
+    if (this.castlingRights.whiteKingSide) castling += 'K';
+    if (this.castlingRights.whiteQueenSide) castling += 'Q';
+    if (this.castlingRights.blackKingSide) castling += 'k';
+    if (this.castlingRights.blackQueenSide) castling += 'q';
+    fen += ` ${castling || '-'}`;
+    
+    // Add en passant target square
+    if (this.enPassantTarget) {
+      const fileChar = String.fromCharCode(97 + this.enPassantTarget.file); // 'a' + file
+      const rankChar = (this.enPassantTarget.rank + 1).toString(); // rank + 1 for 1-based
+      fen += ` ${fileChar}${rankChar}`;
+    } else {
+      fen += ' -';
+    }
+    
+    // Add halfmove clock and fullmove number
+    fen += ` ${this.halfmoveClock} ${this.fullmoveNumber}`;
+
+    return fen;
+  }
+
+  private pieceToFENChar(piece: Piece): string {
+    const chars = ['p', 'r', 'n', 'b', 'q', 'k'];
+    let char = chars[piece.type];
+    return piece.color === Color.White ? char.toUpperCase() : char;
+  }
+
+  public setPosition(fen: string): boolean {
+    try {
+      const parts = fen.split(' ');
+      if (parts.length < 4) return false; // Need at least position, color, castling, en passant
+      
+      const position = parts[0];
+      const activeColor = parts[1];
+      const castlingRights = parts[2];
+      const enPassant = parts[3];
+      const halfmove = parts[4] ? parseInt(parts[4]) : 0;
+      const fullmove = parts[5] ? parseInt(parts[5]) : 1;
+      
+      // Clear board
+      this.board = this.createEmptyBoard();
+      
+      // Parse board position
+      const ranks = position.split('/');
+      for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
+        const rank = ranks[rankIndex];
+        let fileIndex = 0;
+        
+        for (const char of rank) {
+          if (char >= '1' && char <= '8') {
+            // Empty squares
+            fileIndex += parseInt(char);
+          } else {
+            // Piece
+            const piece = this.fenCharToPiece(char);
+            if (piece) {
+              this.board[7 - rankIndex][fileIndex] = piece;
+            }
+            fileIndex++;
+          }
+        }
+      }
+      
+      // Set active color
+      this.currentPlayer = activeColor === 'w' ? Color.White : Color.Black;
+      
+      // Parse castling rights
+      this.castlingRights = {
+        whiteKingSide: castlingRights.includes('K'),
+        whiteQueenSide: castlingRights.includes('Q'),
+        blackKingSide: castlingRights.includes('k'),
+        blackQueenSide: castlingRights.includes('q'),
+      };
+      
+      // Parse en passant target
+      if (enPassant !== '-') {
+        const file = enPassant.charCodeAt(0) - 97; // 'a' = 97
+        const rank = parseInt(enPassant[1]) - 1; // Convert to 0-based
+        this.enPassantTarget = { file, rank };
+      } else {
+        this.enPassantTarget = null;
+      }
+      
+      // Set move counters
+      this.halfmoveClock = halfmove;
+      this.fullmoveNumber = fullmove;
+      
+      // Clear move history and last move when setting position
+      this.lastMove = null;
+      this.moveHistory = [];
+      
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private fenCharToPiece(char: string): Piece | null {
+    const lowerChar = char.toLowerCase();
+    const color = char === lowerChar ? Color.Black : Color.White;
+    
+    switch (lowerChar) {
+      case 'p': return { type: PieceType.Pawn, color };
+      case 'r': return { type: PieceType.Rook, color };
+      case 'n': return { type: PieceType.Knight, color };
+      case 'b': return { type: PieceType.Bishop, color };
+      case 'q': return { type: PieceType.Queen, color };
+      case 'k': return { type: PieceType.King, color };
+      default: return null;
+    }
+  }
 
   public resetGame(): void {
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
     this.enPassantTarget = null;
     this.lastMove = null;
+    this.moveHistory = [];
+    this.halfmoveClock = 0;
+    this.fullmoveNumber = 1;
     this.castlingRights = {
       whiteKingSide: true,
       whiteQueenSide: true,

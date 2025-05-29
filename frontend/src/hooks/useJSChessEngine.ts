@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { JSChessEngine, Piece, Position, PieceType, Color, Move, MoveResult, ValidMoveResult } from '../engine/jsChessEngine';
+import { JSChessEngine, Piece, Position, PieceType, Color, Move, MoveResult, ValidMoveResult, GameState } from '../engine/jsChessEngine';
 
 interface ChessEngineAPI {
   getBoardState: () => (Piece | null)[][];
@@ -10,6 +10,8 @@ interface ChessEngineAPI {
   isValidMove: (from: Position, to: Position, promotionPiece?: PieceType) => ValidMoveResult;
   isKingInCheck: (color: Color) => boolean;
   getLastMove: () => Move | null;
+  getGameState: () => GameState;
+  setPosition: (fen: string) => boolean;
   resetGame: () => void;
 }
 
@@ -68,6 +70,18 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     triggerUpdate();
   }, [engine, triggerUpdate]);
 
+  const getGameState = useCallback((): GameState => {
+    return engine.getGameState();
+  }, [engine]);
+
+  const setPosition = useCallback((fen: string): boolean => {
+    const success = engine.setPosition(fen);
+    if (success) {
+      triggerUpdate();
+    }
+    return success;
+  }, [engine, triggerUpdate]);
+
   // Trigger initial update to ensure React knows about the initial board state
   useEffect(() => {
     triggerUpdate();
@@ -82,6 +96,8 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     isValidMove,
     isKingInCheck,
     getLastMove,
+    getGameState,
+    setPosition,
     resetGame
   };
 };

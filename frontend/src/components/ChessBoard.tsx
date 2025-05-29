@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { DndProvider, useDrag, useDrop, useDragLayer } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { getEmptyImage } from 'react-dnd-html5-backend';
@@ -15,7 +15,9 @@ import blackBishop from '../icons/bishop-b.svg';
 import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
-import { Piece, Position, PieceType, Color } from '../engine/jsChessEngine';
+import { useGameStateMachine } from '../hooks/useGameStateMachine';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef, Move, ChessError } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
 import './ChessBoard.css';
 
@@ -459,18 +461,35 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
   );
 };
 
-interface ChessBoardProps {
+interface ChessBoardProps extends ChessBoardCallbacks {
   size?: number; // Board size in pixels (default: fills container)
   className?: string;
   flipped?: boolean; // Whether to flip the board for black perspective
 }
 
-export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped }) => {
+export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({ 
+  size, 
+  className, 
+  flipped, 
+  onWhiteMove, 
+  onBlackMove, 
+  onError, 
+  onGameStateChange 
+}, ref) => {
   const chessEngine = useJSChessEngine();
   const [boardSize, setBoardSize] = useState(size || 512);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const squareSize = boardSize / 8;
+
+  // Initialize state machine
+  const stateMachine = useGameStateMachine({
+    chessEngine,
+    onWhiteMove,
+    onBlackMove,
+    onError,
+    onGameStateChange,
+  });
 
   // Handle responsive sizing when no size prop is provided
   useEffect(() => {
@@ -524,6 +543,39 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     toRank: 0,
     color: Color.White,
   });
+
+  // Add ref methods
+  useImperativeHandle(ref, () => ({
+    resetGame: () => {
+      chessEngine.resetGame();
+      stateMachine.actions.resetGame();
+      setSelectedSquare(null);
+      setValidMoves([]);
+      setArrows([]);
+      setHighlightedSquares([]);
+      setAnimatingPieces(null);
+    },
+    setPosition: (fen: string) => {
+      const success = chessEngine.setPosition(fen);
+      if (success) {
+        stateMachine.actions.resetGame();
+        setSelectedSquare(null);
+        setValidMoves([]);
+        setArrows([]);
+        setHighlightedSquares([]);
+        setAnimatingPieces(null);
+      }
+      return success;
+    },
+    getGameState: () => chessEngine.getGameState(),
+  }), [chessEngine, stateMachine.actions]);
+
+  // Game state change notification
+  useEffect(() => {
+    if (onGameStateChange) {
+      onGameStateChange(chessEngine.getGameState());
+    }
+  }, [chessEngine, onGameStateChange, selectedSquare, animatingPieces]);
 
   const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
     if (!chessEngine) return false;
@@ -611,6 +663,57 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
     return result.success;
   }, [chessEngine]);
 
+  // Automated player callback logic
+  useEffect(() => {
+    const currentPlayer = chessEngine.getCurrentPlayer();
+    const gameState = chessEngine.getGameState();
+    
+    // Don't trigger callbacks if game is over, animation is running, or promotion dialog is open
+    if (gameState.isGameOver || animatingPieces || promotionDialog.isOpen) {
+      return;
+    }
+
+    const callback = currentPlayer === Color.White ? onWhiteMove : onBlackMove;
+    if (callback) {
+      // This player is automated
+      const executeAutomatedMove = async () => {
+        try {
+          // Get the opponent's last move (if any)
+          const opponentMove = chessEngine.getLastMove();
+          
+          const move = await callback(gameState, opponentMove || undefined);
+          const from = { file: move.fromFile, rank: move.fromRank };
+          const to = { file: move.toFile, rank: move.toRank };
+          
+          // Validate and execute the move
+          const validationResult = chessEngine.isValidMove(from, to);
+          if (validationResult.valid) {
+            attemptMove(move.fromFile, move.fromRank, move.toFile, move.toRank, true);
+          } else {
+            const error: ChessError = {
+              type: 'invalid_move',
+              player: currentPlayer,
+              move,
+              message: 'Invalid move returned by callback'
+            };
+            onError?.(error);
+          }
+        } catch (error) {
+          const chessError: ChessError = {
+            type: 'callback_error',
+            player: currentPlayer,
+            message: `Callback error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            originalError: error instanceof Error ? error : undefined
+          };
+          onError?.(chessError);
+        }
+      };
+
+      // Execute immediately since we already checked for blocking conditions
+      executeAutomatedMove();
+    }
+  }, [chessEngine, onWhiteMove, onBlackMove, onError, attemptMove, animatingPieces, promotionDialog.isOpen]);
+
   const handleAnimationComplete = useCallback(() => {
     if (animatingPieces && chessEngine) {
       const { fromFile, fromRank, toFile, toRank, isDragCastling } = animatingPieces.moveData;
@@ -677,6 +780,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
   const handleSquareClick = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
 
+    // Check if current player is automated (has a callback)
+    const currentPlayer = chessEngine.getCurrentPlayer();
+    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isAutomated) return; // Don't accept user input for automated players
+
     // Clear arrows and highlights on any left click
     setArrows([]);
     setHighlightedSquares([]);
@@ -705,10 +813,15 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       const moves = chessEngine.getValidMoves({ file, rank });
       setValidMoves(moves);
     }
-  }, [chessEngine, selectedSquare, attemptMove]);
+  }, [chessEngine, selectedSquare, attemptMove, onWhiteMove, onBlackMove]);
 
   const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
     if (!chessEngine) return;
+
+    // Check if current player is automated (has a callback)
+    const currentPlayer = chessEngine.getCurrentPlayer();
+    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isAutomated) return; // Don't accept user input for automated players
 
     const from = { file: fromFile, rank: fromRank };
     const to = { file: toFile, rank: toRank };
@@ -753,10 +866,15 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
     // Regular move (non-castling)
     attemptMove(fromFile, fromRank, toFile, toRank);
-  }, [chessEngine, attemptMove]);
+  }, [chessEngine, attemptMove, onWhiteMove, onBlackMove]);
 
   const handleDragStart = useCallback((file: number, rank: number) => {
     if (!chessEngine) return;
+
+    // Check if current player is automated (has a callback)
+    const currentPlayer = chessEngine.getCurrentPlayer();
+    const isAutomated = currentPlayer === Color.White ? !!onWhiteMove : !!onBlackMove;
+    if (isAutomated) return; // Don't accept user input for automated players
 
     // Clear arrows, highlights, and any existing selection indicators when starting to drag
     setArrows([]);
@@ -765,7 +883,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
 
     const moves = chessEngine.getValidMoves({ file, rank });
     setValidMoves(moves);
-  }, [chessEngine]);
+  }, [chessEngine, onWhiteMove, onBlackMove]);
 
   const handleDragEnd = useCallback((file: number, rank: number) => {
 
@@ -974,4 +1092,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ size, className, flipped
       </div>
     </DndProvider>
   );
-};
+});
+
+ChessBoard.displayName = 'ChessBoard';
