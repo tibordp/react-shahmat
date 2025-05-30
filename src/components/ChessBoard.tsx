@@ -34,7 +34,6 @@ import {
   Move,
 } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
-import { calculateBasicPieceMovements } from '../utils/pieceMovements';
 import './ChessBoard.css';
 
 // Constants (animationDuration prop will override this)
@@ -986,7 +985,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
         // If we can make pre-moves (external player's turn) and pre-moves are enabled, use basic movement patterns
         if (game.canMakePreMoves && enablePreMoves) {
-          return calculateBasicPieceMovements(piece, file, rank, visualBoard);
+          return chessEngine.getPotentialMoves({ file, rank }, { forPreMove: true });
         }
 
         // Otherwise use normal engine calculation which includes all game rules

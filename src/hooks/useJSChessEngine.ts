@@ -15,6 +15,15 @@ export interface ChessEngineAPI {
   getBoardState: () => (Piece | null)[][];
   getCurrentPlayer: () => Color;
   getValidMoves: (from: Position) => Position[];
+  getPotentialMoves: (
+    from: Position,
+    options?: {
+      ignorePieceBlocking?: boolean;
+      includeIllegalMoves?: boolean;
+      forPreMove?: boolean;
+      forAnyColor?: boolean;
+    }
+  ) => Position[];
   getPiece: (position: Position) => Piece | null;
   makeMove: (
     from: Position,
@@ -58,6 +67,21 @@ export const useJSChessEngine = (): ChessEngineAPI => {
   const getValidMoves = useCallback(
     (from: Position): Position[] => {
       return engine.getValidMoves(from);
+    },
+    [engine]
+  );
+
+  const getPotentialMoves = useCallback(
+    (
+      from: Position,
+      options: {
+        ignorePieceBlocking?: boolean;
+        includeIllegalMoves?: boolean;
+        forPreMove?: boolean;
+        forAnyColor?: boolean;
+      } = {}
+    ): Position[] => {
+      return engine.getPotentialMoves(from, options);
     },
     [engine]
   );
@@ -131,6 +155,7 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getBoardState,
     getCurrentPlayer,
     getValidMoves,
+    getPotentialMoves,
     getPiece,
     makeMove,
     isValidMove,

@@ -184,6 +184,52 @@ export class JSChessEngine {
     return pseudoLegalMoves.filter(to => this.isMoveLegal(from, to));
   }
 
+  /**
+   * Get potential moves for UI hints and pre-moves.
+   * This method can be configured to show different levels of move validation.
+   */
+  public getPotentialMoves(
+    from: Position,
+    options: {
+      ignorePieceBlocking?: boolean;
+      includeIllegalMoves?: boolean;
+      forPreMove?: boolean;
+      forAnyColor?: boolean; // Allow moves for any color, not just current player
+    } = {}
+  ): Position[] {
+    const piece = this.getPiece(from);
+    if (!piece) return [];
+
+    // For pre-moves or when forAnyColor is true, allow any color
+    if (!options.forAnyColor && !options.forPreMove && piece.color !== this.currentPlayer) {
+      return [];
+    }
+
+    const moves = this.getMovementPattern(
+      from.file,
+      from.rank,
+      piece,
+      options.ignorePieceBlocking || options.forPreMove
+    );
+
+    // If we want to include illegal moves (like for pre-moves), return early
+    if (options.includeIllegalMoves || options.forPreMove) {
+      return moves;
+    }
+
+    // Otherwise filter out moves that would leave the king in check
+    return moves.filter(to => this.isMoveLegal(from, to));
+  }
+
+  /**
+   * Get basic movement pattern for a piece type, ignoring all game rules.
+   * This is useful for showing potential squares in UI.
+   */
+  public getBasicMovementPattern(pieceType: PieceType, from: Position, color: Color): Position[] {
+    const piece = { type: pieceType, color };
+    return this.getMovementPattern(from.file, from.rank, piece, true);
+  }
+
   private isMoveLegal(from: Position, to: Position): boolean {
     // Simulate the move and check if king would be in check
     const piece = this.getPiece(from);
@@ -236,51 +282,72 @@ export class JSChessEngine {
     return isLegal;
   }
 
-  private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
+  private addPawnMovesPattern(
+    from: Position,
+    color: Color,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
+  ): void {
     const direction = color === Color.White ? 1 : -1;
     const startRank = color === Color.White ? 1 : 6;
 
     // Forward move
     const newRank = from.rank + direction;
-    if (
-      this.isInBounds(from.file, newRank) &&
-      !this.getPiece({ file: from.file, rank: newRank })
-    ) {
-      moves.push({ file: from.file, rank: newRank });
+    if (this.isInBounds(from.file, newRank)) {
+      const forwardBlocked = !ignorePieceBlocking && this.getPiece({ file: from.file, rank: newRank });
+      
+      if (ignorePieceBlocking || !forwardBlocked) {
+        moves.push({ file: from.file, rank: newRank });
 
-      // Double forward from starting position
-      if (from.rank === startRank) {
-        const doubleRank = newRank + direction;
-        if (
-          this.isInBounds(from.file, doubleRank) &&
-          !this.getPiece({ file: from.file, rank: doubleRank })
-        ) {
-          moves.push({ file: from.file, rank: doubleRank });
+        // Double forward from starting position
+        if (from.rank === startRank) {
+          const doubleRank = newRank + direction;
+          if (this.isInBounds(from.file, doubleRank)) {
+            const doubleBlocked = !ignorePieceBlocking && this.getPiece({ file: from.file, rank: doubleRank });
+            if (ignorePieceBlocking || !doubleBlocked) {
+              moves.push({ file: from.file, rank: doubleRank });
+            }
+          }
         }
       }
     }
 
-    // Capture moves
+    // Capture moves (diagonal)
     for (const fileOffset of [-1, 1]) {
       const newFile = from.file + fileOffset;
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece({ file: newFile, rank: newRank });
-        if (target && target.color !== color) {
+        if (ignorePieceBlocking) {
+          // For pre-moves, show all diagonal squares
           moves.push({ file: newFile, rank: newRank });
-        }
-        // En passant capture
-        else if (
-          this.enPassantTarget &&
-          this.enPassantTarget.file === newFile &&
-          this.enPassantTarget.rank === newRank
-        ) {
-          moves.push({ file: newFile, rank: newRank });
+        } else {
+          const target = this.getPiece({ file: newFile, rank: newRank });
+          if (target && target.color !== color) {
+            moves.push({ file: newFile, rank: newRank });
+          }
+          // En passant capture
+          else if (
+            this.enPassantTarget &&
+            this.enPassantTarget.file === newFile &&
+            this.enPassantTarget.rank === newRank
+          ) {
+            moves.push({ file: newFile, rank: newRank });
+          }
         }
       }
     }
   }
 
-  private addRookMoves(from: Position, color: Color, moves: Position[]): void {
+  // Backward compatibility
+  private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
+    this.addPawnMovesPattern(from, color, moves, false);
+  }
+
+  private addRookMovesPattern(
+    from: Position,
+    color: Color,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
+  ): void {
     const directions = [
       [0, 1],
       [0, -1],
@@ -288,14 +355,20 @@ export class JSChessEngine {
       [-1, 0],
     ];
     for (const [fileDir, rankDir] of directions) {
-      this.addSlidingMoves(from, color, fileDir, rankDir, moves);
+      this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, ignorePieceBlocking);
     }
   }
 
-  private addBishopMoves(
+  // Backward compatibility
+  private addRookMoves(from: Position, color: Color, moves: Position[]): void {
+    this.addRookMovesPattern(from, color, moves, false);
+  }
+
+  private addBishopMovesPattern(
     from: Position,
     color: Color,
-    moves: Position[]
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
   ): void {
     const directions = [
       [1, 1],
@@ -304,19 +377,39 @@ export class JSChessEngine {
       [-1, -1],
     ];
     for (const [fileDir, rankDir] of directions) {
-      this.addSlidingMoves(from, color, fileDir, rankDir, moves);
+      this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, ignorePieceBlocking);
     }
   }
 
-  private addQueenMoves(from: Position, color: Color, moves: Position[]): void {
-    this.addRookMoves(from, color, moves);
-    this.addBishopMoves(from, color, moves);
-  }
-
-  private addKnightMoves(
+  // Backward compatibility
+  private addBishopMoves(
     from: Position,
     color: Color,
     moves: Position[]
+  ): void {
+    this.addBishopMovesPattern(from, color, moves, false);
+  }
+
+  private addQueenMovesPattern(
+    from: Position,
+    color: Color,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
+  ): void {
+    this.addRookMovesPattern(from, color, moves, ignorePieceBlocking);
+    this.addBishopMovesPattern(from, color, moves, ignorePieceBlocking);
+  }
+
+  // Backward compatibility
+  private addQueenMoves(from: Position, color: Color, moves: Position[]): void {
+    this.addQueenMovesPattern(from, color, moves, false);
+  }
+
+  private addKnightMovesPattern(
+    from: Position,
+    color: Color,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
   ): void {
     const knightMoves = [
       [2, 1],
@@ -334,15 +427,33 @@ export class JSChessEngine {
       const newRank = from.rank + rankOffset;
 
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece({ file: newFile, rank: newRank });
-        if (!target || target.color !== color) {
+        if (ignorePieceBlocking) {
           moves.push({ file: newFile, rank: newRank });
+        } else {
+          const target = this.getPiece({ file: newFile, rank: newRank });
+          if (!target || target.color !== color) {
+            moves.push({ file: newFile, rank: newRank });
+          }
         }
       }
     }
   }
 
-  private addKingMoves(from: Position, color: Color, moves: Position[]): void {
+  // Backward compatibility
+  private addKnightMoves(
+    from: Position,
+    color: Color,
+    moves: Position[]
+  ): void {
+    this.addKnightMovesPattern(from, color, moves, false);
+  }
+
+  private addKingMovesPattern(
+    from: Position,
+    color: Color,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
+  ): void {
     const kingMoves = [
       [1, 0],
       [-1, 0],
@@ -359,17 +470,69 @@ export class JSChessEngine {
       const newRank = from.rank + rankOffset;
 
       if (this.isInBounds(newFile, newRank)) {
-        const target = this.getPiece({ file: newFile, rank: newRank });
-        if (!target || target.color !== color) {
+        if (ignorePieceBlocking) {
           moves.push({ file: newFile, rank: newRank });
+        } else {
+          const target = this.getPiece({ file: newFile, rank: newRank });
+          if (!target || target.color !== color) {
+            moves.push({ file: newFile, rank: newRank });
+          }
         }
       }
     }
 
     // Add castling moves
-    this.addCastlingMoves(from, color, moves);
+    if (ignorePieceBlocking) {
+      // For pre-moves, add castling squares without validation
+      const homeRank = color === Color.White ? 0 : 7;
+      if (from.rank === homeRank && from.file === 4) {
+        moves.push({ file: 6, rank: homeRank }); // King side
+        moves.push({ file: 2, rank: homeRank }); // Queen side
+      }
+    } else {
+      this.addCastlingMoves(from, color, moves);
+    }
   }
 
+  // Backward compatibility
+  private addKingMoves(from: Position, color: Color, moves: Position[]): void {
+    this.addKingMovesPattern(from, color, moves, false);
+  }
+
+  private addSlidingMovesPattern(
+    from: Position,
+    color: Color,
+    fileDir: number,
+    rankDir: number,
+    moves: Position[],
+    ignorePieceBlocking: boolean = false
+  ): void {
+    let file = from.file + fileDir;
+    let rank = from.rank + rankDir;
+
+    while (this.isInBounds(file, rank)) {
+      if (ignorePieceBlocking) {
+        // For pre-moves, show all squares in the direction
+        moves.push({ file, rank });
+      } else {
+        const target = this.getPiece({ file, rank });
+
+        if (!target) {
+          moves.push({ file, rank });
+        } else {
+          if (target.color !== color) {
+            moves.push({ file, rank });
+          }
+          break;
+        }
+      }
+
+      file += fileDir;
+      rank += rankDir;
+    }
+  }
+
+  // Backward compatibility
   private addSlidingMoves(
     from: Position,
     color: Color,
@@ -377,24 +540,7 @@ export class JSChessEngine {
     rankDir: number,
     moves: Position[]
   ): void {
-    let file = from.file + fileDir;
-    let rank = from.rank + rankDir;
-
-    while (this.isInBounds(file, rank)) {
-      const target = this.getPiece({ file, rank });
-
-      if (!target) {
-        moves.push({ file, rank });
-      } else {
-        if (target.color !== color) {
-          moves.push({ file, rank });
-        }
-        break;
-      }
-
-      file += fileDir;
-      rank += rankDir;
-    }
+    this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, false);
   }
 
   private isInBounds(file: number, rank: number): boolean {
@@ -503,64 +649,50 @@ export class JSChessEngine {
     return false;
   }
 
-  private getValidMovesForPiece(
+  /**
+   * Get movement pattern for a piece, with optional piece blocking consideration.
+   * This unifies the logic used by both legal move validation and pre-move hints.
+   */
+  private getMovementPattern(
     file: number,
     rank: number,
     piece: Piece,
-    includeCastling: boolean = true
+    ignorePieceBlocking: boolean = false
   ): Position[] {
     const moves: Position[] = [];
     const from = { file, rank };
 
     switch (piece.type) {
       case PieceType.Pawn:
-        this.addPawnMoves(from, piece.color, moves);
+        this.addPawnMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
       case PieceType.Rook:
-        this.addRookMoves(from, piece.color, moves);
+        this.addRookMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
       case PieceType.Knight:
-        this.addKnightMoves(from, piece.color, moves);
+        this.addKnightMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
       case PieceType.Bishop:
-        this.addBishopMoves(from, piece.color, moves);
+        this.addBishopMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
       case PieceType.Queen:
-        this.addQueenMoves(from, piece.color, moves);
+        this.addQueenMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
       case PieceType.King:
-        // Add basic king moves
-        const kingMoves = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-          [1, 1],
-          [1, -1],
-          [-1, 1],
-          [-1, -1],
-        ];
-
-        for (const [fileOffset, rankOffset] of kingMoves) {
-          const newFile = from.file + fileOffset;
-          const newRank = from.rank + rankOffset;
-
-          if (this.isInBounds(newFile, newRank)) {
-            const target = this.getPiece({ file: newFile, rank: newRank });
-            if (!target || target.color !== piece.color) {
-              moves.push({ file: newFile, rank: newRank });
-            }
-          }
-        }
-
-        // Add castling moves only if requested
-        if (includeCastling) {
-          this.addCastlingMoves(from, piece.color, moves);
-        }
+        this.addKingMovesPattern(from, piece.color, moves, ignorePieceBlocking);
         break;
     }
 
     return moves;
+  }
+
+  private getValidMovesForPiece(
+    file: number,
+    rank: number,
+    piece: Piece,
+    includeCastling: boolean = true
+  ): Position[] {
+    return this.getMovementPattern(file, rank, piece, false);
   }
 
   private analyzeMoveType(
