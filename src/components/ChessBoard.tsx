@@ -8,18 +8,6 @@ import React, {
 } from 'react';
 import { DndProvider, useDragLayer } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
-import whitePawn from '../icons/pawn-w.svg';
-import whiteRook from '../icons/rook-w.svg';
-import whiteKnight from '../icons/knight-w.svg';
-import whiteBishop from '../icons/bishop-w.svg';
-import whiteQueen from '../icons/queen-w.svg';
-import whiteKing from '../icons/king-w.svg';
-import blackPawn from '../icons/pawn-b.svg';
-import blackRook from '../icons/rook-b.svg';
-import blackKnight from '../icons/knight-b.svg';
-import blackBishop from '../icons/bishop-b.svg';
-import blackQueen from '../icons/queen-b.svg';
-import blackKing from '../icons/king-b.svg';
 import { Square } from './Square';
 import { ArrowOverlay } from './ArrowOverlay';
 import { PromotionDialog } from './PromotionDialog';
@@ -38,34 +26,9 @@ import {
   Move,
 } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
+import { getPieceIcon, whiteKing } from '../utils/pieceIcons';
 import './ChessBoard.css';
 
-// Piece icons for drag layer (duplicated from PieceAnimations for independence)
-const PIECE_ICONS: { [key: string]: string } = {
-  White_Pawn: whitePawn,
-  White_Rook: whiteRook,
-  White_Knight: whiteKnight,
-  White_Bishop: whiteBishop,
-  White_Queen: whiteQueen,
-  White_King: whiteKing,
-  Black_Pawn: blackPawn,
-  Black_Rook: blackRook,
-  Black_Knight: blackKnight,
-  Black_Bishop: blackBishop,
-  Black_Queen: blackQueen,
-  Black_King: blackKing,
-};
-
-function getPieceTypeName(pieceType: number): string {
-  const types = ['Pawn', 'Rook', 'Knight', 'Bishop', 'Queen', 'King'];
-  return types[pieceType] || 'Unknown';
-}
-
-function getPieceIcon(piece: Piece): string {
-  const colorName = piece.color === Color.White ? 'White' : 'Black';
-  const typeName = getPieceTypeName(piece.type);
-  return PIECE_ICONS[`${colorName}_${typeName}`];
-}
 
 
 
