@@ -18,6 +18,10 @@
 .env.test.local
 .env.production.local
 
+# stockfish files (copied from node_modules during build)
+/public/stockfish.js
+/public/stockfish-nnue-16-single.wasm
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

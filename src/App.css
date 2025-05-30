@@ -313,3 +313,25 @@
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   Stockfish Status Indicator
+   ========================================================================== */
+
+.stockfish-status {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.stockfish-status.ready {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.stockfish-status.loading {
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.1);
+}

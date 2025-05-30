@@ -87,6 +87,7 @@ export function useChessGame({
       });
       return true;
     } else {
+      console.log('Invalid move attempt:', validationResult);
       const error: ChessError = {
         type: 'invalid_move',
         player: currentPlayer!,

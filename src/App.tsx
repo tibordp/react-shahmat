@@ -2,6 +2,7 @@ import React from 'react';
 import './App.css';
 import { ChessBoard } from './components/ChessBoard';
 import { GameState, Move, ChessError, PieceType, ChessBoardRef } from './engine/jsChessEngine';
+import { useStockfish } from './hooks/useStockfish';
 
 function App() {
   const [flipped, setFlipped] = React.useState(false);
@@ -17,29 +18,57 @@ function App() {
   const [enableSounds, setEnableSounds] = React.useState(true);
   const [enableArrows, setEnableArrows] = React.useState(true);
   const [enableHighlights, setEnableHighlights] = React.useState(true);
+  const [aiSkillLevel, setAiSkillLevel] = React.useState(5);
   const chessBoardRef = React.useRef<ChessBoardRef>(null);
+  const stockfish = useStockfish();
 
-  const handlePositionChange = React.useCallback((gameState: GameState, lastMove?: Move) => {
+  const handlePositionChange = React.useCallback(async (gameState: GameState, lastMove?: Move) => {
     // Determine if current player is AI
     const currentPlayerIsAi = gameState.currentPlayer === 0 ? whiteAi : blackAi;
     console.log('Position changed:', gameState, 'Last move:', lastMove);
+
+    const startTick = performance.now();
+    const sendMove = (move: Move) => {
+      const took = performance.now() - startTick;
+      if (took < 500) {
+        setTimeout(() => {
+          chessBoardRef.current?.executeExternalMove(move);
+        }, 500 - took);
+      } else {
+        chessBoardRef.current?.executeExternalMove(move);
+      }
+    };
+
     if (currentPlayerIsAi && !gameState.isGameOver && chessBoardRef.current) {
-      // Add a small delay to simulate thinking time
-      setTimeout(async () => {
         try {
-          // Pick a random legal move (includes all promotion options)
-          const validMoves = gameState.validMoves;
-          if (validMoves.length > 0) {
-            const randomIndex = Math.floor(Math.random() * validMoves.length);
-            const move = validMoves[randomIndex];
-            chessBoardRef.current?.executeExternalMove(move);
+          let move: Move | null = null;
+
+          if (stockfish.isReady && !stockfish.isThinking) {
+            // Try to get move from Stockfish
+            move = await stockfish.getBestMove(gameState.fen, aiSkillLevel);
+          }
+
+          // Fallback to random move if Stockfish fails
+          if (!move && gameState.validMoves.length > 0) {
+            console.log('Using fallback random move');
+            const randomIndex = Math.floor(Math.random() * gameState.validMoves.length);
+            move = gameState.validMoves[randomIndex];
+          }
+
+          if (move && chessBoardRef.current) {
+            sendMove(move);
           }
         } catch (error) {
           console.error('AI move error:', error);
+          // Final fallback to random move
+          if (gameState.validMoves.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameState.validMoves.length);
+            const move = gameState.validMoves[randomIndex];
+            sendMove(move);
+          }
         }
-      }, 1000);
     }
-  }, [whiteAi, blackAi]);
+  }, [whiteAi, blackAi, stockfish, aiSkillLevel]);
 
   const handleError = React.useCallback((error: ChessError) => {
     console.error('Chess engine error:', error);
@@ -70,7 +99,7 @@ function App() {
 
   return (
     <div className="App">
-      <button 
+      <button
         className="mobile-menu-toggle"
         onClick={() => setControlsOpen(!controlsOpen)}
         aria-label="Toggle controls"
@@ -236,6 +265,30 @@ function App() {
             <option value={500}>Slow (500ms)</option>
             <option value={800}>Very Slow (800ms)</option>
           </select>
+        </div>
+
+        <div className="control-group">
+          <label htmlFor="aiSkillLevel">Stockfish Skill Level:</label>
+          <select
+            id="aiSkillLevel"
+            value={aiSkillLevel}
+            onChange={(e) => setAiSkillLevel(parseInt(e.target.value))}
+            className="control-select-small"
+          >
+            <option value={1}>Level 1 (1-ply depth)</option>
+            <option value={3}>Level 3 (2-ply depth)</option>
+            <option value={5}>Level 5 (3-ply depth)</option>
+            <option value={8}>Level 8 (500ms time)</option>
+            <option value={15}>Level 15 (1000ms time)</option>
+            <option value={20}>Level 20 (2000ms time)</option>
+          </select>
+        </div>
+
+        <div className="control-group">
+          <label>Stockfish Status:</label>
+          <span className={`stockfish-status ${stockfish.isReady ? 'ready' : 'loading'}`} style={{display: 'inline-block', minWidth: '80px'}}>
+            {stockfish.isThinking ? 'Thinking...' : stockfish.isReady ? 'Ready' : 'Loading...'}
+          </span>
         </div>
 
         <div className="control-group">
