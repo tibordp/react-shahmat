@@ -23,8 +23,10 @@ import blackKing from '../icons/king-b.svg';
 import { Square } from './Square';
 import { ArrowOverlay } from './ArrowOverlay';
 import { PromotionDialog } from './PromotionDialog';
+import { PieceAnimations } from './PieceAnimations';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
 import { useChessGame } from '../hooks/useChessGame';
+import { usePieceAnimations } from '../hooks/usePieceAnimations';
 import {
   Piece,
   Position,
@@ -38,9 +40,7 @@ import {
 import { soundManager } from '../utils/soundManager';
 import './ChessBoard.css';
 
-// Constants (animationDuration prop will override this)
-// const DEFAULT_ANIMATION_DURATION = 300; // Currently unused
-
+// Piece icons for drag layer (duplicated from PieceAnimations for independence)
 const PIECE_ICONS: { [key: string]: string } = {
   White_Pawn: whitePawn,
   White_Rook: whiteRook,
@@ -66,6 +66,7 @@ function getPieceIcon(piece: Piece): string {
   const typeName = getPieceTypeName(piece.type);
   return PIECE_ICONS[`${colorName}_${typeName}`];
 }
+
 
 
 
@@ -115,89 +116,6 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
   );
 };
 
-interface AnimatingPieceProps {
-  piece: Piece;
-  from: Position;
-  to: Position;
-  startTime: number;
-  flipped?: boolean; // Whether to flip the board for black perspective
-  onComplete: () => void;
-}
-
-const AnimatingPiece: React.FC<
-  AnimatingPieceProps & { squareSize: number; animationDuration: number }
-> = ({
-  piece,
-  from,
-  to,
-  startTime,
-  onComplete,
-  squareSize,
-  flipped,
-  animationDuration,
-}) => {
-  const effectiveFrom = flipped
-    ? { file: 7 - from.file, rank: 7 - from.rank }
-    : from;
-  const effectiveTo = flipped ? { file: 7 - to.file, rank: 7 - to.rank } : to;
-
-  const fromX = effectiveFrom.file * squareSize + squareSize / 2;
-  const fromY = (7 - effectiveFrom.rank) * squareSize + squareSize / 2;
-  const toX = effectiveTo.file * squareSize + squareSize / 2;
-  const toY = (7 - effectiveTo.rank) * squareSize + squareSize / 2;
-
-  const [position, setPosition] = useState({ x: fromX, y: fromY });
-  const animationRef = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / animationDuration, 1);
-
-      // Easing function for smooth animation
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-
-      const currentX = fromX + (toX - fromX) * easeOutQuart;
-      const currentY = fromY + (toY - fromY) * easeOutQuart;
-
-      setPosition({ x: currentX, y: currentY });
-
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        onComplete();
-      }
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [fromX, fromY, toX, toY, startTime, onComplete, animationDuration]);
-
-  const pieceIcon = getPieceIcon(piece);
-  const scale = squareSize * 0.95; // Scale down to fit within the square
-  return (
-    <div
-      className='animating-piece'
-      style={{
-        left: position.x - scale / 2,
-        top: position.y - scale / 2,
-        width: scale,
-        height: scale,
-      }}
-    >
-      <img
-        src={pieceIcon}
-        alt='animating piece'
-        className='animating-piece-img'
-      />
-    </div>
-  );
-};
 
 
 interface GameEndBadgeProps {
@@ -401,6 +319,12 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       onError,
     });
 
+    // Initialize animation system
+    const animations = usePieceAnimations({
+      enableAnimations,
+      animationDuration,
+    });
+
     // Handle responsive sizing when no size prop is provided
     useEffect(() => {
       if (size) return; // Don't resize if explicit size is provided
@@ -567,18 +491,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       [chessEngine, game.canMakePreMoves, getVisualBoardState, enablePreMoves]
     );
 
-    const [animatingPieces, setAnimatingPieces] = useState<{
-      pieces: Array<{
-        piece: Piece;
-        from: Position;
-        to: Position;
-      }>;
-      startTime: number;
-      moveId: string; // Unique identifier for this animation
-    } | null>(null);
-
-    // Store completed animations to allow for interruption
-    const animationCompleteRef = useRef<(() => void) | null>(null);
 
     // Shared function to handle pre-move logic
     const handlePreMoveAttempt = useCallback(
@@ -590,7 +502,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       ): boolean => {
         // Allow pre-moves when it's external player's turn OR during any animation
         if (
-          !(game.canMakePreMoves || animatingPieces) ||
+          !(game.canMakePreMoves || animations.isAnimating) ||
           !enablePreMoves ||
           !chessEngine
         )
@@ -674,7 +586,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         isPawnPromotion,
         game,
         autoPromotionPiece,
-        animatingPieces,
+        animations.isAnimating,
         whiteIsHuman,
         blackIsHuman,
         enableSounds,
@@ -709,7 +621,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
           setValidMoves([]);
           setArrows([]);
           setHighlightedSquares([]);
-          setAnimatingPieces(null);
+          animations.interruptAnimation();
           setKingInCheckHighlight(null);
         },
         setPosition: (fen: string) => {
@@ -719,7 +631,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
             setValidMoves([]);
             setArrows([]);
             setHighlightedSquares([]);
-            setAnimatingPieces(null);
+            animations.interruptAnimation();
             setKingInCheckHighlight(null);
           }
           return success;
@@ -727,20 +639,9 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         getGameState: () => chessEngine.getGameState(),
         executeExternalMove: (move: Move) => game.executeExternalMove(move),
       }),
-      [game, chessEngine]
+      [game, chessEngine, animations]
     );
 
-    // Helper function to interrupt current animation if needed
-    const interruptAnimation = useCallback(() => {
-      if (animatingPieces) {
-        // Cancel any ongoing animation
-        if (animationCompleteRef.current) {
-          animationCompleteRef.current();
-          animationCompleteRef.current = null;
-        }
-        setAnimatingPieces(null);
-      }
-    }, [animatingPieces]);
 
     // Unified move execution function that handles both human and external moves
     const executeMove = useCallback(
@@ -783,9 +684,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
         // Handle animation after move execution (purely visual)
         if (animate && enableAnimations && movingPiece) {
-          // Interrupt any current animation
-          interruptAnimation();
-
           const piecesToAnimate = [
             {
               piece: movingPiece,
@@ -805,12 +703,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
             }
           }
 
-          const moveId = `${Date.now()}-${Math.random()}`;
-          setAnimatingPieces({
-            pieces: piecesToAnimate,
-            startTime: Date.now(),
-            moveId,
-          });
+          animations.startAnimation(piecesToAnimate);
         }
 
         return true;
@@ -820,7 +713,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         game,
         playMoveSound,
         enableAnimations,
-        interruptAnimation,
+        animations,
         handleInvalidMoveInCheck,
       ]
     );
@@ -895,18 +788,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       }
     }, [game.lastExternalMove, executeMove, enableAnimations, game]);
 
-    const handleAnimationComplete = useCallback(() => {
-      // Animation is now purely visual - just clean up
-      setAnimatingPieces(null);
-      animationCompleteRef.current = null;
-    }, []);
-
-    // Set up the animation completion reference when animation starts
-    useEffect(() => {
-      if (animatingPieces) {
-        animationCompleteRef.current = handleAnimationComplete;
-      }
-    }, [animatingPieces, handleAnimationComplete]);
 
     const handlePromotion = useCallback(
       (pieceType: PieceType) => {
@@ -1013,7 +894,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
           }
         }
         // Handle pre-moves when it's external player's turn OR during any animation (and pre-moves are enabled)
-        else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
+        else if ((game.canMakePreMoves || animations.isAnimating) && enablePreMoves) {
           // Determine human player color (opposite of current player)
           const humanPlayerColor =
             chessEngine.getCurrentPlayer() === Color.White
@@ -1061,7 +942,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         getVisualBoardState,
         enablePreMoves,
         handlePreMoveAttempt,
-        animatingPieces,
+        animations.isAnimating,
         enableAnimations,
       ]
     );
@@ -1097,22 +978,14 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
               // Animate only the rook visually if animations enabled (move is already executed, king is in position)
               if (validationResult.additionalMoves && enableAnimations) {
-                // Interrupt any current animation
-                interruptAnimation();
-
                 const rookMove = validationResult.additionalMoves[0];
-                const moveId = `${Date.now()}-${Math.random()}`;
-                setAnimatingPieces({
-                  pieces: [
-                    {
-                      piece: rookMove.piece,
-                      from: rookMove.from,
-                      to: rookMove.to,
-                    },
-                  ],
-                  startTime: Date.now(),
-                  moveId,
-                });
+                animations.startAnimation([
+                  {
+                    piece: rookMove.piece,
+                    from: rookMove.from,
+                    to: rookMove.to,
+                  },
+                ]);
               }
             }
             return;
@@ -1122,7 +995,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
           attemptMove(fromFile, fromRank, toFile, toRank, false);
         }
         // Handle pre-move drops when it's external player's turn OR during any animation (and pre-moves are enabled)
-        else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
+        else if ((game.canMakePreMoves || animations.isAnimating) && enablePreMoves) {
           // Use shared pre-move logic
           handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
           setSelectedSquare(null);
@@ -1136,10 +1009,9 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         handlePreMoveAttempt,
         enablePreMoves,
         playMoveSound,
-        animatingPieces,
+        animations,
         enableAnimations,
         handleInvalidMoveInCheck,
-        interruptAnimation,
       ]
     );
 
@@ -1224,24 +1096,24 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
     const isAnimatingFrom = useCallback(
       (file: number, rank: number) => {
         return (
-          animatingPieces?.pieces.some(
+          animations.animatingPieces?.pieces.some(
             p => p.from.file === file && p.from.rank === rank
           ) || false
         );
       },
-      [animatingPieces]
+      [animations.animatingPieces]
     );
 
     const isAnimatingTo = useCallback(
       (file: number, rank: number) => {
         // Hide pieces at animation destination squares
         return (
-          animatingPieces?.pieces.some(
+          animations.animatingPieces?.pieces.some(
             p => p.to.file === file && p.to.rank === rank
           ) || false
         );
       },
-      [animatingPieces]
+      [animations.animatingPieces]
     );
 
     const isLastMoveFrom = useCallback(
@@ -1415,21 +1287,15 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
               flipped={flipped}
             />
 
-            {enableAnimations &&
-              animatingPieces &&
-              animatingPieces.pieces.map((animatingPiece, index) => (
-                <AnimatingPiece
-                  key={`${animatingPiece.from.file}-${animatingPiece.from.rank}-${index}`}
-                  piece={animatingPiece.piece}
-                  from={animatingPiece.from}
-                  to={animatingPiece.to}
-                  startTime={animatingPieces.startTime}
-                  squareSize={squareSize}
-                  animationDuration={animationDuration}
-                  onComplete={index === 0 ? handleAnimationComplete : () => {}} // Only call completion for the first piece
-                  flipped={flipped}
-                />
-              ))}
+            {enableAnimations && (
+              <PieceAnimations
+                animationState={animations.animatingPieces}
+                squareSize={squareSize}
+                animationDuration={animationDuration}
+                flipped={flipped}
+                onAnimationComplete={animations.handleAnimationComplete}
+              />
+            )}
 
             {/* Promotion dialog overlay */}
             <PromotionDialog
