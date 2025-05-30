@@ -233,28 +233,52 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       (result: any, delay: number = 0) => {
         if (!enableSounds) return;
 
+        console.log('playMoveSound called with result:', result);
         const gameState = chessEngine.getGameState();
 
+        // Game end conditions have highest priority
+        if (gameState.isGameOver && gameState.result) {
+          if (gameState.result.reason === 'checkmate') {
+            // Checkmate - dramatic conclusion
+            if (delay > 0) {
+              setTimeout(() => soundManager.playCheckmateSound(), delay);
+            } else {
+              soundManager.playCheckmateSound();
+            }
+            return; // Don't play other sounds for game end
+          } else if (gameState.result.reason === 'stalemate') {
+            // Stalemate/Draw - peaceful resolution
+            if (delay > 0) {
+              setTimeout(() => soundManager.playDrawSound(), delay);
+            } else {
+              soundManager.playDrawSound();
+            }
+            return; // Don't play other sounds for game end
+          }
+        }
+
+        // Regular game sounds (corrected priority order)
         if (gameState.isCheck) {
-          // Check has highest priority
+          // Check has highest priority among non-game-ending moves
           if (delay > 0) {
             setTimeout(() => soundManager.playCheckSound(), delay);
           } else {
             soundManager.playCheckSound();
           }
-        } else if (result?.capturedPiece) {
-          // Capture sound has second priority
-          if (delay > 0) {
-            setTimeout(() => soundManager.playCaptureSound(), delay);
-          } else {
-            soundManager.playCaptureSound();
-          }
         } else if (result?.type === 'promotion') {
-          // Promotion sound has third priority
+          // Promotion sound has second priority (before capture, since promotions can also capture)
+          console.log('Playing promotion sound, result:', result);
           if (delay > 0) {
             setTimeout(() => soundManager.playPromotionSound(), delay);
           } else {
             soundManager.playPromotionSound();
+          }
+        } else if (result?.capturedPiece) {
+          // Capture sound has third priority
+          if (delay > 0) {
+            setTimeout(() => soundManager.playCaptureSound(), delay);
+          } else {
+            soundManager.playCaptureSound();
           }
         } else {
           // Regular move sound is default

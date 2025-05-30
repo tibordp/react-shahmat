@@ -32,24 +32,24 @@
   transition: all 0.2s ease;
 }
 
-/* Square Color Variants */
+/* Square Color Variants - Chess.com inspired green theme */
 .square.light {
-  background-color: #f0d9b5;
+  background-color: #eeeed2; /* Light cream/off-white for light squares */
 }
 
 .square.dark {
-  background-color: #b58863;
+  background-color: #769656; /* Rich forest green for dark squares */
 }
 
 /* Square State Styles */
 .square.last-move.light,
 .square.selected.light {
-  background-color: #ffb765;
+  background-color: #f7ec74; /* Bright yellow for selected/last move on light squares */
 }
 
 .square.last-move.dark,
 .square.selected.dark {
-  background-color: #e59a43;
+  background-color: #baca44; /* Much darker yellow that clearly contrasts with light squares */
 }
 
 .square.highlighted.light {
@@ -152,11 +152,11 @@
 }
 
 .light-text {
-  color: #f0d9b5;
+  color: #eeeed2; /* Light cream text for dark squares */
 }
 
 .dark-text {
-  color: #b58863;
+  color: #769656; /* Green text for light squares */
 }
 
 /* Piece Styles */

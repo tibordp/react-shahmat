@@ -900,6 +900,7 @@ export class JSChessEngine {
       `Making move from ${from.file},${from.rank} to ${to.file},${to.rank} with promotion: ${promotionPiece}`
     );
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
+    console.log('analyzeMoveType returned:', analysis);
     if (!analysis.valid) {
       return {
         success: false,
@@ -909,6 +910,7 @@ export class JSChessEngine {
 
     const piece = this.getPiece(from)!; // We know it exists from analysis
     const { type, capturedPiece, additionalMoves } = analysis;
+    console.log('Move analysis result:', analysis);
 
     // Clear en passant target from previous turn
     this.enPassantTarget = null;
