@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Move } from '../engine/jsChessEngine';
+import { Move } from 'react-shahmat';
 
 export interface StockfishAPI {
   getBestMove: (fen: string, skillLevel?: number) => Promise<Move | null>;

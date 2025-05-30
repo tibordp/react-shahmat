@@ -37,7 +37,7 @@ interface CustomDragLayerProps {
 }
 
 const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
-  const { isDragging, item, currentOffset } = useDragLayer(monitor => ({
+  const { isDragging, item, currentOffset } = useDragLayer((monitor: any) => ({
     item: monitor.getItem(),
     currentOffset: monitor.getClientOffset(),
     isDragging: monitor.isDragging(),

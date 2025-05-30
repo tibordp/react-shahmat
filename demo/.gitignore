@@ -12,13 +12,17 @@ package-lock.json
 
 # production
 /build
-/dist
 
-# development
+# misc
+.DS_Store
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# stockfish files (copied from node_modules during build)
+/public/stockfish.js
+/public/stockfish-nnue-16-single.wasm
 
 # IDE and editor files
 .vscode/
@@ -27,26 +31,10 @@ package-lock.json
 *.swo
 *~
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
 
 # Optional npm cache directory
 .npm
@@ -64,16 +52,5 @@ pids
 tmp/
 temp/
 
-# Demo app (has its own gitignore)
-demo/node_modules/
-demo/build/
-demo/.env.local
-demo/.env.development.local
-demo/.env.test.local
-demo/.env.production.local
-demo/npm-debug.log*
-demo/yarn-debug.log*
-demo/yarn-error.log*
-
-# Vercel
-.vercel
+# Create React App specific
+.env

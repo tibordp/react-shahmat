@@ -1,46 +1,110 @@
-# Getting Started with Create React App
+# react-shahmat
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React chess board component with built-in game logic, animations, and sound effects. Features include drag-and-drop piece movement, premove support, right-click arrows and square highlighting, and visual game end indicators.
 
-## Available Scripts
+**Disclaimer:** This library was entirely created by Claude Code. The code quality and architecture may not meet typical production standards.
 
-In the project directory, you can run:
+## Installation
 
-### `npm start`
+```bash
+npm install react-shahmat
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Basic Usage
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```tsx
+import React from 'react';
+import { ChessBoard } from 'react-shahmat';
+import 'react-shahmat/dist/ChessBoard.css';
 
-### `npm test`
+function App() {
+  return (
+    <div style={{ width: '500px', height: '500px' }}>
+      <ChessBoard />
+    </div>
+  );
+}
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Features
 
-### `npm run build`
+- **Built-in chess engine** - Complete game logic with move validation
+- **Touch and mouse support** - Works on desktop and mobile devices  
+- **Premove functionality** - Queue moves while waiting for opponent
+- **Piece animations** - Smooth movement transitions
+- **Sound effects** - Audio feedback for moves, captures, check, and game end
+- **Visual indicators** - Last move highlighting, valid move dots, game end badges
+- **Right-click interactions** - Draw arrows and highlight squares
+- **Responsive design** - Automatically sizes to container
+- **TypeScript support** - Full type definitions included
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Props
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `size` | `number` | `undefined` | Fixed board size in pixels (responsive if omitted) |
+| `flipped` | `boolean` | `false` | Whether to flip board for black perspective |
+| `whiteIsHuman` | `boolean` | `true` | Whether white player is human-controlled |
+| `blackIsHuman` | `boolean` | `true` | Whether black player is human-controlled |
+| `enablePreMoves` | `boolean` | `true` | Enable premove functionality |
+| `autoPromotionPiece` | `PieceType` | `undefined` | Auto-promote pawns to this piece |
+| `showCoordinates` | `boolean` | `true` | Show rank and file labels |
+| `animationDuration` | `number` | `300` | Animation duration in milliseconds |
+| `enableAnimations` | `boolean` | `true` | Enable piece movement animations |
+| `enableSounds` | `boolean` | `true` | Enable sound effects |
+| `enableArrows` | `boolean` | `true` | Enable right-click arrow drawing |
+| `enableHighlights` | `boolean` | `true` | Enable right-click square highlighting |
+| `onPositionChange` | `function` | `undefined` | Called when position changes |
+| `onError` | `function` | `undefined` | Called on game errors |
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Ref Methods
 
-### `npm run eject`
+```tsx
+const boardRef = useRef<ChessBoardRef>(null);
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+// Reset to starting position
+boardRef.current?.resetGame();
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+// Set position from FEN
+boardRef.current?.setPosition('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+// Get current game state
+const gameState = boardRef.current?.getGameState();
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+// Execute external move (for AI/online opponents)
+boardRef.current?.executeExternalMove({
+  fromFile: 4, fromRank: 1, toFile: 4, toRank: 3
+});
+```
 
-## Learn More
+## Example with AI Integration
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```tsx
+import React, { useRef } from 'react';
+import { ChessBoard, ChessBoardRef, GameState, Move } from 'react-shahmat';
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+function ChessGame() {
+  const boardRef = useRef<ChessBoardRef>(null);
+
+  const handlePositionChange = (gameState: GameState, lastMove?: Move) => {
+    if (gameState.currentPlayer === 'black' && !gameState.isGameOver) {
+      // Trigger AI move
+      calculateAIMove(gameState.fen).then(aiMove => {
+        boardRef.current?.executeExternalMove(aiMove);
+      });
+    }
+  };
+
+  return (
+    <ChessBoard
+      ref={boardRef}
+      blackIsHuman={false}
+      onPositionChange={handlePositionChange}
+    />
+  );
+}
+```
+
+## License
+
+MIT

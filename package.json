@@ -1,197 +1,71 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
-  "private": true,
+  "name": "react-shahmat",
+  "version": "1.0.0",
+  "description": "A React chess board component with built-in game logic, animations, and sound effects. Features drag-and-drop, premoves, arrows, and visual indicators.",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=16.14.0",
+    "react-dom": ">=16.14.0"
+  },
   "dependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.126",
-    "@types/react": "^19.1.5",
-    "@types/react-dom": "^19.1.5",
-    "react": "^19.1.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
-    "react-dnd-touch-backend": "^16.0.1",
-    "react-dom": "^19.1.0",
-    "react-scripts": "5.0.1",
-    "stockfish": "^16.0.0",
-    "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
-  },
-  "scripts": {
-    "start": "npm run copy-stockfish && react-scripts start",
-    "build": "npm run copy-stockfish && react-scripts build",
-    "copy-stockfish": "cp node_modules/stockfish/src/stockfish-nnue-16-single.js public/stockfish.js && cp node_modules/stockfish/src/stockfish-nnue-16-single.wasm public/stockfish-nnue-16-single.wasm",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
-    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,md}\""
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest",
-      "plugin:jsx-a11y/recommended",
-      "plugin:import/recommended",
-      "plugin:import/typescript",
-      "prettier"
-    ],
-    "plugins": [
-      "prettier",
-      "jsx-a11y",
-      "import"
-    ],
-    "rules": {
-      "prettier/prettier": "error",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        {
-          "argsIgnorePattern": "^_"
-        }
-      ],
-      "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/prefer-const": "error",
-      "@typescript-eslint/no-non-null-assertion": "error",
-      "@typescript-eslint/no-empty-function": "error",
-      "@typescript-eslint/no-empty-interface": "error",
-      "@typescript-eslint/no-inferrable-types": "error",
-      "@typescript-eslint/no-unnecessary-type-assertion": "error",
-      "@typescript-eslint/prefer-optional-chain": "error",
-      "@typescript-eslint/prefer-nullish-coalescing": "error",
-      "@typescript-eslint/strict-boolean-expressions": [
-        "error",
-        {
-          "allowString": false,
-          "allowNumber": false,
-          "allowNullableObject": false
-        }
-      ],
-      "react-hooks/exhaustive-deps": "error",
-      "react/jsx-no-useless-fragment": "error",
-      "react/jsx-curly-brace-presence": [
-        "error",
-        {
-          "props": "never",
-          "children": "never"
-        }
-      ],
-      "react/no-array-index-key": "warn",
-      "react/prefer-stateless-function": "error",
-      "react/self-closing-comp": "error",
-      "no-console": [
-        "error",
-        {
-          "allow": [
-            "warn",
-            "error"
-          ]
-        }
-      ],
-      "no-debugger": "error",
-      "no-alert": "error",
-      "no-duplicate-imports": "error",
-      "no-implicit-coercion": "error",
-      "no-nested-ternary": "error",
-      "no-return-await": "error",
-      "no-throw-literal": "error",
-      "no-unneeded-ternary": "error",
-      "no-useless-concat": "error",
-      "no-useless-return": "error",
-      "prefer-const": "error",
-      "prefer-template": "error",
-      "no-var": "error",
-      "eqeqeq": [
-        "error",
-        "always"
-      ],
-      "curly": [
-        "error",
-        "all"
-      ],
-      "dot-notation": "error",
-      "no-else-return": "error",
-      "no-lonely-if": "error",
-      "no-magic-numbers": [
-        "warn",
-        {
-          "ignore": [
-            -1,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8
-          ],
-          "ignoreArrayIndexes": true,
-          "ignoreDefaultValues": true
-        }
-      ],
-      "no-multiple-empty-lines": [
-        "error",
-        {
-          "max": 1
-        }
-      ],
-      "object-shorthand": "error",
-      "one-var": [
-        "error",
-        "never"
-      ],
-      "prefer-arrow-callback": "error",
-      "prefer-destructuring": [
-        "error",
-        {
-          "array": true,
-          "object": true
-        },
-        {
-          "enforceForRenamedProperties": false
-        }
-      ],
-      "spaced-comment": [
-        "error",
-        "always"
-      ],
-      "yoda": "error",
-      "import/order": ["error", {
-        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
-        "newlines-between": "always",
-        "alphabetize": { "order": "asc", "caseInsensitive": true }
-      }],
-      "import/no-unresolved": "error",
-      "import/no-duplicates": "error",
-      "import/no-unused-modules": "warn",
-      "jsx-a11y/alt-text": "error",
-      "jsx-a11y/click-events-have-key-events": "error",
-      "jsx-a11y/no-static-element-interactions": "error"
-    }
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "react-dnd-touch-backend": "^16.0.1"
   },
   "devDependencies": {
-    "eslint-config-prettier": "^10.1.5",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-prettier": "^5.4.1",
-    "prettier": "^3.5.3"
-  }
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@rollup/plugin-url": "^8.0.2",
+    "@types/react": "^19.1.5",
+    "@types/react-dom": "^19.1.5",
+    "@typescript-eslint/eslint-plugin": "^8.33.0",
+    "@typescript-eslint/parser": "^8.33.0",
+    "eslint": "^9.27.0",
+    "eslint-plugin-react": "^7.32.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "postcss": "^8.5.4",
+    "rollup": "^4.41.1",
+    "rollup-plugin-copy": "^3.5.0",
+    "rollup-plugin-dts": "^6.2.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "rollup-plugin-postcss": "^4.0.2",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "react",
+    "chess",
+    "chessboard",
+    "game",
+    "component",
+    "typescript",
+    "shahmat",
+    "interactive"
+  ],
+  "author": "Claude Code <noreply@anthropic.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tibordp/react-shahmat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tibordp/react-shahmat/issues"
+  },
+  "homepage": "https://github.com/tibordp/react-shahmat#readme"
 }

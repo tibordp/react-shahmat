@@ -78,7 +78,7 @@ export const Square: React.FC<SquareProps> = ({
       end: () => {
         onDragEnd(file, rank);
       },
-      collect: monitor => ({
+      collect: (monitor: any) => ({
         isDragging: monitor.isDragging(),
       }),
     }),
@@ -93,10 +93,10 @@ export const Square: React.FC<SquareProps> = ({
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: 'piece',
-      drop: (item: DragItem, monitor) => {
+      drop: (item: DragItem, monitor: any) => {
         onDrop(item.file, item.rank, file, rank);
       },
-      collect: monitor => ({
+      collect: (monitor: any) => ({
         isOver: monitor.isOver() && monitor.canDrop(),
       }),
     }),

@@ -1,13 +1,14 @@
 import React from 'react';
 import './App.css';
-import { ChessBoard } from './components/ChessBoard';
+import 'react-shahmat/dist/ChessBoard.css';
 import {
+  ChessBoard,
+  ChessBoardRef,
   GameState,
   Move,
   ChessError,
-  PieceType,
-  ChessBoardRef,
-} from './engine/jsChessEngine';
+  PieceType
+} from 'react-shahmat';
 import { useStockfish } from './hooks/useStockfish';
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
       // Determine if current player is AI
       const currentPlayerIsAi =
         gameState.currentPlayer === 0 ? whiteAi : blackAi;
+      // eslint-disable-next-line no-console
       console.log('Position changed:', gameState, 'Last move:', lastMove);
 
       const startTick = performance.now();
@@ -60,7 +62,7 @@ function App() {
 
           // Fallback to random move if Stockfish fails
           if (!move && gameState.validMoves.length > 0) {
-            console.log('Using fallback random move');
+            console.warn('Using fallback random move');
             const randomIndex = Math.floor(
               Math.random() * gameState.validMoves.length
             );
@@ -98,7 +100,7 @@ function App() {
     if (fenInput.trim() && chessBoardRef.current) {
       const success = chessBoardRef.current.setPosition(fenInput.trim());
       if (!success) {
-        alert('Invalid FEN string');
+        console.error('Invalid FEN string');
       }
     }
   }, [fenInput]);
@@ -109,7 +111,7 @@ function App() {
       if (chessBoardRef.current) {
         const success = chessBoardRef.current.setPosition(fen);
         if (!success) {
-          alert(`Failed to load ${description}`);
+          console.error(`Failed to load ${description}`);
         }
       }
     },
