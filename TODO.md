@@ -52,13 +52,14 @@ This document outlines a focused refactoring plan to improve the chess component
 **Goal**: Break down monolithic ChessBoard into focused components
 **Priority**: HIGH - Enables clearer separation of concerns
 
-#### Step 2.1: Extract Square Component
+#### Step 2.1: Extract Square Component ✅ COMPLETED
 - **File**: `src/components/Square.tsx`
 - **Purpose**: Individual square rendering logic
 - **Changes**:
-  - Extract square rendering from ChessBoard (lines 1471-1600)
-  - Move piece icon rendering logic
-  - Keep Square focused on display only
+  - ✅ Extracted square rendering from ChessBoard component
+  - ✅ Moved piece icon rendering logic and helper functions
+  - ✅ Created self-contained Square component with all dependencies
+  - ✅ Cleaned up unused imports and maintained build stability
 
 #### Step 2.2: Extract UI Overlay Components
 - **Files**: `src/components/MoveIndicators.tsx`, `src/components/ArrowOverlay.tsx`
