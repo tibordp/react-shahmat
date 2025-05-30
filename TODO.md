@@ -19,33 +19,34 @@ This document outlines a focused refactoring plan to improve the chess component
 
 ## Refactoring Plan (7 Phases)
 
-### Phase 1: Chess Logic Consolidation
+### Phase 1: Chess Logic Consolidation ✅ COMPLETED
 **Goal**: Create single source of truth for all chess rules
 **Priority**: HIGH - Eliminates core architectural duplication
 
-#### Step 1.1: Analyze Logic Overlap
+#### Step 1.1: Analyze Logic Overlap ✅ COMPLETED
 - **Files**: `src/engine/jsChessEngine.ts`, `src/utils/pieceMovements.ts`
 - **Purpose**: Document overlapping functionality
 - **Changes**:
-  - Map functions that exist in both files
-  - Identify which implementation should be canonical
-  - Document pre-move vs regular move differences
+  - ✅ Mapped functions that exist in both files (80% overlap documented)
+  - ✅ Identified engine as canonical implementation
+  - ✅ Documented pre-move vs regular move differences in OVERLAP_ANALYSIS.md
 
-#### Step 1.2: Extend Chess Engine for UI Needs
+#### Step 1.2: Extend Chess Engine for UI Needs ✅ COMPLETED
 - **File**: `src/engine/jsChessEngine.ts`
 - **Purpose**: Make engine handle all chess logic needs
 - **Changes**:
-  - Add methods for pre-move calculations
-  - Add board state queries needed by UI
-  - Ensure engine can handle "what-if" scenarios for UI
+  - ✅ Added `getPotentialMoves()` method for pre-move calculations
+  - ✅ Added `getBasicMovementPattern()` for UI queries
+  - ✅ Created pattern-based internal methods supporting both use cases
+  - ✅ Ensured engine can handle "what-if" scenarios for UI
 
-#### Step 1.3: Remove Duplicate Logic
+#### Step 1.3: Remove Duplicate Logic ✅ COMPLETED
 - **Files**: `src/utils/pieceMovements.ts`, components using it
 - **Purpose**: Use single chess logic source
 - **Changes**:
-  - Replace all `pieceMovements.ts` calls with engine calls
-  - Delete `pieceMovements.ts`
-  - Update UI components to use consolidated logic
+  - ✅ Replaced `calculateBasicPieceMovements()` calls with `engine.getPotentialMoves()`
+  - ✅ Deleted `src/utils/pieceMovements.ts` (153 lines eliminated)
+  - ✅ Updated ChessBoard component to use consolidated logic
 
 ### Phase 2: Component Decomposition
 **Goal**: Break down monolithic ChessBoard into focused components

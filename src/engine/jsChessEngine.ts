@@ -692,6 +692,35 @@ export class JSChessEngine {
     piece: Piece,
     includeCastling: boolean = true
   ): Position[] {
+    if (piece.type === PieceType.King && !includeCastling) {
+      // For king in check detection, use only basic king moves without castling
+      const moves: Position[] = [];
+      const kingMoves = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ];
+
+      const from = { file, rank };
+      for (const [fileOffset, rankOffset] of kingMoves) {
+        const newFile = from.file + fileOffset;
+        const newRank = from.rank + rankOffset;
+
+        if (this.isInBounds(newFile, newRank)) {
+          const target = this.getPiece({ file: newFile, rank: newRank });
+          if (!target || target.color !== piece.color) {
+            moves.push({ file: newFile, rank: newRank });
+          }
+        }
+      }
+      return moves;
+    }
+    
     return this.getMovementPattern(file, rank, piece, false);
   }
 
