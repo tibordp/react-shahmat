@@ -147,12 +147,10 @@ export const ArrowOverlay: React.FC<ArrowOverlayProps> = ({
     >
       {arrows.map((arrow, index) => {
         const fromX =
-          (flipped ? 7 - arrow.from.file : arrow.from.file) *
-            squareSize +
+          (flipped ? 7 - arrow.from.file : arrow.from.file) * squareSize +
           squareSize / 2;
         const fromY =
-          (flipped ? arrow.from.rank : 7 - arrow.from.rank) *
-            squareSize +
+          (flipped ? arrow.from.rank : 7 - arrow.from.rank) * squareSize +
           squareSize / 2;
         const toX =
           (flipped ? 7 - arrow.to.file : arrow.to.file) * squareSize +

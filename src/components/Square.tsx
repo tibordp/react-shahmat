@@ -1,9 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import {
-  Piece,
-} from '../engine/jsChessEngine';
+import { Piece } from '../engine/jsChessEngine';
 import { getPieceIcon } from '../utils/pieceIcons';
 
 export interface SquareProps {

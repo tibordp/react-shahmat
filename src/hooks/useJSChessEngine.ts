@@ -22,6 +22,7 @@ export interface ChessEngineAPI {
       includeIllegalMoves?: boolean;
       forPreMove?: boolean;
       forAnyColor?: boolean;
+      boardState?: (Piece | null)[][];
     }
   ) => Position[];
   getPiece: (position: Position) => Piece | null;

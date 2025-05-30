@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  PieceType,
-  Color,
-} from '../engine/jsChessEngine';
+import { PieceType, Color } from '../engine/jsChessEngine';
 import { getPieceIconByType } from '../utils/pieceIcons';
 
 export interface PromotionDialogProps {

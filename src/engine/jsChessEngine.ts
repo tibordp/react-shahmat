@@ -169,6 +169,25 @@ export class JSChessEngine {
     return this.board[rank][file];
   }
 
+  private getPieceFromBoard(
+    position: Position,
+    board: (Piece | null)[][]
+  ): Piece | null {
+    const { file, rank } = position;
+    if (file < 0 || file > 7 || rank < 0 || rank > 7) return null;
+    // Note: board is in visual format [7-rank][file], need to convert
+    return board[7 - rank][file];
+  }
+
+  private getPieceForPattern(
+    position: Position,
+    customBoard?: (Piece | null)[][]
+  ): Piece | null {
+    return customBoard
+      ? this.getPieceFromBoard(position, customBoard)
+      : this.getPiece(position);
+  }
+
   public getValidMoves(from: Position): Position[] {
     const piece = this.getPiece(from);
     if (!piece || piece.color !== this.currentPlayer) return [];
@@ -195,13 +214,20 @@ export class JSChessEngine {
       includeIllegalMoves?: boolean;
       forPreMove?: boolean;
       forAnyColor?: boolean; // Allow moves for any color, not just current player
+      boardState?: (Piece | null)[][]; // Optional custom board state for premove calculations
     } = {}
   ): Position[] {
-    const piece = this.getPiece(from);
+    const piece = options.boardState
+      ? this.getPieceFromBoard(from, options.boardState)
+      : this.getPiece(from);
     if (!piece) return [];
 
     // For pre-moves or when forAnyColor is true, allow any color
-    if (!options.forAnyColor && !options.forPreMove && piece.color !== this.currentPlayer) {
+    if (
+      !options.forAnyColor &&
+      !options.forPreMove &&
+      piece.color !== this.currentPlayer
+    ) {
       return [];
     }
 
@@ -209,7 +235,8 @@ export class JSChessEngine {
       from.file,
       from.rank,
       piece,
-      options.ignorePieceBlocking || options.forPreMove
+      options.ignorePieceBlocking || options.forPreMove,
+      options.boardState
     );
 
     // If we want to include illegal moves (like for pre-moves), return early
@@ -225,7 +252,11 @@ export class JSChessEngine {
    * Get basic movement pattern for a piece type, ignoring all game rules.
    * This is useful for showing potential squares in UI.
    */
-  public getBasicMovementPattern(pieceType: PieceType, from: Position, color: Color): Position[] {
+  public getBasicMovementPattern(
+    pieceType: PieceType,
+    from: Position,
+    color: Color
+  ): Position[] {
     const piece = { type: pieceType, color };
     return this.getMovementPattern(from.file, from.rank, piece, true);
   }
@@ -286,7 +317,8 @@ export class JSChessEngine {
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     const direction = color === Color.White ? 1 : -1;
     const startRank = color === Color.White ? 1 : 6;
@@ -294,8 +326,13 @@ export class JSChessEngine {
     // Forward move
     const newRank = from.rank + direction;
     if (this.isInBounds(from.file, newRank)) {
-      const forwardBlocked = !ignorePieceBlocking && this.getPiece({ file: from.file, rank: newRank });
-      
+      const forwardBlocked =
+        !ignorePieceBlocking &&
+        this.getPieceForPattern(
+          { file: from.file, rank: newRank },
+          customBoard
+        );
+
       if (ignorePieceBlocking || !forwardBlocked) {
         moves.push({ file: from.file, rank: newRank });
 
@@ -303,7 +340,12 @@ export class JSChessEngine {
         if (from.rank === startRank) {
           const doubleRank = newRank + direction;
           if (this.isInBounds(from.file, doubleRank)) {
-            const doubleBlocked = !ignorePieceBlocking && this.getPiece({ file: from.file, rank: doubleRank });
+            const doubleBlocked =
+              !ignorePieceBlocking &&
+              this.getPieceForPattern(
+                { file: from.file, rank: doubleRank },
+                customBoard
+              );
             if (ignorePieceBlocking || !doubleBlocked) {
               moves.push({ file: from.file, rank: doubleRank });
             }
@@ -320,7 +362,10 @@ export class JSChessEngine {
           // For pre-moves, show all diagonal squares
           moves.push({ file: newFile, rank: newRank });
         } else {
-          const target = this.getPiece({ file: newFile, rank: newRank });
+          const target = this.getPieceForPattern(
+            { file: newFile, rank: newRank },
+            customBoard
+          );
           if (target && target.color !== color) {
             moves.push({ file: newFile, rank: newRank });
           }
@@ -337,16 +382,12 @@ export class JSChessEngine {
     }
   }
 
-  // Backward compatibility
-  private addPawnMoves(from: Position, color: Color, moves: Position[]): void {
-    this.addPawnMovesPattern(from, color, moves, false);
-  }
-
   private addRookMovesPattern(
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     const directions = [
       [0, 1],
@@ -355,20 +396,24 @@ export class JSChessEngine {
       [-1, 0],
     ];
     for (const [fileDir, rankDir] of directions) {
-      this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, ignorePieceBlocking);
+      this.addSlidingMovesPattern(
+        from,
+        color,
+        fileDir,
+        rankDir,
+        moves,
+        ignorePieceBlocking,
+        customBoard
+      );
     }
-  }
-
-  // Backward compatibility
-  private addRookMoves(from: Position, color: Color, moves: Position[]): void {
-    this.addRookMovesPattern(from, color, moves, false);
   }
 
   private addBishopMovesPattern(
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     const directions = [
       [1, 1],
@@ -377,39 +422,47 @@ export class JSChessEngine {
       [-1, -1],
     ];
     for (const [fileDir, rankDir] of directions) {
-      this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, ignorePieceBlocking);
+      this.addSlidingMovesPattern(
+        from,
+        color,
+        fileDir,
+        rankDir,
+        moves,
+        ignorePieceBlocking,
+        customBoard
+      );
     }
-  }
-
-  // Backward compatibility
-  private addBishopMoves(
-    from: Position,
-    color: Color,
-    moves: Position[]
-  ): void {
-    this.addBishopMovesPattern(from, color, moves, false);
   }
 
   private addQueenMovesPattern(
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
-    this.addRookMovesPattern(from, color, moves, ignorePieceBlocking);
-    this.addBishopMovesPattern(from, color, moves, ignorePieceBlocking);
-  }
-
-  // Backward compatibility
-  private addQueenMoves(from: Position, color: Color, moves: Position[]): void {
-    this.addQueenMovesPattern(from, color, moves, false);
+    this.addRookMovesPattern(
+      from,
+      color,
+      moves,
+      ignorePieceBlocking,
+      customBoard
+    );
+    this.addBishopMovesPattern(
+      from,
+      color,
+      moves,
+      ignorePieceBlocking,
+      customBoard
+    );
   }
 
   private addKnightMovesPattern(
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     const knightMoves = [
       [2, 1],
@@ -430,7 +483,10 @@ export class JSChessEngine {
         if (ignorePieceBlocking) {
           moves.push({ file: newFile, rank: newRank });
         } else {
-          const target = this.getPiece({ file: newFile, rank: newRank });
+          const target = this.getPieceForPattern(
+            { file: newFile, rank: newRank },
+            customBoard
+          );
           if (!target || target.color !== color) {
             moves.push({ file: newFile, rank: newRank });
           }
@@ -439,20 +495,12 @@ export class JSChessEngine {
     }
   }
 
-  // Backward compatibility
-  private addKnightMoves(
-    from: Position,
-    color: Color,
-    moves: Position[]
-  ): void {
-    this.addKnightMovesPattern(from, color, moves, false);
-  }
-
   private addKingMovesPattern(
     from: Position,
     color: Color,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     const kingMoves = [
       [1, 0],
@@ -473,7 +521,10 @@ export class JSChessEngine {
         if (ignorePieceBlocking) {
           moves.push({ file: newFile, rank: newRank });
         } else {
-          const target = this.getPiece({ file: newFile, rank: newRank });
+          const target = this.getPieceForPattern(
+            { file: newFile, rank: newRank },
+            customBoard
+          );
           if (!target || target.color !== color) {
             moves.push({ file: newFile, rank: newRank });
           }
@@ -494,18 +545,14 @@ export class JSChessEngine {
     }
   }
 
-  // Backward compatibility
-  private addKingMoves(from: Position, color: Color, moves: Position[]): void {
-    this.addKingMovesPattern(from, color, moves, false);
-  }
-
   private addSlidingMovesPattern(
     from: Position,
     color: Color,
     fileDir: number,
     rankDir: number,
     moves: Position[],
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): void {
     let file = from.file + fileDir;
     let rank = from.rank + rankDir;
@@ -515,7 +562,7 @@ export class JSChessEngine {
         // For pre-moves, show all squares in the direction
         moves.push({ file, rank });
       } else {
-        const target = this.getPiece({ file, rank });
+        const target = this.getPieceForPattern({ file, rank }, customBoard);
 
         if (!target) {
           moves.push({ file, rank });
@@ -530,17 +577,6 @@ export class JSChessEngine {
       file += fileDir;
       rank += rankDir;
     }
-  }
-
-  // Backward compatibility
-  private addSlidingMoves(
-    from: Position,
-    color: Color,
-    fileDir: number,
-    rankDir: number,
-    moves: Position[]
-  ): void {
-    this.addSlidingMovesPattern(from, color, fileDir, rankDir, moves, false);
   }
 
   private isInBounds(file: number, rank: number): boolean {
@@ -657,29 +693,66 @@ export class JSChessEngine {
     file: number,
     rank: number,
     piece: Piece,
-    ignorePieceBlocking: boolean = false
+    ignorePieceBlocking: boolean = false,
+    customBoard?: (Piece | null)[][]
   ): Position[] {
     const moves: Position[] = [];
     const from = { file, rank };
 
     switch (piece.type) {
       case PieceType.Pawn:
-        this.addPawnMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addPawnMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
       case PieceType.Rook:
-        this.addRookMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addRookMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
       case PieceType.Knight:
-        this.addKnightMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addKnightMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
       case PieceType.Bishop:
-        this.addBishopMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addBishopMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
       case PieceType.Queen:
-        this.addQueenMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addQueenMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
       case PieceType.King:
-        this.addKingMovesPattern(from, piece.color, moves, ignorePieceBlocking);
+        this.addKingMovesPattern(
+          from,
+          piece.color,
+          moves,
+          ignorePieceBlocking,
+          customBoard
+        );
         break;
     }
 
@@ -720,7 +793,7 @@ export class JSChessEngine {
       }
       return moves;
     }
-    
+
     return this.getMovementPattern(file, rank, piece, false);
   }
 

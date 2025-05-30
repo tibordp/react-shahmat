@@ -35,8 +35,10 @@ export function usePieceAnimations(
 ): UsePieceAnimationsReturn {
   const { enableAnimations = true } = options;
 
-  const [animatingPieces, setAnimatingPieces] = useState<AnimationState | null>(null);
-  
+  const [animatingPieces, setAnimatingPieces] = useState<AnimationState | null>(
+    null
+  );
+
   // Store completed animations to allow for interruption
   const animationCompleteRef = useRef<(() => void) | null>(null);
 
