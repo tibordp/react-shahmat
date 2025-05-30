@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import { DndProvider, useDrag, useDrop, useDragLayer } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { getEmptyImage } from 'react-dnd-html5-backend';
@@ -16,7 +23,16 @@ import blackQueen from '../icons/queen-b.svg';
 import blackKing from '../icons/king-b.svg';
 import { useJSChessEngine } from '../hooks/useJSChessEngine';
 import { useChessGame } from '../hooks/useChessGame';
-import { Piece, Position, PieceType, Color, ChessBoardCallbacks, ChessBoardRef, GameState, Move } from '../engine/jsChessEngine';
+import {
+  Piece,
+  Position,
+  PieceType,
+  Color,
+  ChessBoardCallbacks,
+  ChessBoardRef,
+  GameState,
+  Move,
+} from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
 import { calculateBasicPieceMovements } from '../utils/pieceMovements';
 import './ChessBoard.css';
@@ -25,18 +41,18 @@ import './ChessBoard.css';
 // const DEFAULT_ANIMATION_DURATION = 300; // Currently unused
 
 const PIECE_ICONS: { [key: string]: string } = {
-  'White_Pawn': whitePawn,
-  'White_Rook': whiteRook,
-  'White_Knight': whiteKnight,
-  'White_Bishop': whiteBishop,
-  'White_Queen': whiteQueen,
-  'White_King': whiteKing,
-  'Black_Pawn': blackPawn,
-  'Black_Rook': blackRook,
-  'Black_Knight': blackKnight,
-  'Black_Bishop': blackBishop,
-  'Black_Queen': blackQueen,
-  'Black_King': blackKing,
+  White_Pawn: whitePawn,
+  White_Rook: whiteRook,
+  White_Knight: whiteKnight,
+  White_Bishop: whiteBishop,
+  White_Queen: whiteQueen,
+  White_King: whiteKing,
+  Black_Pawn: blackPawn,
+  Black_Rook: blackRook,
+  Black_Knight: blackKnight,
+  Black_Bishop: blackBishop,
+  Black_Queen: blackQueen,
+  Black_King: blackKing,
 };
 
 function getPieceTypeName(pieceType: number): string {
@@ -67,7 +83,12 @@ interface SquareProps {
   flipped?: boolean; // Whether to flip the board for black perspective
   showCoordinates?: boolean; // Whether to show rank and file labels
   onSquareClick: (file: number, rank: number) => void;
-  onDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
+  onDrop: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number
+  ) => void;
   onDragStart: (file: number, rank: number) => void;
   onDragEnd: (file: number, rank: number) => void;
   onRightMouseDown: (file: number, rank: number) => void;
@@ -86,7 +107,7 @@ interface CustomDragLayerProps {
 }
 
 const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
-  const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
+  const { isDragging, item, currentOffset } = useDragLayer(monitor => ({
     item: monitor.getItem(),
     currentOffset: monitor.getClientOffset(),
     isDragging: monitor.isDragging(),
@@ -106,12 +127,12 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
   const pieceIcon = getPieceIcon(piece);
 
   return (
-    <div className="custom-drag-layer">
+    <div className='custom-drag-layer'>
       <div
-        className="drag-preview-piece"
+        className='drag-preview-piece'
         style={{
-          left: x - (squareSize * 0.5),
-          top: y - (squareSize * 0.5),
+          left: x - squareSize * 0.5,
+          top: y - squareSize * 0.5,
           position: 'absolute',
           width: squareSize,
           height: squareSize,
@@ -119,8 +140,8 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
       >
         <img
           src={pieceIcon}
-          alt="chess piece"
-          className="drag-preview-piece-img"
+          alt='chess piece'
+          className='drag-preview-piece-img'
         />
       </div>
     </div>
@@ -136,8 +157,21 @@ interface AnimatingPieceProps {
   onComplete: () => void;
 }
 
-const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number; animationDuration: number }> = ({ piece, from, to, startTime, onComplete, squareSize, flipped, animationDuration }) => {
-  const effectiveFrom = flipped ? { file: 7 - from.file, rank: 7 - from.rank } : from;
+const AnimatingPiece: React.FC<
+  AnimatingPieceProps & { squareSize: number; animationDuration: number }
+> = ({
+  piece,
+  from,
+  to,
+  startTime,
+  onComplete,
+  squareSize,
+  flipped,
+  animationDuration,
+}) => {
+  const effectiveFrom = flipped
+    ? { file: 7 - from.file, rank: 7 - from.rank }
+    : from;
   const effectiveTo = flipped ? { file: 7 - to.file, rank: 7 - to.rank } : to;
 
   const fromX = effectiveFrom.file * squareSize + squareSize / 2;
@@ -181,7 +215,7 @@ const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number; anima
   const scale = squareSize * 0.95; // Scale down to fit within the square
   return (
     <div
-      className="animating-piece"
+      className='animating-piece'
       style={{
         left: position.x - scale / 2,
         top: position.y - scale / 2,
@@ -191,8 +225,8 @@ const AnimatingPiece: React.FC<AnimatingPieceProps & { squareSize: number; anima
     >
       <img
         src={pieceIcon}
-        alt="animating piece"
-        className="animating-piece-img"
+        alt='animating piece'
+        className='animating-piece-img'
       />
     </div>
   );
@@ -208,7 +242,15 @@ interface PromotionDialogProps {
   onCancel: () => void;
 }
 
-const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promotionSquare, squareSize, flipped, onSelect, onCancel }) => {
+const PromotionDialog: React.FC<PromotionDialogProps> = ({
+  isOpen,
+  color,
+  promotionSquare,
+  squareSize,
+  flipped,
+  onSelect,
+  onCancel,
+}) => {
   if (!isOpen) return null;
 
   // Calculate position based on promotion square
@@ -224,10 +266,22 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
   const isVisuallyAtBottom = squareY === 7 * squareSize; // Bottom of the visual board
 
   let pieces = [
-    { type: PieceType.Queen, icon: getPieceIcon({ type: PieceType.Queen, color }) },
-    { type: PieceType.Rook, icon: getPieceIcon({ type: PieceType.Rook, color }) },
-    { type: PieceType.Bishop, icon: getPieceIcon({ type: PieceType.Bishop, color }) },
-    { type: PieceType.Knight, icon: getPieceIcon({ type: PieceType.Knight, color }) },
+    {
+      type: PieceType.Queen,
+      icon: getPieceIcon({ type: PieceType.Queen, color }),
+    },
+    {
+      type: PieceType.Rook,
+      icon: getPieceIcon({ type: PieceType.Rook, color }),
+    },
+    {
+      type: PieceType.Bishop,
+      icon: getPieceIcon({ type: PieceType.Bishop, color }),
+    },
+    {
+      type: PieceType.Knight,
+      icon: getPieceIcon({ type: PieceType.Knight, color }),
+    },
   ];
 
   // Reverse piece order for bottom promotions so Queen is closest to promotion square
@@ -243,7 +297,7 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
     dialogY = squareY;
   } else if (isVisuallyAtBottom) {
     // Visually at bottom - show dialog going up (position so it ends at promotion square)
-    dialogY = squareY - (3 * squareSize);
+    dialogY = squareY - 3 * squareSize;
   } else {
     // Fallback (shouldn't happen in normal chess)
     dialogY = squareY;
@@ -253,7 +307,7 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
     <>
       {/* Invisible overlay for click-outside-to-cancel */}
       <div
-        className="promotion-board-overlay"
+        className='promotion-board-overlay'
         style={{
           position: 'absolute',
           top: 0,
@@ -265,7 +319,7 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
         onClick={onCancel}
       />
       <div
-        className="promotion-dialog"
+        className='promotion-dialog'
         style={{
           position: 'absolute',
           left: dialogX,
@@ -274,19 +328,23 @@ const PromotionDialog: React.FC<PromotionDialogProps> = ({ isOpen, color, promot
           height: squareSize * 4,
           zIndex: 1000,
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         {pieces.map(({ type, icon }) => (
           <button
             key={type}
-            className="promotion-piece"
+            className='promotion-piece'
             style={{
               width: squareSize,
               height: squareSize,
             }}
             onClick={() => onSelect(type)}
           >
-            <img src={icon} alt="promotion piece" className="promotion-piece-img" />
+            <img
+              src={icon}
+              alt='promotion piece'
+              className='promotion-piece-img'
+            />
           </button>
         ))}
       </div>
@@ -301,7 +359,12 @@ interface GameEndBadgeProps {
   badgeType: 'winner' | 'loser' | 'draw';
 }
 
-const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, flipped, badgeType }) => {
+const GameEndBadge: React.FC<GameEndBadgeProps> = ({
+  kingPosition,
+  squareSize,
+  flipped,
+  badgeType,
+}) => {
   // Calculate the king's visual position
   const effectivePosition = flipped
     ? { file: 7 - kingPosition.file, rank: 7 - kingPosition.rank }
@@ -311,7 +374,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
   const kingY = (7 - effectivePosition.rank) * squareSize;
 
   // Badge size (about 40% of square size for better visibility)
-  const badgeSize = squareSize * 0.5  ;
+  const badgeSize = squareSize * 0.5;
 
   // Default position: top-right corner of king's square
   let badgeX = kingX + squareSize - badgeSize / 2;
@@ -332,16 +395,25 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
 
   const getBadgeColor = () => {
     switch (badgeType) {
-      case 'winner': return '#4CAF50';
-      case 'loser': return '#f44336';
-      case 'draw': return '#757575';
+      case 'winner':
+        return '#4CAF50';
+      case 'loser':
+        return '#f44336';
+      case 'draw':
+        return '#757575';
     }
   };
 
   const renderBadgeContent = () => {
     if (badgeType === 'draw') {
       return (
-        <span style={{ color: 'white', fontSize: badgeSize * 0.6, fontWeight: 'bold' }}>
+        <span
+          style={{
+            color: 'white',
+            fontSize: badgeSize * 0.6,
+            fontWeight: 'bold',
+          }}
+        >
           ½
         </span>
       );
@@ -350,7 +422,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
       return (
         <img
           src={whiteKing}
-          alt="king"
+          alt='king'
           style={{
             width: badgeSize * 0.7,
             height: badgeSize * 0.7,
@@ -364,7 +436,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({ kingPosition, squareSize, f
 
   return (
     <div
-      className="game-end-badge"
+      className='game-end-badge'
       style={{
         position: 'absolute',
         left: badgeX,
@@ -394,10 +466,17 @@ interface ArrowComponentProps {
   squareSize: number;
 }
 
-const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY, isKnightMove, squareSize }) => {
+const ArrowComponent: React.FC<ArrowComponentProps> = ({
+  fromX,
+  fromY,
+  toX,
+  toY,
+  isKnightMove,
+  squareSize,
+}) => {
   const arrowHeadSize = Math.max(15, squareSize * 0.4);
   const strokeWidth = Math.max(8, squareSize * 0.2);
-  const color = "rgba(0, 200, 0, 0.5)";
+  const color = 'rgba(0, 200, 0, 0.5)';
   const markerId = `arrowhead-${Math.random().toString(36).substr(2, 9)}`;
   const shortenAmount = arrowHeadSize * 0.75;
   const edgeOffset = squareSize * 0.35; // 10% from edge towards center
@@ -410,13 +489,10 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY,
       markerHeight={3}
       refX={0}
       refY={1.2}
-      orient="auto"
-      markerUnits="strokeWidth"
+      orient='auto'
+      markerUnits='strokeWidth'
     >
-      <polygon
-        points={`0,0 0,2.4, 1.5,1.2`}
-        fill={color}
-      />
+      <polygon points={`0,0 0,2.4, 1.5,1.2`} fill={color} />
     </marker>
   );
 
@@ -460,9 +536,9 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY,
         d={`M ${adjustedFromX} ${adjustedFromY} L ${cornerX} ${cornerY} L ${adjustedToX} ${adjustedToY}`}
         stroke={color}
         strokeWidth={strokeWidth}
-        fill="none"
-        strokeLinecap="butt"
-        strokeLinejoin="miter"
+        fill='none'
+        strokeLinecap='butt'
+        strokeLinejoin='miter'
         markerEnd={`url(#${markerId})`}
       />
     );
@@ -485,7 +561,7 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY,
         y2={adjustedToY}
         stroke={color}
         strokeWidth={strokeWidth}
-        strokeLinecap="butt"
+        strokeLinecap='butt'
         markerEnd={`url(#${markerId})`}
       />
     );
@@ -499,40 +575,68 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({ fromX, fromY, toX, toY,
   );
 };
 
-const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidMove, isCapture, isAnimatingFrom, isAnimatingTo, isLastMoveFrom, isLastMoveTo, isHighlighted, isPreMove, isKingInCheck, onSquareClick, onDrop, onDragStart, onDragEnd, onRightMouseDown, onRightMouseUp, flipped, showCoordinates }) => {
+const Square: React.FC<SquareProps> = ({
+  file,
+  rank,
+  piece,
+  isSelected,
+  isValidMove,
+  isCapture,
+  isAnimatingFrom,
+  isAnimatingTo,
+  isLastMoveFrom,
+  isLastMoveTo,
+  isHighlighted,
+  isPreMove,
+  isKingInCheck,
+  onSquareClick,
+  onDrop,
+  onDragStart,
+  onDragEnd,
+  onRightMouseDown,
+  onRightMouseUp,
+  flipped,
+  showCoordinates,
+}) => {
   const squareRef = useRef<HTMLDivElement>(null);
-  const [{ isDragging }, drag, preview] = useDrag(() => ({
-    type: 'piece',
-    item: () => {
-      if (piece) {
-        onDragStart(file, rank);
-        return { type: 'piece', file, rank, piece };
-      }
-      return null;
-    },
-    canDrag: () => !!piece,
-    end: () => {
-      onDragEnd(file, rank);
-    },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
+  const [{ isDragging }, drag, preview] = useDrag(
+    () => ({
+      type: 'piece',
+      item: () => {
+        if (piece) {
+          onDragStart(file, rank);
+          return { type: 'piece', file, rank, piece };
+        }
+        return null;
+      },
+      canDrag: () => !!piece,
+      end: () => {
+        onDragEnd(file, rank);
+      },
+      collect: monitor => ({
+        isDragging: monitor.isDragging(),
+      }),
     }),
-  }), [piece, file, rank, onDragStart, onDragEnd]);
+    [piece, file, rank, onDragStart, onDragEnd]
+  );
 
   // Setup drag preview to prevent native drag behavior
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  const [{ isOver }, drop] = useDrop(() => ({
-    accept: 'piece',
-    drop: (item: DragItem, monitor) => {
-      onDrop(item.file, item.rank, file, rank);
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver() && monitor.canDrop(),
+  const [{ isOver }, drop] = useDrop(
+    () => ({
+      accept: 'piece',
+      drop: (item: DragItem, monitor) => {
+        onDrop(item.file, item.rank, file, rank);
+      },
+      collect: monitor => ({
+        isOver: monitor.isOver() && monitor.canDrop(),
+      }),
     }),
-  }), [file, rank, onDrop, isValidMove]);
+    [file, rank, onDrop, isValidMove]
+  );
 
   const isLight = (file + rank) % 2 === 1;
   let squareClass = `square ${isLight ? 'light' : 'dark'}`;
@@ -581,38 +685,49 @@ const Square: React.FC<SquareProps> = ({ file, rank, piece, isSelected, isValidM
       ref={attachRef}
       className={squareClass}
       onClick={() => onSquareClick(file, rank)}
-      onMouseDown={(e) => {
-        if (e.button === 2) { // Right mouse button
+      onMouseDown={e => {
+        if (e.button === 2) {
+          // Right mouse button
           e.preventDefault();
           onRightMouseDown(file, rank);
         }
       }}
-      onMouseUp={(e) => {
-        if (e.button === 2) { // Right mouse button
+      onMouseUp={e => {
+        if (e.button === 2) {
+          // Right mouse button
           e.preventDefault();
           onRightMouseUp(file, rank);
         }
       }}
-      onContextMenu={(e) => e.preventDefault()} // Prevent context menu
+      onContextMenu={e => e.preventDefault()} // Prevent context menu
     >
       {pieceIcon && (
         <img
           src={pieceIcon}
-          alt="chess piece"
-          className="piece"
-          style={{ display: isDragging || isAnimatingFrom || isAnimatingTo ? 'none' : 'block' }}
+          alt='chess piece'
+          className='piece'
+          style={{
+            display:
+              isDragging || isAnimatingFrom || isAnimatingTo ? 'none' : 'block',
+          }}
         />
       )}
-      {(isValidMove) && (
-        <div className={`move-indicator ${isCapture ? 'capture-indicator' : 'normal-indicator'}`} />
+      {isValidMove && (
+        <div
+          className={`move-indicator ${isCapture ? 'capture-indicator' : 'normal-indicator'}`}
+        />
       )}
       {fileLabel && (
-        <div className={`file-label-inset ${isLight ? 'dark-text' : 'light-text'}`}>
+        <div
+          className={`file-label-inset ${isLight ? 'dark-text' : 'light-text'}`}
+        >
           {fileLabel}
         </div>
       )}
       {rankLabel && (
-        <div className={`rank-label-inset ${isLight ? 'dark-text' : 'light-text'}`}>
+        <div
+          className={`rank-label-inset ${isLight ? 'dark-text' : 'light-text'}`}
+        >
           {rankLabel}
         </div>
       )}
@@ -638,998 +753,1244 @@ interface ChessBoardProps {
   onError?: ChessBoardCallbacks['onError']; // Called on errors
 }
 
-export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(({
-  size,
-  className,
-  flipped,
-  whiteIsHuman = true,
-  blackIsHuman = true,
-  enablePreMoves = true,
-  autoPromotionPiece,
-  showCoordinates = true,
-  animationDuration = 300,
-  enableAnimations = true,
-  enableSounds = true,
-  enableArrows = true,
-  enableHighlights = true,
-  onPositionChange,
-  onError
-}, ref) => {
-  const chessEngine = useJSChessEngine();
-  const [boardSize, setBoardSize] = useState(size || 512);
-  const boardRef = useRef<HTMLDivElement>(null);
+export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
+  (
+    {
+      size,
+      className,
+      flipped,
+      whiteIsHuman = true,
+      blackIsHuman = true,
+      enablePreMoves = true,
+      autoPromotionPiece,
+      showCoordinates = true,
+      animationDuration = 300,
+      enableAnimations = true,
+      enableSounds = true,
+      enableArrows = true,
+      enableHighlights = true,
+      onPositionChange,
+      onError,
+    },
+    ref
+  ) => {
+    const chessEngine = useJSChessEngine();
+    const [boardSize, setBoardSize] = useState(size || 512);
+    const boardRef = useRef<HTMLDivElement>(null);
 
-  const squareSize = boardSize / 8;
+    const squareSize = boardSize / 8;
 
-  // Helper function to play appropriate sound based on move result
-  const playMoveSound = useCallback((result: any, delay: number = 0) => {
-    if (!enableSounds) return;
+    // Helper function to play appropriate sound based on move result
+    const playMoveSound = useCallback(
+      (result: any, delay: number = 0) => {
+        if (!enableSounds) return;
 
-    const gameState = chessEngine.getGameState();
+        const gameState = chessEngine.getGameState();
 
-    if (gameState.isCheck) {
-      // Check has highest priority
-      if (delay > 0) {
-        setTimeout(() => soundManager.playCheckSound(), delay);
-      } else {
-        soundManager.playCheckSound();
-      }
-    } else if (result?.capturedPiece) {
-      // Capture sound has second priority
-      if (delay > 0) {
-        setTimeout(() => soundManager.playCaptureSound(), delay);
-      } else {
-        soundManager.playCaptureSound();
-      }
-    } else if (result?.type === 'promotion') {
-      // Promotion sound has third priority
-      if (delay > 0) {
-        setTimeout(() => soundManager.playPromotionSound(), delay);
-      } else {
-        soundManager.playPromotionSound();
-      }
-    } else {
-      // Regular move sound is default
-      if (delay > 0) {
-        setTimeout(() => soundManager.playMoveSound(), delay);
-      } else {
-        soundManager.playMoveSound();
-      }
-    }
-  }, [enableSounds, chessEngine]);
+        if (gameState.isCheck) {
+          // Check has highest priority
+          if (delay > 0) {
+            setTimeout(() => soundManager.playCheckSound(), delay);
+          } else {
+            soundManager.playCheckSound();
+          }
+        } else if (result?.capturedPiece) {
+          // Capture sound has second priority
+          if (delay > 0) {
+            setTimeout(() => soundManager.playCaptureSound(), delay);
+          } else {
+            soundManager.playCaptureSound();
+          }
+        } else if (result?.type === 'promotion') {
+          // Promotion sound has third priority
+          if (delay > 0) {
+            setTimeout(() => soundManager.playPromotionSound(), delay);
+          } else {
+            soundManager.playPromotionSound();
+          }
+        } else {
+          // Regular move sound is default
+          if (delay > 0) {
+            setTimeout(() => soundManager.playMoveSound(), delay);
+          } else {
+            soundManager.playMoveSound();
+          }
+        }
+      },
+      [enableSounds, chessEngine]
+    );
 
-  // Initialize clean chess game hook
-  const game = useChessGame({
-    chessEngine,
-    whiteIsHuman,
-    blackIsHuman,
-    onPositionChange,
-    onError,
-  });
-
-
-  // Handle responsive sizing when no size prop is provided
-  useEffect(() => {
-    if (size) return; // Don't resize if explicit size is provided
-
-    const handleResize = () => {
-      if (boardRef.current && boardRef.current.parentElement) {
-        const parentWidth = boardRef.current.parentElement.clientWidth;
-        const parentHeight = boardRef.current.parentElement.clientHeight;
-        const availableSize = Math.min(parentWidth, parentHeight) - 20; // Leave minimal padding
-        setBoardSize(Math.max(200, availableSize)); // Lower minimum for better flexibility
-      }
-    };
-
-    // Use ResizeObserver for better responsiveness
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
+    // Initialize clean chess game hook
+    const game = useChessGame({
+      chessEngine,
+      whiteIsHuman,
+      blackIsHuman,
+      onPositionChange,
+      onError,
     });
 
-    handleResize();
-    if (boardRef.current && boardRef.current.parentElement) {
-      resizeObserver.observe(boardRef.current.parentElement);
-    }
+    // Handle responsive sizing when no size prop is provided
+    useEffect(() => {
+      if (size) return; // Don't resize if explicit size is provided
 
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [size]);
-  const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
-  const [validMoves, setValidMoves] = useState<Position[]>([]);
-  const [arrows, setArrows] = useState<Array<{ from: Position; to: Position }>>([]);
-  const [arrowStart, setArrowStart] = useState<Position | null>(null);
-  const [highlightedSquares, setHighlightedSquares] = useState<Position[]>([]);
-  const [kingInCheckHighlight, setKingInCheckHighlight] = useState<Position | null>(null);
+      const handleResize = () => {
+        if (boardRef.current && boardRef.current.parentElement) {
+          const parentWidth = boardRef.current.parentElement.clientWidth;
+          const parentHeight = boardRef.current.parentElement.clientHeight;
+          const availableSize = Math.min(parentWidth, parentHeight) - 20; // Leave minimal padding
+          setBoardSize(Math.max(200, availableSize)); // Lower minimum for better flexibility
+        }
+      };
 
-  // Find king positions on the current board
-  const findKingPositions = useCallback(() => {
-    const boardState = chessEngine.getBoardState();
-    const kings: { white?: Position; black?: Position } = {};
+      // Use ResizeObserver for better responsiveness
+      const resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
 
-    for (let rank = 0; rank < 8; rank++) {
-      for (let file = 0; file < 8; file++) {
-        const piece = boardState[7 - rank]?.[file];
-        if (piece?.type === PieceType.King) {
-          if (piece.color === Color.White) {
-            kings.white = { file, rank };
-          } else {
-            kings.black = { file, rank };
+      handleResize();
+      if (boardRef.current && boardRef.current.parentElement) {
+        resizeObserver.observe(boardRef.current.parentElement);
+      }
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }, [size]);
+    const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
+    const [validMoves, setValidMoves] = useState<Position[]>([]);
+    const [arrows, setArrows] = useState<
+      Array<{ from: Position; to: Position }>
+    >([]);
+    const [arrowStart, setArrowStart] = useState<Position | null>(null);
+    const [highlightedSquares, setHighlightedSquares] = useState<Position[]>(
+      []
+    );
+    const [kingInCheckHighlight, setKingInCheckHighlight] =
+      useState<Position | null>(null);
+
+    // Find king positions on the current board
+    const findKingPositions = useCallback(() => {
+      const boardState = chessEngine.getBoardState();
+      const kings: { white?: Position; black?: Position } = {};
+
+      for (let rank = 0; rank < 8; rank++) {
+        for (let file = 0; file < 8; file++) {
+          const piece = boardState[7 - rank]?.[file];
+          if (piece?.type === PieceType.King) {
+            if (piece.color === Color.White) {
+              kings.white = { file, rank };
+            } else {
+              kings.black = { file, rank };
+            }
           }
         }
       }
-    }
 
-    return kings;
-  }, [chessEngine]);
+      return kings;
+    }, [chessEngine]);
 
-  // Shared function to handle invalid move feedback when king is in check
-  const handleInvalidMoveInCheck = useCallback((fromFile: number, fromRank: number) => {
-    // Only show feedback if the move was attempted with the current player's piece
-    const boardState = chessEngine.getBoardState();
-    const piece = boardState[7 - fromRank]?.[fromFile];
-    
-    if (!piece || piece.color !== chessEngine.getCurrentPlayer()) {
-      return; // Don't show feedback for opponent pieces or empty squares
-    }
+    // Shared function to handle invalid move feedback when king is in check
+    const handleInvalidMoveInCheck = useCallback(
+      (fromFile: number, fromRank: number) => {
+        // Only show feedback if the move was attempted with the current player's piece
+        const boardState = chessEngine.getBoardState();
+        const piece = boardState[7 - fromRank]?.[fromFile];
 
-    const gameState = chessEngine.getGameState();
-    if (gameState.isCheck) {
-      // Find the king's position and highlight it in red
-      const kingPositions = findKingPositions();
-      const currentPlayerKing = chessEngine.getCurrentPlayer() === Color.White ? kingPositions.white : kingPositions.black;
-      
-      if (currentPlayerKing) {
-        // Highlight the king in red temporarily
-        setKingInCheckHighlight(currentPlayerKing);
-        setTimeout(() => setKingInCheckHighlight(null), 1000);
-        
-        // Play error sound if enabled
-        if (enableSounds) {
-          soundManager.playErrorSound();
+        if (!piece || piece.color !== chessEngine.getCurrentPlayer()) {
+          return; // Don't show feedback for opponent pieces or empty squares
+        }
+
+        const gameState = chessEngine.getGameState();
+        if (gameState.isCheck) {
+          // Find the king's position and highlight it in red
+          const kingPositions = findKingPositions();
+          const currentPlayerKing =
+            chessEngine.getCurrentPlayer() === Color.White
+              ? kingPositions.white
+              : kingPositions.black;
+
+          if (currentPlayerKing) {
+            // Highlight the king in red temporarily
+            setKingInCheckHighlight(currentPlayerKing);
+            setTimeout(() => setKingInCheckHighlight(null), 1000);
+
+            // Play error sound if enabled
+            if (enableSounds) {
+              soundManager.playErrorSound();
+            }
+          }
+        }
+      },
+      [chessEngine, findKingPositions, enableSounds]
+    );
+
+    // Pre-move squares (both origin and destination to show in red)
+    const preMoveSquares = game.preMoves.flatMap(move => [
+      { file: move.fromFile, rank: move.fromRank }, // origin square
+      { file: move.toFile, rank: move.toRank }, // destination square
+    ]);
+
+    // Calculate visual board state with pre-moves applied
+    const getVisualBoardState = useCallback(() => {
+      const baseBoardState = chessEngine.getBoardState();
+
+      if (game.preMoves.length === 0) {
+        return baseBoardState;
+      }
+
+      // Create a copy of the board state
+      const visualBoard = baseBoardState.map(row => [...row]);
+
+      // Apply pre-moves visually
+      for (const preMove of game.preMoves) {
+        const piece = visualBoard[7 - preMove.fromRank]?.[preMove.fromFile];
+        if (piece) {
+          // Remove piece from source
+          visualBoard[7 - preMove.fromRank][preMove.fromFile] = null;
+
+          // Place piece at destination - use promoted piece if specified
+          if (preMove.promotionPiece !== undefined) {
+            // Show promoted piece instead of pawn
+            visualBoard[7 - preMove.toRank][preMove.toFile] = {
+              type: preMove.promotionPiece,
+              color: piece.color,
+            };
+          } else {
+            // Regular piece
+            visualBoard[7 - preMove.toRank][preMove.toFile] = piece;
+          }
         }
       }
-    }
-  }, [chessEngine, findKingPositions, enableSounds]);
 
-  // Pre-move squares (both origin and destination to show in red)
-  const preMoveSquares = game.preMoves.flatMap(move => [
-    { file: move.fromFile, rank: move.fromRank }, // origin square
-    { file: move.toFile, rank: move.toRank }       // destination square
-  ]);
+      return visualBoard;
+    }, [chessEngine, game.preMoves]);
 
-  // Calculate visual board state with pre-moves applied
-  const getVisualBoardState = useCallback(() => {
-    const baseBoardState = chessEngine.getBoardState();
+    // Helper function to detect if a move is a pawn promotion
+    const isPawnPromotion = useCallback(
+      (piece: Piece, fromRank: number, toRank: number): boolean => {
+        if (piece.type !== PieceType.Pawn) return false;
 
-    if (game.preMoves.length === 0) {
-      return baseBoardState;
-    }
+        const promotionRank = piece.color === Color.White ? 7 : 0;
+        return toRank === promotionRank;
+      },
+      []
+    );
 
-    // Create a copy of the board state
-    const visualBoard = baseBoardState.map(row => [...row]);
+    // Calculate valid moves for a piece at a given position
+    const getValidMovesFromVisualBoard = useCallback(
+      (file: number, rank: number) => {
+        const visualBoard = getVisualBoardState();
+        const piece = visualBoard[7 - rank]?.[file];
 
-    // Apply pre-moves visually
-    for (const preMove of game.preMoves) {
-      const piece = visualBoard[7 - preMove.fromRank]?.[preMove.fromFile];
-      if (piece) {
-        // Remove piece from source
-        visualBoard[7 - preMove.fromRank][preMove.fromFile] = null;
+        if (!piece) return [];
 
-        // Place piece at destination - use promoted piece if specified
-        if (preMove.promotionPiece !== undefined) {
-          // Show promoted piece instead of pawn
-          visualBoard[7 - preMove.toRank][preMove.toFile] = {
-            type: preMove.promotionPiece,
-            color: piece.color
-          };
+        // If we can make pre-moves (external player's turn) and pre-moves are enabled, use basic movement patterns
+        if (game.canMakePreMoves && enablePreMoves) {
+          return calculateBasicPieceMovements(piece, file, rank, visualBoard);
+        }
+
+        // Otherwise use normal engine calculation which includes all game rules
+        return chessEngine.getValidMoves({ file, rank });
+      },
+      [chessEngine, game.canMakePreMoves, getVisualBoardState, enablePreMoves]
+    );
+
+    const [animatingPieces, setAnimatingPieces] = useState<{
+      pieces: Array<{
+        piece: Piece;
+        from: Position;
+        to: Position;
+      }>;
+      startTime: number;
+      moveId: string; // Unique identifier for this animation
+    } | null>(null);
+
+    // Store completed animations to allow for interruption
+    const animationCompleteRef = useRef<(() => void) | null>(null);
+
+    // Shared function to handle pre-move logic
+    const handlePreMoveAttempt = useCallback(
+      (
+        fromFile: number,
+        fromRank: number,
+        toFile: number,
+        toRank: number
+      ): boolean => {
+        // Allow pre-moves when it's external player's turn OR during any animation
+        if (
+          !(game.canMakePreMoves || animatingPieces) ||
+          !enablePreMoves ||
+          !chessEngine
+        )
+          return false;
+
+        const visualBoardState = getVisualBoardState();
+        const piece = visualBoardState[7 - fromRank]?.[fromFile];
+
+        if (!piece) return false;
+
+        // Only allow pre-moves with human player's pieces
+        const isHumanPiece =
+          (whiteIsHuman && piece.color === Color.White) ||
+          (blackIsHuman && piece.color === Color.Black);
+        if (!isHumanPiece) return false;
+
+        // Check if this is a valid pre-move destination
+        const validMoves = getValidMovesFromVisualBoard(fromFile, fromRank);
+        const isValidDestination = validMoves.some(
+          move => move.file === toFile && move.rank === toRank
+        );
+
+        if (!isValidDestination) return false;
+
+        // Check if this is a pawn promotion
+        if (isPawnPromotion(piece, fromRank, toRank)) {
+          if (autoPromotionPiece) {
+            // Auto-promote without showing dialog
+            const preMove = {
+              fromFile,
+              fromRank,
+              toFile,
+              toRank,
+              promotionPiece: autoPromotionPiece,
+            };
+            game.addPreMove(preMove);
+
+            // Play pre-move sound
+            if (enableSounds) {
+              soundManager.playPreMoveSound();
+            }
+
+            // Clear UI indicators since the pre-move was successfully added
+            setSelectedSquare(null);
+            setValidMoves([]);
+          } else {
+            // Show promotion dialog for pre-move
+            setPromotionDialog({
+              isOpen: true,
+              fromFile,
+              fromRank,
+              toFile,
+              toRank,
+              color: piece.color,
+              isPreMove: true,
+            });
+          }
         } else {
-          // Regular piece
-          visualBoard[7 - preMove.toRank][preMove.toFile] = piece;
-        }
-      }
-    }
+          // Regular pre-move
+          const preMove = {
+            fromFile,
+            fromRank,
+            toFile,
+            toRank,
+          };
+          game.addPreMove(preMove);
 
-    return visualBoard;
-  }, [chessEngine, game.preMoves]);
-
-  // Helper function to detect if a move is a pawn promotion
-  const isPawnPromotion = useCallback((piece: Piece, fromRank: number, toRank: number): boolean => {
-    if (piece.type !== PieceType.Pawn) return false;
-
-    const promotionRank = piece.color === Color.White ? 7 : 0;
-    return toRank === promotionRank;
-  }, []);
-
-  // Calculate valid moves for a piece at a given position
-  const getValidMovesFromVisualBoard = useCallback((file: number, rank: number) => {
-    const visualBoard = getVisualBoardState();
-    const piece = visualBoard[7 - rank]?.[file];
-
-    if (!piece) return [];
-
-    // If we can make pre-moves (external player's turn) and pre-moves are enabled, use basic movement patterns
-    if (game.canMakePreMoves && enablePreMoves) {
-      return calculateBasicPieceMovements(piece, file, rank, visualBoard);
-    }
-
-    // Otherwise use normal engine calculation which includes all game rules
-    return chessEngine.getValidMoves({ file, rank });
-  }, [chessEngine, game.canMakePreMoves, getVisualBoardState, enablePreMoves]);
-
-  const [animatingPieces, setAnimatingPieces] = useState<{
-    pieces: Array<{
-      piece: Piece;
-      from: Position;
-      to: Position;
-    }>;
-    startTime: number;
-    moveId: string; // Unique identifier for this animation
-  } | null>(null);
-
-  // Store completed animations to allow for interruption
-  const animationCompleteRef = useRef<(() => void) | null>(null);
-
-  // Shared function to handle pre-move logic
-  const handlePreMoveAttempt = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number): boolean => {
-    // Allow pre-moves when it's external player's turn OR during any animation
-    if (!(game.canMakePreMoves || animatingPieces) || !enablePreMoves || !chessEngine) return false;
-
-    const visualBoardState = getVisualBoardState();
-    const piece = visualBoardState[7 - fromRank]?.[fromFile];
-    
-    if (!piece) return false;
-
-    // Only allow pre-moves with human player's pieces
-    const isHumanPiece = (whiteIsHuman && piece.color === Color.White) || (blackIsHuman && piece.color === Color.Black);
-    if (!isHumanPiece) return false;
-
-    // Check if this is a valid pre-move destination
-    const validMoves = getValidMovesFromVisualBoard(fromFile, fromRank);
-    const isValidDestination = validMoves.some(move => move.file === toFile && move.rank === toRank);
-
-    if (!isValidDestination) return false;
-
-    // Check if this is a pawn promotion
-    if (isPawnPromotion(piece, fromRank, toRank)) {
-      if (autoPromotionPiece) {
-        // Auto-promote without showing dialog
-        const preMove = {
-          fromFile,
-          fromRank,
-          toFile,
-          toRank,
-          promotionPiece: autoPromotionPiece,
-        };
-        game.addPreMove(preMove);
-
-        // Play pre-move sound
-        if (enableSounds) {
-          soundManager.playPreMoveSound();
+          // Play pre-move sound
+          if (enableSounds) {
+            soundManager.playPreMoveSound();
+          }
         }
 
-        // Clear UI indicators since the pre-move was successfully added
-        setSelectedSquare(null);
-        setValidMoves([]);
-      } else {
-        // Show promotion dialog for pre-move
-        setPromotionDialog({
-          isOpen: true,
-          fromFile,
-          fromRank,
-          toFile,
-          toRank,
-          color: piece.color,
-          isPreMove: true,
-        });
-      }
-    } else {
-      // Regular pre-move
-      const preMove = {
-        fromFile,
-        fromRank,
-        toFile,
-        toRank
-      };
-      game.addPreMove(preMove);
+        return true; // Indicates pre-move was handled
+      },
+      [
+        enablePreMoves,
+        chessEngine,
+        getVisualBoardState,
+        getValidMovesFromVisualBoard,
+        isPawnPromotion,
+        game,
+        autoPromotionPiece,
+        animatingPieces,
+        whiteIsHuman,
+        blackIsHuman,
+        enableSounds,
+      ]
+    );
 
-      // Play pre-move sound
-      if (enableSounds) {
-        soundManager.playPreMoveSound();
-      }
-    }
+    const [promotionDialog, setPromotionDialog] = useState<{
+      isOpen: boolean;
+      fromFile: number;
+      fromRank: number;
+      toFile: number;
+      toRank: number;
+      color: Color;
+      isPreMove?: boolean; // Flag to distinguish pre-move promotions
+    }>({
+      isOpen: false,
+      fromFile: 0,
+      fromRank: 0,
+      toFile: 0,
+      toRank: 0,
+      color: Color.White,
+      isPreMove: false,
+    });
 
-    return true; // Indicates pre-move was handled
-  }, [enablePreMoves, chessEngine, getVisualBoardState, getValidMovesFromVisualBoard, isPawnPromotion, game, autoPromotionPiece, animatingPieces, whiteIsHuman, blackIsHuman, enableSounds]);
+    // Add ref methods
+    useImperativeHandle(
+      ref,
+      () => ({
+        resetGame: () => {
+          game.resetGame();
+          setSelectedSquare(null);
+          setValidMoves([]);
+          setArrows([]);
+          setHighlightedSquares([]);
+          setAnimatingPieces(null);
+          setKingInCheckHighlight(null);
+        },
+        setPosition: (fen: string) => {
+          const success = game.setPosition(fen);
+          if (success) {
+            setSelectedSquare(null);
+            setValidMoves([]);
+            setArrows([]);
+            setHighlightedSquares([]);
+            setAnimatingPieces(null);
+            setKingInCheckHighlight(null);
+          }
+          return success;
+        },
+        getGameState: () => chessEngine.getGameState(),
+        executeExternalMove: (move: Move) => game.executeExternalMove(move),
+      }),
+      [game, chessEngine]
+    );
 
-  const [promotionDialog, setPromotionDialog] = useState<{
-    isOpen: boolean;
-    fromFile: number;
-    fromRank: number;
-    toFile: number;
-    toRank: number;
-    color: Color;
-    isPreMove?: boolean; // Flag to distinguish pre-move promotions
-  }>({
-    isOpen: false,
-    fromFile: 0,
-    fromRank: 0,
-    toFile: 0,
-    toRank: 0,
-    color: Color.White,
-    isPreMove: false,
-  });
-
-  // Add ref methods
-  useImperativeHandle(ref, () => ({
-    resetGame: () => {
-      game.resetGame();
-      setSelectedSquare(null);
-      setValidMoves([]);
-      setArrows([]);
-      setHighlightedSquares([]);
-      setAnimatingPieces(null);
-      setKingInCheckHighlight(null);
-    },
-    setPosition: (fen: string) => {
-      const success = game.setPosition(fen);
-      if (success) {
-        setSelectedSquare(null);
-        setValidMoves([]);
-        setArrows([]);
-        setHighlightedSquares([]);
+    // Helper function to interrupt current animation if needed
+    const interruptAnimation = useCallback(() => {
+      if (animatingPieces) {
+        // Cancel any ongoing animation
+        if (animationCompleteRef.current) {
+          animationCompleteRef.current();
+          animationCompleteRef.current = null;
+        }
         setAnimatingPieces(null);
-        setKingInCheckHighlight(null);
       }
-      return success;
-    },
-    getGameState: () => chessEngine.getGameState(),
-    executeExternalMove: (move: Move) => game.executeExternalMove(move),
-  }), [game, chessEngine]);
+    }, [animatingPieces]);
 
+    // Unified move execution function that handles both human and external moves
+    const executeMove = useCallback(
+      (
+        move: Move,
+        animate: boolean = false,
+        isExternalMove: boolean = false
+      ) => {
+        if (!chessEngine) return false;
 
-  // Helper function to interrupt current animation if needed
-  const interruptAnimation = useCallback(() => {
-    if (animatingPieces) {
-      // Cancel any ongoing animation
-      if (animationCompleteRef.current) {
-        animationCompleteRef.current();
-        animationCompleteRef.current = null;
-      }
-      setAnimatingPieces(null);
-    }
-  }, [animatingPieces]);
+        const from = { file: move.fromFile, rank: move.fromRank };
+        const to = { file: move.toFile, rank: move.toRank };
 
-  // Unified move execution function that handles both human and external moves
-  const executeMove = useCallback((move: Move, animate: boolean = false, isExternalMove: boolean = false) => {
-    if (!chessEngine) return false;
+        // Check if the move is valid and what type it would be
+        const validationResult = chessEngine.isValidMove(
+          from,
+          to,
+          move.promotionPiece
+        );
 
-    const from = { file: move.fromFile, rank: move.fromRank };
-    const to = { file: move.toFile, rank: move.toRank };
+        if (!validationResult.valid) {
+          if (!isExternalMove) {
+            handleInvalidMoveInCheck(move.fromFile, move.fromRank);
+          }
+          return false;
+        }
 
-    // Check if the move is valid and what type it would be
-    const validationResult = chessEngine.isValidMove(from, to, move.promotionPiece);
+        // Get piece information BEFORE making move for animation
+        const boardState = chessEngine.getBoardState();
+        const movingPiece = boardState[7 - move.fromRank]?.[move.fromFile];
 
-    if (!validationResult.valid) {
-      if (!isExternalMove) {
-        handleInvalidMoveInCheck(move.fromFile, move.fromRank);
-      }
-      return false;
-    }
+        // Execute move immediately
+        const result = game.makeMove(move);
+        if (!result?.success) {
+          return false;
+        }
 
-    // Get piece information BEFORE making move for animation
-    const boardState = chessEngine.getBoardState();
-    const movingPiece = boardState[7 - move.fromRank]?.[move.fromFile];
+        // Play sound immediately
+        playMoveSound(result);
 
-    // Execute move immediately
-    const result = game.makeMove(move);
-    if (!result?.success) {
-      return false;
-    }
+        // Handle animation after move execution (purely visual)
+        if (animate && enableAnimations && movingPiece) {
+          // Interrupt any current animation
+          interruptAnimation();
 
-    // Play sound immediately
-    playMoveSound(result);
+          const piecesToAnimate = [
+            {
+              piece: movingPiece,
+              from: { file: move.fromFile, rank: move.fromRank },
+              to: { file: move.toFile, rank: move.toRank },
+            },
+          ];
 
-    // Handle animation after move execution (purely visual)
-    if (animate && enableAnimations && movingPiece) {
-      // Interrupt any current animation
-      interruptAnimation();
-      
-      const piecesToAnimate = [{
-        piece: movingPiece,
-        from: { file: move.fromFile, rank: move.fromRank },
-        to: { file: move.toFile, rank: move.toRank },
-      }];
+          // Add any additional moves (like castling rook) from validation result
+          if (validationResult.additionalMoves) {
+            for (const additionalMove of validationResult.additionalMoves) {
+              piecesToAnimate.push({
+                piece: additionalMove.piece,
+                from: additionalMove.from,
+                to: additionalMove.to,
+              });
+            }
+          }
 
-      // Add any additional moves (like castling rook) from validation result
-      if (validationResult.additionalMoves) {
-        for (const additionalMove of validationResult.additionalMoves) {
-          piecesToAnimate.push({
-            piece: additionalMove.piece,
-            from: additionalMove.from,
-            to: additionalMove.to,
+          const moveId = `${Date.now()}-${Math.random()}`;
+          setAnimatingPieces({
+            pieces: piecesToAnimate,
+            startTime: Date.now(),
+            moveId,
           });
         }
-      }
 
-      const moveId = `${Date.now()}-${Math.random()}`;
-      setAnimatingPieces({
-        pieces: piecesToAnimate,
-        startTime: Date.now(),
-        moveId,
-      });
-    }
+        return true;
+      },
+      [
+        chessEngine,
+        game,
+        playMoveSound,
+        enableAnimations,
+        interruptAnimation,
+        handleInvalidMoveInCheck,
+      ]
+    );
 
-    return true;
-  }, [chessEngine, game, playMoveSound, enableAnimations, interruptAnimation, handleInvalidMoveInCheck]);
+    const attemptMove = useCallback(
+      (
+        fromFile: number,
+        fromRank: number,
+        toFile: number,
+        toRank: number,
+        animate: boolean = false
+      ) => {
+        if (!chessEngine) return false;
 
-  const attemptMove = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number, animate: boolean = false) => {
-    if (!chessEngine) return false;
+        const from = { file: fromFile, rank: fromRank };
+        const to = { file: toFile, rank: toRank };
+        const move = { fromFile, fromRank, toFile, toRank };
 
-    const from = { file: fromFile, rank: fromRank };
-    const to = { file: toFile, rank: toRank };
-    const move = { fromFile, fromRank, toFile, toRank };
+        // Check if promotion is required
+        const validationResult = chessEngine.isValidMove(from, to);
+        if (validationResult.promotionRequired) {
+          if (autoPromotionPiece) {
+            // Auto-promote without showing dialog
+            const moveWithPromotion = {
+              fromFile,
+              fromRank,
+              toFile,
+              toRank,
+              promotionPiece: autoPromotionPiece,
+            };
+            const success = executeMove(moveWithPromotion, animate);
+            if (success) {
+              setSelectedSquare(null);
+              setValidMoves([]);
+            }
+            return success;
+          } else {
+            setPromotionDialog({
+              isOpen: true,
+              fromFile,
+              fromRank,
+              toFile,
+              toRank,
+              color: chessEngine.getPiece(from)?.color || Color.White,
+            });
+            return true;
+          }
+        }
 
-    // Check if promotion is required
-    const validationResult = chessEngine.isValidMove(from, to);
-    if (validationResult.promotionRequired) {
-      if (autoPromotionPiece) {
-        // Auto-promote without showing dialog
-        const moveWithPromotion = { fromFile, fromRank, toFile, toRank, promotionPiece: autoPromotionPiece };
-        const success = executeMove(moveWithPromotion, animate);
+        // Use unified executeMove function
+        const success = executeMove(move, animate);
         if (success) {
           setSelectedSquare(null);
           setValidMoves([]);
         }
         return success;
-      } else {
-        setPromotionDialog({
-          isOpen: true,
-          fromFile,
-          fromRank,
-          toFile,
-          toRank,
-          color: chessEngine.getPiece(from)?.color || Color.White,
-        });
-        return true;
+      },
+      [chessEngine, autoPromotionPiece, executeMove]
+    );
+
+    // Handle external moves - execute them using the same logic as human moves
+    useEffect(() => {
+      if (game.lastExternalMove) {
+        const moveData = game.lastExternalMove;
+        const move = moveData.move;
+
+        // Execute external move with animation using unified logic
+        executeMove(move, enableAnimations, true);
+
+        // Clear the external move after handling
+        game.clearLastExternalMove();
       }
-    }
+    }, [game.lastExternalMove, executeMove, enableAnimations, game]);
 
-    // Use unified executeMove function
-    const success = executeMove(move, animate);
-    if (success) {
-      setSelectedSquare(null);
-      setValidMoves([]);
-    }
-    return success;
-  }, [chessEngine, autoPromotionPiece, executeMove]);
+    const handleAnimationComplete = useCallback(() => {
+      // Animation is now purely visual - just clean up
+      setAnimatingPieces(null);
+      animationCompleteRef.current = null;
+    }, []);
 
-  // Handle external moves - execute them using the same logic as human moves
-  useEffect(() => {
-    if (game.lastExternalMove) {
-      const moveData = game.lastExternalMove;
-      const move = moveData.move;
-
-      // Execute external move with animation using unified logic
-      executeMove(move, enableAnimations, true);
-      
-      // Clear the external move after handling
-      game.clearLastExternalMove();
-    }
-  }, [game.lastExternalMove, executeMove, enableAnimations, game]);
-
-  const handleAnimationComplete = useCallback(() => {
-    // Animation is now purely visual - just clean up
-    setAnimatingPieces(null);
-    animationCompleteRef.current = null;
-  }, []);
-
-  // Set up the animation completion reference when animation starts
-  useEffect(() => {
-    if (animatingPieces) {
-      animationCompleteRef.current = handleAnimationComplete;
-    }
-  }, [animatingPieces, handleAnimationComplete]);
-
-  const handlePromotion = useCallback((pieceType: PieceType) => {
-    if (!chessEngine) return;
-
-    if (promotionDialog.isPreMove) {
-      // Handle pre-move promotion
-      const preMove = {
-        fromFile: promotionDialog.fromFile,
-        fromRank: promotionDialog.fromRank,
-        toFile: promotionDialog.toFile,
-        toRank: promotionDialog.toRank,
-        promotionPiece: pieceType
-      };
-      game.addPreMove(preMove);
-
-      // Play pre-move sound
-      if (enableSounds) {
-        soundManager.playPreMoveSound();
+    // Set up the animation completion reference when animation starts
+    useEffect(() => {
+      if (animatingPieces) {
+        animationCompleteRef.current = handleAnimationComplete;
       }
+    }, [animatingPieces, handleAnimationComplete]);
 
-      setSelectedSquare(null);
-      setValidMoves([]);
-    } else {
-      // Handle regular promotion
-      const moveWithPromotion = {
-        fromFile: promotionDialog.fromFile,
-        fromRank: promotionDialog.fromRank,
-        toFile: promotionDialog.toFile,
-        toRank: promotionDialog.toRank,
-        promotionPiece: pieceType
-      };
-      const success = executeMove(moveWithPromotion, enableAnimations);
+    const handlePromotion = useCallback(
+      (pieceType: PieceType) => {
+        if (!chessEngine) return;
 
-      if (success) {
-        setSelectedSquare(null);
-        setValidMoves([]);
-      }
-    }
+        if (promotionDialog.isPreMove) {
+          // Handle pre-move promotion
+          const preMove = {
+            fromFile: promotionDialog.fromFile,
+            fromRank: promotionDialog.fromRank,
+            toFile: promotionDialog.toFile,
+            toRank: promotionDialog.toRank,
+            promotionPiece: pieceType,
+          };
+          game.addPreMove(preMove);
 
-    setPromotionDialog(prev => ({ ...prev, isOpen: false }));
-  }, [chessEngine, promotionDialog, game, enableSounds, executeMove, enableAnimations]);
+          // Play pre-move sound
+          if (enableSounds) {
+            soundManager.playPreMoveSound();
+          }
 
-  const handlePromotionCancel = useCallback(() => {
-    setPromotionDialog(prev => ({ ...prev, isOpen: false }));
-  }, []);
-
-  const handleSquareClick = useCallback((file: number, rank: number) => {
-    if (!chessEngine) return;
-
-    // Clear arrows and highlights on any left click
-    setArrows([]);
-    setHighlightedSquares([]);
-
-    // Use visual board state to account for pre-moves
-    const visualBoardState = getVisualBoardState();
-    const piece = visualBoardState[7 - rank]?.[file];
-
-    // Handle normal moves when it's human's turn
-    if (game.canHumanMove) {
-      if (selectedSquare) {
-        // Try to make a move
-        if ((selectedSquare.file === file && selectedSquare.rank === rank) || (piece && piece.color === chessEngine.getCurrentPlayer())) {
-          // Clicking on a different piece of the same player - switch selection
-          setSelectedSquare({ file, rank });
-          const moves = getValidMovesFromVisualBoard(file, rank);
-          setValidMoves(moves);
+          setSelectedSquare(null);
+          setValidMoves([]);
         } else {
-          // Attempt to move to the clicked square, or deselect if it's an empty square
-          if (!attemptMove(selectedSquare.file, selectedSquare.rank, file, rank, enableAnimations)) {
-            // If move failed and this is an empty square, deselect
-            if (!piece) {
+          // Handle regular promotion
+          const moveWithPromotion = {
+            fromFile: promotionDialog.fromFile,
+            fromRank: promotionDialog.fromRank,
+            toFile: promotionDialog.toFile,
+            toRank: promotionDialog.toRank,
+            promotionPiece: pieceType,
+          };
+          const success = executeMove(moveWithPromotion, enableAnimations);
+
+          if (success) {
+            setSelectedSquare(null);
+            setValidMoves([]);
+          }
+        }
+
+        setPromotionDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      [
+        chessEngine,
+        promotionDialog,
+        game,
+        enableSounds,
+        executeMove,
+        enableAnimations,
+      ]
+    );
+
+    const handlePromotionCancel = useCallback(() => {
+      setPromotionDialog(prev => ({ ...prev, isOpen: false }));
+    }, []);
+
+    const handleSquareClick = useCallback(
+      (file: number, rank: number) => {
+        if (!chessEngine) return;
+
+        // Clear arrows and highlights on any left click
+        setArrows([]);
+        setHighlightedSquares([]);
+
+        // Use visual board state to account for pre-moves
+        const visualBoardState = getVisualBoardState();
+        const piece = visualBoardState[7 - rank]?.[file];
+
+        // Handle normal moves when it's human's turn
+        if (game.canHumanMove) {
+          if (selectedSquare) {
+            // Try to make a move
+            if (
+              (selectedSquare.file === file && selectedSquare.rank === rank) ||
+              (piece && piece.color === chessEngine.getCurrentPlayer())
+            ) {
+              // Clicking on a different piece of the same player - switch selection
+              setSelectedSquare({ file, rank });
+              const moves = getValidMovesFromVisualBoard(file, rank);
+              setValidMoves(moves);
+            } else {
+              // Attempt to move to the clicked square, or deselect if it's an empty square
+              if (
+                !attemptMove(
+                  selectedSquare.file,
+                  selectedSquare.rank,
+                  file,
+                  rank,
+                  enableAnimations
+                )
+              ) {
+                // If move failed and this is an empty square, deselect
+                if (!piece) {
+                  setSelectedSquare(null);
+                  setValidMoves([]);
+                }
+              }
+            }
+          } else if (piece && piece.color === chessEngine.getCurrentPlayer()) {
+            // Select a piece and show valid moves
+            setSelectedSquare({ file, rank });
+            const moves = getValidMovesFromVisualBoard(file, rank);
+            setValidMoves(moves);
+          }
+        }
+        // Handle pre-moves when it's external player's turn OR during any animation (and pre-moves are enabled)
+        else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
+          // Determine human player color (opposite of current player)
+          const humanPlayerColor =
+            chessEngine.getCurrentPlayer() === Color.White
+              ? Color.Black
+              : Color.White;
+
+          if (selectedSquare) {
+            // Try to make a pre-move
+            if (selectedSquare.file === file && selectedSquare.rank === rank) {
+              // Deselect
+              setSelectedSquare(null);
+              setValidMoves([]);
+            } else if (piece && piece.color === humanPlayerColor) {
+              // Clicking on own piece - switch selection (for future turn)
+              setSelectedSquare({ file, rank });
+              // Show valid moves from the visual board position
+              const moves = getValidMovesFromVisualBoard(file, rank);
+              setValidMoves(moves);
+            } else {
+              // Try to make a pre-move using shared logic
+              handlePreMoveAttempt(
+                selectedSquare.file,
+                selectedSquare.rank,
+                file,
+                rank
+              );
               setSelectedSquare(null);
               setValidMoves([]);
             }
+          } else if (piece && piece.color === humanPlayerColor) {
+            // Select a piece for future move
+            setSelectedSquare({ file, rank });
+            // Show valid moves from the visual board position
+            const moves = getValidMovesFromVisualBoard(file, rank);
+            setValidMoves(moves);
           }
         }
-      } else if (piece && piece.color === chessEngine.getCurrentPlayer()) {
-        // Select a piece and show valid moves
-        setSelectedSquare({ file, rank });
-        const moves = getValidMovesFromVisualBoard(file, rank);
-        setValidMoves(moves);
-      }
-    }
-    // Handle pre-moves when it's external player's turn OR during any animation (and pre-moves are enabled)
-    else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
-      // Determine human player color (opposite of current player)
-      const humanPlayerColor = chessEngine.getCurrentPlayer() === Color.White ? Color.Black : Color.White;
+      },
+      [
+        chessEngine,
+        selectedSquare,
+        attemptMove,
+        game,
+        getValidMovesFromVisualBoard,
+        getVisualBoardState,
+        enablePreMoves,
+        handlePreMoveAttempt,
+        animatingPieces,
+        enableAnimations,
+      ]
+    );
 
-      if (selectedSquare) {
-        // Try to make a pre-move
-        if (selectedSquare.file === file && selectedSquare.rank === rank) {
-          // Deselect
+    const handleDrop = useCallback(
+      (fromFile: number, fromRank: number, toFile: number, toRank: number) => {
+        if (!chessEngine) return;
+
+        // Handle normal drops when it's human's turn
+        if (game.canHumanMove) {
+          const from = { file: fromFile, rank: fromRank };
+          const to = { file: toFile, rank: toRank };
+
+          // Check if this is a valid move and what type
+          const validationResult = chessEngine.isValidMove(from, to);
+
+          if (!validationResult.valid) {
+            handleInvalidMoveInCheck(fromFile, fromRank);
+            return;
+          }
+
+          // For castling moves during drag, handle specially
+          if (validationResult.type === 'castling') {
+            // Execute the full castling move immediately (king is already visually positioned)
+            const move = { fromFile, fromRank, toFile, toRank };
+            const result = game.makeMove(move);
+
+            if (result?.success) {
+              // Clear selection and play sound immediately
+              setSelectedSquare(null);
+              setValidMoves([]);
+              playMoveSound(result);
+
+              // Animate only the rook visually if animations enabled (move is already executed, king is in position)
+              if (validationResult.additionalMoves && enableAnimations) {
+                // Interrupt any current animation
+                interruptAnimation();
+
+                const rookMove = validationResult.additionalMoves[0];
+                const moveId = `${Date.now()}-${Math.random()}`;
+                setAnimatingPieces({
+                  pieces: [
+                    {
+                      piece: rookMove.piece,
+                      from: rookMove.from,
+                      to: rookMove.to,
+                    },
+                  ],
+                  startTime: Date.now(),
+                  moveId,
+                });
+              }
+            }
+            return;
+          }
+
+          // Regular move (non-castling) - don't animate drag moves since piece is already positioned
+          attemptMove(fromFile, fromRank, toFile, toRank, false);
+        }
+        // Handle pre-move drops when it's external player's turn OR during any animation (and pre-moves are enabled)
+        else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
+          // Use shared pre-move logic
+          handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
           setSelectedSquare(null);
           setValidMoves([]);
-        } else if (piece && piece.color === humanPlayerColor) {
-          // Clicking on own piece - switch selection (for future turn)
+        }
+      },
+      [
+        chessEngine,
+        attemptMove,
+        game,
+        handlePreMoveAttempt,
+        enablePreMoves,
+        playMoveSound,
+        animatingPieces,
+        enableAnimations,
+        handleInvalidMoveInCheck,
+        interruptAnimation,
+      ]
+    );
+
+    const handleDragStart = useCallback(
+      (file: number, rank: number) => {
+        if (!chessEngine) return;
+
+        // Allow dragging when it's human's turn OR when making pre-moves OR during any animation (and pre-moves are enabled)
+        if (game.canHumanMove || enablePreMoves) {
+          // Use visual board state to account for pre-moves
+          const visualBoardState = getVisualBoardState();
+          const piece = visualBoardState[7 - rank]?.[file];
+          const isHumanPiece =
+            (whiteIsHuman && piece?.color === Color.White) ||
+            (blackIsHuman && piece?.color === Color.Black);
+
+          // Only allow dragging allowed color pieces
+          if (!isHumanPiece) {
+            return;
+          }
+
+          // Clear arrows, highlights, and any existing selection indicators when starting to drag
+          setArrows([]);
+          setHighlightedSquares([]);
           setSelectedSquare({ file, rank });
-          // Show valid moves from the visual board position
+
+          // Show valid moves from the visual board position (works for both normal and pre-moves)
           const moves = getValidMovesFromVisualBoard(file, rank);
           setValidMoves(moves);
-        } else {
-          // Try to make a pre-move using shared logic
-          handlePreMoveAttempt(selectedSquare.file, selectedSquare.rank, file, rank);
-          setSelectedSquare(null);
-          setValidMoves([]);
         }
-      } else if (piece && piece.color === humanPlayerColor) {
-        // Select a piece for future move
-        setSelectedSquare({ file, rank });
-        // Show valid moves from the visual board position
-        const moves = getValidMovesFromVisualBoard(file, rank);
-        setValidMoves(moves);
-      }
-    }
-  }, [chessEngine, selectedSquare, attemptMove, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, handlePreMoveAttempt, animatingPieces, enableAnimations]);
+      },
+      [
+        chessEngine,
+        game,
+        getValidMovesFromVisualBoard,
+        getVisualBoardState,
+        enablePreMoves,
+        whiteIsHuman,
+        blackIsHuman,
+      ]
+    );
 
-  const handleDrop = useCallback((fromFile: number, fromRank: number, toFile: number, toRank: number) => {
-    if (!chessEngine) return;
+    const handleDragEnd = useCallback((file: number, rank: number) => {}, []);
 
-    // Handle normal drops when it's human's turn
-    if (game.canHumanMove) {
+    const isSquareSelected = useCallback(
+      (file: number, rank: number) => {
+        return selectedSquare
+          ? selectedSquare.file === file && selectedSquare.rank === rank
+          : false;
+      },
+      [selectedSquare]
+    );
 
-    const from = { file: fromFile, rank: fromRank };
-    const to = { file: toFile, rank: toRank };
+    const isValidMoveSquare = useCallback(
+      (file: number, rank: number) => {
+        return validMoves.some(
+          move => move.file === file && move.rank === rank
+        );
+      },
+      [validMoves]
+    );
 
-    // Check if this is a valid move and what type
-    const validationResult = chessEngine.isValidMove(from, to);
+    const isCapture = useCallback(
+      (file: number, rank: number) => {
+        if (!chessEngine || !isValidMoveSquare(file, rank)) return false;
+        const boardState = chessEngine.getBoardState();
+        const targetPiece = boardState[7 - rank]?.[file];
+        return !!targetPiece;
+      },
+      [chessEngine, isValidMoveSquare]
+    );
 
-    if (!validationResult.valid) {
-      handleInvalidMoveInCheck(fromFile, fromRank);
-      return;
-    }
+    const isPreMoveSquare = useCallback(
+      (file: number, rank: number) => {
+        return preMoveSquares.some(
+          square => square.file === file && square.rank === rank
+        );
+      },
+      [preMoveSquares]
+    );
 
-    // For castling moves during drag, handle specially
-    if (validationResult.type === 'castling') {
-      // Execute the full castling move immediately (king is already visually positioned)
-      const move = { fromFile, fromRank, toFile, toRank };
-      const result = game.makeMove(move);
+    const isAnimatingFrom = useCallback(
+      (file: number, rank: number) => {
+        return (
+          animatingPieces?.pieces.some(
+            p => p.from.file === file && p.from.rank === rank
+          ) || false
+        );
+      },
+      [animatingPieces]
+    );
 
-      if (result?.success) {
-        // Clear selection and play sound immediately
-        setSelectedSquare(null);
-        setValidMoves([]);
-        playMoveSound(result);
+    const isAnimatingTo = useCallback(
+      (file: number, rank: number) => {
+        // Hide pieces at animation destination squares
+        return (
+          animatingPieces?.pieces.some(
+            p => p.to.file === file && p.to.rank === rank
+          ) || false
+        );
+      },
+      [animatingPieces]
+    );
 
-        // Animate only the rook visually if animations enabled (move is already executed, king is in position)
-        if (validationResult.additionalMoves && enableAnimations) {
-          // Interrupt any current animation
-          interruptAnimation();
-          
-          const rookMove = validationResult.additionalMoves[0];
-          const moveId = `${Date.now()}-${Math.random()}`;
-          setAnimatingPieces({
-            pieces: [{
-              piece: rookMove.piece,
-              from: rookMove.from,
-              to: rookMove.to,
-            }],
-            startTime: Date.now(),
-            moveId,
-          });
+    const isLastMoveFrom = useCallback(
+      (file: number, rank: number) => {
+        const lastMove = chessEngine.getLastMove();
+        return lastMove
+          ? lastMove.fromFile === file && lastMove.fromRank === rank
+          : false;
+      },
+      [chessEngine]
+    );
+
+    const isLastMoveTo = useCallback(
+      (file: number, rank: number) => {
+        const lastMove = chessEngine.getLastMove();
+        return lastMove
+          ? lastMove.toFile === file && lastMove.toRank === rank
+          : false;
+      },
+      [chessEngine]
+    );
+
+    const isHighlighted = useCallback(
+      (file: number, rank: number) => {
+        return highlightedSquares.some(
+          square => square.file === file && square.rank === rank
+        );
+      },
+      [highlightedSquares]
+    );
+
+    const isKingInCheck = useCallback(
+      (file: number, rank: number) => {
+        return (
+          !!kingInCheckHighlight &&
+          kingInCheckHighlight.file === file &&
+          kingInCheckHighlight.rank === rank
+        );
+      },
+      [kingInCheckHighlight]
+    );
+
+    const handleRightMouseDown = useCallback(
+      (file: number, rank: number) => {
+        // Clear pre-moves on any right-click - if pre-moves exist, only clear them and don't start arrow creation
+        if (game.preMoves.length > 0) {
+          game.clearPreMoves();
+          return; // Don't start arrow creation when clearing pre-moves
         }
-      }
-      return;
-    }
 
-      // Regular move (non-castling) - don't animate drag moves since piece is already positioned
-      attemptMove(fromFile, fromRank, toFile, toRank, false);
-    }
-    // Handle pre-move drops when it's external player's turn OR during any animation (and pre-moves are enabled)
-    else if ((game.canMakePreMoves || animatingPieces) && enablePreMoves) {
-      // Use shared pre-move logic
-      handlePreMoveAttempt(fromFile, fromRank, toFile, toRank);
-      setSelectedSquare(null);
-      setValidMoves([]);
-    }
-  }, [chessEngine, attemptMove, game, handlePreMoveAttempt, enablePreMoves, playMoveSound, animatingPieces, enableAnimations, handleInvalidMoveInCheck, interruptAnimation]);
+        // Start arrow creation if arrows are enabled, or set flag for highlights if arrows disabled but highlights enabled
+        if (enableArrows || enableHighlights) {
+          setArrowStart({ file, rank });
+        }
+      },
+      [game, enableArrows, enableHighlights]
+    );
 
-  const handleDragStart = useCallback((file: number, rank: number) => {
-    if (!chessEngine) return;
+    const handleRightMouseUp = useCallback(
+      (file: number, rank: number) => {
+        if (arrowStart) {
+          if (arrowStart.file === file && arrowStart.rank === rank) {
+            // Same square - toggle square highlight instead of creating arrow (if highlights enabled)
+            if (enableHighlights) {
+              setHighlightedSquares(prev => {
+                const existingIndex = prev.findIndex(
+                  square => square.file === file && square.rank === rank
+                );
 
-    // Allow dragging when it's human's turn OR when making pre-moves OR during any animation (and pre-moves are enabled)
-    if (game.canHumanMove || enablePreMoves) {
-      // Use visual board state to account for pre-moves
-      const visualBoardState = getVisualBoardState();
-      const piece = visualBoardState[7 - rank]?.[file];
-      const isHumanPiece = (whiteIsHuman && piece?.color === Color.White) || (blackIsHuman && piece?.color === Color.Black);
-
-      // Only allow dragging allowed color pieces
-      if (!isHumanPiece) {
-        return;
-      }
-
-      // Clear arrows, highlights, and any existing selection indicators when starting to drag
-      setArrows([]);
-      setHighlightedSquares([]);
-      setSelectedSquare({ file, rank });
-
-      // Show valid moves from the visual board position (works for both normal and pre-moves)
-      const moves = getValidMovesFromVisualBoard(file, rank);
-      setValidMoves(moves);
-    }
-  }, [chessEngine, game, getValidMovesFromVisualBoard, getVisualBoardState, enablePreMoves, whiteIsHuman, blackIsHuman]);
-
-  const handleDragEnd = useCallback((file: number, rank: number) => {
-
-  }, []);
-
-  const isSquareSelected = useCallback((file: number, rank: number) => {
-    return selectedSquare ? selectedSquare.file === file && selectedSquare.rank === rank : false;
-  }, [selectedSquare]);
-
-  const isValidMoveSquare = useCallback((file: number, rank: number) => {
-    return validMoves.some(move => move.file === file && move.rank === rank);
-  }, [validMoves]);
-
-  const isCapture = useCallback((file: number, rank: number) => {
-    if (!chessEngine || !isValidMoveSquare(file, rank)) return false;
-    const boardState = chessEngine.getBoardState();
-    const targetPiece = boardState[7 - rank]?.[file];
-    return !!targetPiece;
-  }, [chessEngine, isValidMoveSquare]);
-
-  const isPreMoveSquare = useCallback((file: number, rank: number) => {
-    return preMoveSquares.some(square => square.file === file && square.rank === rank);
-  }, [preMoveSquares]);
-
-  const isAnimatingFrom = useCallback((file: number, rank: number) => {
-    return animatingPieces?.pieces.some(p => p.from.file === file && p.from.rank === rank) || false;
-  }, [animatingPieces]);
-
-  const isAnimatingTo = useCallback((file: number, rank: number) => {
-    // Hide pieces at animation destination squares
-    return animatingPieces?.pieces.some(p => p.to.file === file && p.to.rank === rank) || false;
-  }, [animatingPieces]);
-
-  const isLastMoveFrom = useCallback((file: number, rank: number) => {
-    const lastMove = chessEngine.getLastMove();
-    return lastMove ? lastMove.fromFile === file && lastMove.fromRank === rank : false;
-  }, [chessEngine]);
-
-  const isLastMoveTo = useCallback((file: number, rank: number) => {
-    const lastMove = chessEngine.getLastMove();
-    return lastMove ? lastMove.toFile === file && lastMove.toRank === rank : false;
-  }, [chessEngine]);
-
-  const isHighlighted = useCallback((file: number, rank: number) => {
-    return highlightedSquares.some(square => square.file === file && square.rank === rank);
-  }, [highlightedSquares]);
-
-
-  const isKingInCheck = useCallback((file: number, rank: number) => {
-    return !!kingInCheckHighlight && kingInCheckHighlight.file === file && kingInCheckHighlight.rank === rank;
-  }, [kingInCheckHighlight]);
-
-  const handleRightMouseDown = useCallback((file: number, rank: number) => {
-    // Clear pre-moves on any right-click - if pre-moves exist, only clear them and don't start arrow creation
-    if (game.preMoves.length > 0) {
-      game.clearPreMoves();
-      return; // Don't start arrow creation when clearing pre-moves
-    }
-
-    // Start arrow creation if arrows are enabled, or set flag for highlights if arrows disabled but highlights enabled
-    if (enableArrows || enableHighlights) {
-      setArrowStart({ file, rank });
-    }
-  }, [game, enableArrows, enableHighlights]);
-
-  const handleRightMouseUp = useCallback((file: number, rank: number) => {
-    if (arrowStart) {
-      if (arrowStart.file === file && arrowStart.rank === rank) {
-        // Same square - toggle square highlight instead of creating arrow (if highlights enabled)
-        if (enableHighlights) {
-          setHighlightedSquares(prev => {
-            const existingIndex = prev.findIndex(square =>
-              square.file === file && square.rank === rank
-            );
-
-            if (existingIndex >= 0) {
-              // Remove existing highlight
-              return prev.filter((_, index) => index !== existingIndex);
-            } else {
-              // Add new highlight
-              return [...prev, { file, rank }];
+                if (existingIndex >= 0) {
+                  // Remove existing highlight
+                  return prev.filter((_, index) => index !== existingIndex);
+                } else {
+                  // Add new highlight
+                  return [...prev, { file, rank }];
+                }
+              });
             }
-          });
-        }
-      } else if (enableArrows) {
-        // Different square - create or toggle arrow (if arrows enabled)
-        const newArrow = { from: arrowStart, to: { file, rank } };
-        setArrows(prev => {
-          // Check if arrow already exists
-          const existingIndex = prev.findIndex(arrow =>
-            arrow.from.file === newArrow.from.file &&
-            arrow.from.rank === newArrow.from.rank &&
-            arrow.to.file === newArrow.to.file &&
-            arrow.to.rank === newArrow.to.rank
-          );
-
-          if (existingIndex >= 0) {
-            // Remove existing arrow
-            return prev.filter((_, index) => index !== existingIndex);
-          } else {
-            // Add new arrow
-            return [...prev, newArrow];
-          }
-        });
-      }
-    }
-    setArrowStart(null);
-  }, [arrowStart, enableArrows, enableHighlights]);
-
-
-  if (!chessEngine) {
-    return <div>Loading chess engine...</div>;
-  }
-
-  let visualBoardState = getVisualBoardState();
-  if (flipped) {
-    visualBoardState = [...visualBoardState].reverse(); // Flip the board state for black perspective
-    visualBoardState = visualBoardState.map(row => [...row].reverse()); // Reverse each row as well
-  }
-
-  return (
-    <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
-      <CustomDragLayer squareSize={squareSize} />
-      <div className={`chess-board-container ${className || ''}`}>
-        <div
-          ref={boardRef}
-          className="chess-board"
-          style={{
-            width: boardSize,
-            height: boardSize,
-            gridTemplateColumns: `repeat(8, ${squareSize}px)`,
-            gridTemplateRows: `repeat(8, ${squareSize}px)`,
-            fontSize: Math.max(10, squareSize * 0.12),
-          }}
-        >
-          {visualBoardState.map((row, rankIndex) => (
-
-            row.map((piece, fileIndex) => {
-              const actualRank = flipped ? rankIndex : 7 - rankIndex;
-              const actualFile = flipped ? 7 - fileIndex : fileIndex;
-
-              return (
-                <Square
-                  key={`${actualFile}-${actualRank}`}
-                  file={actualFile}
-                  rank={actualRank}
-                  piece={piece}
-                  flipped={flipped}
-                  showCoordinates={showCoordinates}
-                  isSelected={isSquareSelected(actualFile, actualRank)}
-                  isValidMove={isValidMoveSquare(actualFile, actualRank)}
-                  isCapture={isCapture(actualFile, actualRank)}
-                  isAnimatingFrom={isAnimatingFrom(actualFile, actualRank)}
-                  isAnimatingTo={isAnimatingTo(actualFile, actualRank)}
-                  isLastMoveFrom={isLastMoveFrom(actualFile, actualRank)}
-                  isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
-                  isHighlighted={isHighlighted(actualFile, actualRank)}
-                  isPreMove={isPreMoveSquare(actualFile, actualRank)}
-                  isKingInCheck={isKingInCheck(actualFile, actualRank)}
-                  onSquareClick={handleSquareClick}
-                  onDrop={handleDrop}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onRightMouseDown={handleRightMouseDown}
-                  onRightMouseUp={handleRightMouseUp}
-                />
+          } else if (enableArrows) {
+            // Different square - create or toggle arrow (if arrows enabled)
+            const newArrow = { from: arrowStart, to: { file, rank } };
+            setArrows(prev => {
+              // Check if arrow already exists
+              const existingIndex = prev.findIndex(
+                arrow =>
+                  arrow.from.file === newArrow.from.file &&
+                  arrow.from.rank === newArrow.from.rank &&
+                  arrow.to.file === newArrow.to.file &&
+                  arrow.to.rank === newArrow.to.rank
               );
-            })
-          ))}
 
-          {/* Arrow overlay */}
-          <svg
-            className="arrow-overlay"
+              if (existingIndex >= 0) {
+                // Remove existing arrow
+                return prev.filter((_, index) => index !== existingIndex);
+              } else {
+                // Add new arrow
+                return [...prev, newArrow];
+              }
+            });
+          }
+        }
+        setArrowStart(null);
+      },
+      [arrowStart, enableArrows, enableHighlights]
+    );
+
+    if (!chessEngine) {
+      return <div>Loading chess engine...</div>;
+    }
+
+    let visualBoardState = getVisualBoardState();
+    if (flipped) {
+      visualBoardState = [...visualBoardState].reverse(); // Flip the board state for black perspective
+      visualBoardState = visualBoardState.map(row => [...row].reverse()); // Reverse each row as well
+    }
+
+    return (
+      <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
+        <CustomDragLayer squareSize={squareSize} />
+        <div className={`chess-board-container ${className || ''}`}>
+          <div
+            ref={boardRef}
+            className='chess-board'
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
               width: boardSize,
               height: boardSize,
-              pointerEvents: 'none',
-              zIndex: 100,
+              gridTemplateColumns: `repeat(8, ${squareSize}px)`,
+              gridTemplateRows: `repeat(8, ${squareSize}px)`,
+              fontSize: Math.max(10, squareSize * 0.12),
             }}
           >
-            {arrows.map((arrow, index) => {
-              const fromX = (flipped ? 7 - arrow.from.file : arrow.from.file) * squareSize + squareSize / 2;
-              const fromY = (flipped ? arrow.from.rank : 7 - arrow.from.rank) * squareSize + squareSize / 2;
-              const toX = (flipped ? 7 - arrow.to.file : arrow.to.file) * squareSize + squareSize / 2;
-              const toY = (flipped ? arrow.to.rank : 7 - arrow.to.rank) * squareSize + squareSize / 2;
+            {visualBoardState.map((row, rankIndex) =>
+              row.map((piece, fileIndex) => {
+                const actualRank = flipped ? rankIndex : 7 - rankIndex;
+                const actualFile = flipped ? 7 - fileIndex : fileIndex;
 
-              // Check if this is a knight move
-              const deltaFile = Math.abs(arrow.to.file - arrow.from.file);
-              const deltaRank = Math.abs(arrow.to.rank - arrow.from.rank);
-              const isKnightMove = (deltaFile === 2 && deltaRank === 1) || (deltaFile === 1 && deltaRank === 2);
+                return (
+                  <Square
+                    key={`${actualFile}-${actualRank}`}
+                    file={actualFile}
+                    rank={actualRank}
+                    piece={piece}
+                    flipped={flipped}
+                    showCoordinates={showCoordinates}
+                    isSelected={isSquareSelected(actualFile, actualRank)}
+                    isValidMove={isValidMoveSquare(actualFile, actualRank)}
+                    isCapture={isCapture(actualFile, actualRank)}
+                    isAnimatingFrom={isAnimatingFrom(actualFile, actualRank)}
+                    isAnimatingTo={isAnimatingTo(actualFile, actualRank)}
+                    isLastMoveFrom={isLastMoveFrom(actualFile, actualRank)}
+                    isLastMoveTo={isLastMoveTo(actualFile, actualRank)}
+                    isHighlighted={isHighlighted(actualFile, actualRank)}
+                    isPreMove={isPreMoveSquare(actualFile, actualRank)}
+                    isKingInCheck={isKingInCheck(actualFile, actualRank)}
+                    onSquareClick={handleSquareClick}
+                    onDrop={handleDrop}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onRightMouseDown={handleRightMouseDown}
+                    onRightMouseUp={handleRightMouseUp}
+                  />
+                );
+              })
+            )}
 
-              return (
-                <ArrowComponent
-                  key={`arrow-${index}`}
-                  fromX={fromX}
-                  fromY={fromY}
-                  toX={toX}
-                  toY={toY}
-                  isKnightMove={isKnightMove}
+            {/* Arrow overlay */}
+            <svg
+              className='arrow-overlay'
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: boardSize,
+                height: boardSize,
+                pointerEvents: 'none',
+                zIndex: 100,
+              }}
+            >
+              {arrows.map((arrow, index) => {
+                const fromX =
+                  (flipped ? 7 - arrow.from.file : arrow.from.file) *
+                    squareSize +
+                  squareSize / 2;
+                const fromY =
+                  (flipped ? arrow.from.rank : 7 - arrow.from.rank) *
+                    squareSize +
+                  squareSize / 2;
+                const toX =
+                  (flipped ? 7 - arrow.to.file : arrow.to.file) * squareSize +
+                  squareSize / 2;
+                const toY =
+                  (flipped ? arrow.to.rank : 7 - arrow.to.rank) * squareSize +
+                  squareSize / 2;
+
+                // Check if this is a knight move
+                const deltaFile = Math.abs(arrow.to.file - arrow.from.file);
+                const deltaRank = Math.abs(arrow.to.rank - arrow.from.rank);
+                const isKnightMove =
+                  (deltaFile === 2 && deltaRank === 1) ||
+                  (deltaFile === 1 && deltaRank === 2);
+
+                return (
+                  <ArrowComponent
+                    key={`arrow-${index}`}
+                    fromX={fromX}
+                    fromY={fromY}
+                    toX={toX}
+                    toY={toY}
+                    isKnightMove={isKnightMove}
+                    squareSize={squareSize}
+                  />
+                );
+              })}
+            </svg>
+
+            {enableAnimations &&
+              animatingPieces &&
+              animatingPieces.pieces.map((animatingPiece, index) => (
+                <AnimatingPiece
+                  key={`${animatingPiece.from.file}-${animatingPiece.from.rank}-${index}`}
+                  piece={animatingPiece.piece}
+                  from={animatingPiece.from}
+                  to={animatingPiece.to}
+                  startTime={animatingPieces.startTime}
                   squareSize={squareSize}
+                  animationDuration={animationDuration}
+                  onComplete={index === 0 ? handleAnimationComplete : () => {}} // Only call completion for the first piece
+                  flipped={flipped}
                 />
-              );
-            })}
-          </svg>
+              ))}
 
-          {enableAnimations && animatingPieces && animatingPieces.pieces.map((animatingPiece, index) => (
-            <AnimatingPiece
-              key={`${animatingPiece.from.file}-${animatingPiece.from.rank}-${index}`}
-              piece={animatingPiece.piece}
-              from={animatingPiece.from}
-              to={animatingPiece.to}
-              startTime={animatingPieces.startTime}
+            {/* Promotion dialog overlay */}
+            <PromotionDialog
+              isOpen={promotionDialog.isOpen}
+              color={promotionDialog.color}
+              promotionSquare={{
+                file: promotionDialog.toFile,
+                rank: promotionDialog.toRank,
+              }}
               squareSize={squareSize}
-              animationDuration={animationDuration}
-              onComplete={index === 0 ? handleAnimationComplete : () => {}} // Only call completion for the first piece
               flipped={flipped}
+              onSelect={handlePromotion}
+              onCancel={handlePromotionCancel}
             />
-          ))}
 
-          {/* Promotion dialog overlay */}
-          <PromotionDialog
-            isOpen={promotionDialog.isOpen}
-            color={promotionDialog.color}
-            promotionSquare={{ file: promotionDialog.toFile, rank: promotionDialog.toRank }}
-            squareSize={squareSize}
-            flipped={flipped}
-            onSelect={handlePromotion}
-            onCancel={handlePromotionCancel}
-          />
+            {/* Game end badges for checkmate/stalemate */}
+            {(() => {
+              const gameState = chessEngine.getGameState();
+              if (!gameState.isGameOver || !gameState.result) return null;
 
-          {/* Game end badges for checkmate/stalemate */}
-          {(() => {
-            const gameState = chessEngine.getGameState();
-            if (!gameState.isGameOver || !gameState.result) return null;
+              const kingPositions = findKingPositions();
+              const badges = [];
 
-            const kingPositions = findKingPositions();
-            const badges = [];
-
-            if (gameState.result.reason === 'checkmate' && gameState.result.winner !== undefined) {
-              // Checkmate: winner gets crown, loser gets fallen king
-              if (kingPositions.white) {
-                badges.push(
-                  <GameEndBadge
-                    key="white-king"
-                    kingPosition={kingPositions.white}
-                    squareSize={squareSize}
-                    flipped={flipped}
-                    badgeType={gameState.result.winner === Color.White ? 'winner' : 'loser'}
-                  />
-                );
+              if (
+                gameState.result.reason === 'checkmate' &&
+                gameState.result.winner !== undefined
+              ) {
+                // Checkmate: winner gets crown, loser gets fallen king
+                if (kingPositions.white) {
+                  badges.push(
+                    <GameEndBadge
+                      key='white-king'
+                      kingPosition={kingPositions.white}
+                      squareSize={squareSize}
+                      flipped={flipped}
+                      badgeType={
+                        gameState.result.winner === Color.White
+                          ? 'winner'
+                          : 'loser'
+                      }
+                    />
+                  );
+                }
+                if (kingPositions.black) {
+                  badges.push(
+                    <GameEndBadge
+                      key='black-king'
+                      kingPosition={kingPositions.black}
+                      squareSize={squareSize}
+                      flipped={flipped}
+                      badgeType={
+                        gameState.result.winner === Color.Black
+                          ? 'winner'
+                          : 'loser'
+                      }
+                    />
+                  );
+                }
+              } else if (gameState.result.reason === 'stalemate') {
+                // Stalemate: both kings get draw badge
+                if (kingPositions.white) {
+                  badges.push(
+                    <GameEndBadge
+                      key='white-king'
+                      kingPosition={kingPositions.white}
+                      squareSize={squareSize}
+                      flipped={flipped}
+                      badgeType='draw'
+                    />
+                  );
+                }
+                if (kingPositions.black) {
+                  badges.push(
+                    <GameEndBadge
+                      key='black-king'
+                      kingPosition={kingPositions.black}
+                      squareSize={squareSize}
+                      flipped={flipped}
+                      badgeType='draw'
+                    />
+                  );
+                }
               }
-              if (kingPositions.black) {
-                badges.push(
-                  <GameEndBadge
-                    key="black-king"
-                    kingPosition={kingPositions.black}
-                    squareSize={squareSize}
-                    flipped={flipped}
-                    badgeType={gameState.result.winner === Color.Black ? 'winner' : 'loser'}
-                  />
-                );
-              }
-            } else if (gameState.result.reason === 'stalemate') {
-              // Stalemate: both kings get draw badge
-              if (kingPositions.white) {
-                badges.push(
-                  <GameEndBadge
-                    key="white-king"
-                    kingPosition={kingPositions.white}
-                    squareSize={squareSize}
-                    flipped={flipped}
-                    badgeType="draw"
-                  />
-                );
-              }
-              if (kingPositions.black) {
-                badges.push(
-                  <GameEndBadge
-                    key="black-king"
-                    kingPosition={kingPositions.black}
-                    squareSize={squareSize}
-                    flipped={flipped}
-                    badgeType="draw"
-                  />
-                );
-              }
-            }
 
-            return badges;
-          })()}
+              return badges;
+            })()}
+          </div>
         </div>
-      </div>
-    </DndProvider>
-  );
-});
+      </DndProvider>
+    );
+  }
+);
 
 ChessBoard.displayName = 'ChessBoard';

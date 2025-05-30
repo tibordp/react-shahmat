@@ -26,13 +26,154 @@
     "build": "npm run copy-stockfish && react-scripts build",
     "copy-stockfish": "cp node_modules/stockfish/src/stockfish-nnue-16-single.js public/stockfish.js && cp node_modules/stockfish/src/stockfish-nnue-16-single.wasm public/stockfish-nnue-16-single.wasm",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "eslintConfig": {
     "extends": [
       "react-app",
-      "react-app/jest"
-    ]
+      "react-app/jest",
+      "plugin:jsx-a11y/recommended",
+      "plugin:import/recommended",
+      "plugin:import/typescript",
+      "prettier"
+    ],
+    "plugins": [
+      "prettier",
+      "jsx-a11y",
+      "import"
+    ],
+    "rules": {
+      "prettier/prettier": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/prefer-const": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-empty-function": "error",
+      "@typescript-eslint/no-empty-interface": "error",
+      "@typescript-eslint/no-inferrable-types": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/prefer-optional-chain": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      "@typescript-eslint/strict-boolean-expressions": [
+        "error",
+        {
+          "allowString": false,
+          "allowNumber": false,
+          "allowNullableObject": false
+        }
+      ],
+      "react-hooks/exhaustive-deps": "error",
+      "react/jsx-no-useless-fragment": "error",
+      "react/jsx-curly-brace-presence": [
+        "error",
+        {
+          "props": "never",
+          "children": "never"
+        }
+      ],
+      "react/no-array-index-key": "warn",
+      "react/prefer-stateless-function": "error",
+      "react/self-closing-comp": "error",
+      "no-console": [
+        "error",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
+      ],
+      "no-debugger": "error",
+      "no-alert": "error",
+      "no-duplicate-imports": "error",
+      "no-implicit-coercion": "error",
+      "no-nested-ternary": "error",
+      "no-return-await": "error",
+      "no-throw-literal": "error",
+      "no-unneeded-ternary": "error",
+      "no-useless-concat": "error",
+      "no-useless-return": "error",
+      "prefer-const": "error",
+      "prefer-template": "error",
+      "no-var": "error",
+      "eqeqeq": [
+        "error",
+        "always"
+      ],
+      "curly": [
+        "error",
+        "all"
+      ],
+      "dot-notation": "error",
+      "no-else-return": "error",
+      "no-lonely-if": "error",
+      "no-magic-numbers": [
+        "warn",
+        {
+          "ignore": [
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "ignoreArrayIndexes": true,
+          "ignoreDefaultValues": true
+        }
+      ],
+      "no-multiple-empty-lines": [
+        "error",
+        {
+          "max": 1
+        }
+      ],
+      "object-shorthand": "error",
+      "one-var": [
+        "error",
+        "never"
+      ],
+      "prefer-arrow-callback": "error",
+      "prefer-destructuring": [
+        "error",
+        {
+          "array": true,
+          "object": true
+        },
+        {
+          "enforceForRenamedProperties": false
+        }
+      ],
+      "spaced-comment": [
+        "error",
+        "always"
+      ],
+      "yoda": "error",
+      "import/order": ["error", {
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+        "newlines-between": "always",
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
+      }],
+      "import/no-unresolved": "error",
+      "import/no-duplicates": "error",
+      "import/no-unused-modules": "warn",
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/no-static-element-interactions": "error"
+    }
   },
   "browserslist": {
     "production": [
@@ -45,5 +186,12 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-prettier": "^5.4.1",
+    "prettier": "^3.5.3"
   }
 }

@@ -5,7 +5,8 @@ class SoundManager {
 
   constructor() {
     try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
     } catch (e) {
       console.warn('Web Audio API not supported');
     }
@@ -13,14 +14,19 @@ class SoundManager {
 
   private async initializeAudio() {
     if (!this.audioContext) return;
-    
+
     // Resume audio context if suspended (required by browsers)
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
   }
 
-  private createTone(frequency: number, duration: number, type: OscillatorType = 'sine', volume = 1) {
+  private createTone(
+    frequency: number,
+    duration: number,
+    type: OscillatorType = 'sine',
+    volume = 1
+  ) {
     if (!this.audioContext) return;
 
     const oscillator = this.audioContext.createOscillator();
@@ -29,13 +35,19 @@ class SoundManager {
     oscillator.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
 
-    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(
+      frequency,
+      this.audioContext.currentTime
+    );
     oscillator.type = type;
 
     // Envelope for smooth sound
     const now = this.audioContext.currentTime;
     gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(this.masterVolume * volume, now + 0.01);
+    gainNode.gain.linearRampToValueAtTime(
+      this.masterVolume * volume,
+      now + 0.01
+    );
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     oscillator.start(now);
@@ -55,9 +67,12 @@ class SoundManager {
     gainNode.connect(this.audioContext.destination);
 
     // Create a filtered click sound (more realistic)
-    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(
+      frequency,
+      this.audioContext.currentTime
+    );
     oscillator.type = 'triangle';
-    
+
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(2000, this.audioContext.currentTime);
     filter.Q.setValueAtTime(1, this.audioContext.currentTime);
@@ -65,7 +80,10 @@ class SoundManager {
     // Very short, sharp envelope for click
     const now = this.audioContext.currentTime;
     gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(this.masterVolume * volume, now + 0.002);
+    gainNode.gain.linearRampToValueAtTime(
+      this.masterVolume * volume,
+      now + 0.002
+    );
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     oscillator.start(now);

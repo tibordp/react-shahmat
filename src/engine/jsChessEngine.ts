@@ -34,7 +34,7 @@ export interface MoveResult {
   success: boolean;
   type?: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
   capturedPiece?: Piece;
-  additionalMoves?: Array<{from: Position, to: Position, piece: Piece}>; // For castling rook move
+  additionalMoves?: Array<{ from: Position; to: Position; piece: Piece }>; // For castling rook move
   promotionRequired?: boolean; // When success=false due to missing promotion piece
   checkStatus?: 'none' | 'check' | 'checkmate' | 'stalemate';
 }
@@ -43,7 +43,7 @@ export interface ValidMoveResult {
   valid: boolean;
   type?: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
   capturedPiece?: Piece;
-  additionalMoves?: Array<{from: Position, to: Position, piece: Piece}>; // For castling rook move
+  additionalMoves?: Array<{ from: Position; to: Position; piece: Piece }>; // For castling rook move
   promotionRequired?: boolean; // If move requires promotion piece
   resultingCheckStatus?: 'none' | 'check' | 'checkmate' | 'stalemate'; // Game state after this move
 }
@@ -119,7 +119,9 @@ export class JSChessEngine {
   }
 
   private createEmptyBoard(): (Piece | null)[][] {
-    return Array(8).fill(null).map(() => Array(8).fill(null));
+    return Array(8)
+      .fill(null)
+      .map(() => Array(8).fill(null));
   }
 
   private setupInitialPosition(): void {
@@ -152,9 +154,9 @@ export class JSChessEngine {
 
   public getBoardState(): (Piece | null)[][] {
     // Return a deep copy to prevent external modification
-    return this.board.map(row => row.map(piece =>
-      piece ? { ...piece } : null
-    ));
+    return this.board.map(row =>
+      row.map(piece => (piece ? { ...piece } : null))
+    );
   }
 
   public getCurrentPlayer(): Color {
@@ -171,7 +173,12 @@ export class JSChessEngine {
     const piece = this.getPiece(from);
     if (!piece || piece.color !== this.currentPlayer) return [];
 
-    const pseudoLegalMoves = this.getValidMovesForPiece(from.file, from.rank, piece, true);
+    const pseudoLegalMoves = this.getValidMovesForPiece(
+      from.file,
+      from.rank,
+      piece,
+      true
+    );
 
     // Filter out moves that would leave the king in check
     return pseudoLegalMoves.filter(to => this.isMoveLegal(from, to));
@@ -196,10 +203,12 @@ export class JSChessEngine {
     let capturedEnPassantPawn: Piece | null = null;
     let capturedEnPassantPos: Position | null = null;
 
-    if (piece.type === PieceType.Pawn &&
-        this.enPassantTarget &&
-        to.file === this.enPassantTarget.file &&
-        to.rank === this.enPassantTarget.rank) {
+    if (
+      piece.type === PieceType.Pawn &&
+      this.enPassantTarget &&
+      to.file === this.enPassantTarget.file &&
+      to.rank === this.enPassantTarget.rank
+    ) {
       const direction = piece.color === Color.White ? 1 : -1;
       capturedEnPassantPos = { file: to.file, rank: to.rank - direction };
       capturedEnPassantPawn = this.getPiece(capturedEnPassantPos);
@@ -218,7 +227,8 @@ export class JSChessEngine {
     this.board[to.rank][to.file] = originalTarget;
 
     if (capturedEnPassantPawn && capturedEnPassantPos) {
-      this.board[capturedEnPassantPos.rank][capturedEnPassantPos.file] = capturedEnPassantPawn;
+      this.board[capturedEnPassantPos.rank][capturedEnPassantPos.file] =
+        capturedEnPassantPawn;
     }
 
     this.enPassantTarget = originalEnPassantTarget;
@@ -232,13 +242,19 @@ export class JSChessEngine {
 
     // Forward move
     const newRank = from.rank + direction;
-    if (this.isInBounds(from.file, newRank) && !this.getPiece({ file: from.file, rank: newRank })) {
+    if (
+      this.isInBounds(from.file, newRank) &&
+      !this.getPiece({ file: from.file, rank: newRank })
+    ) {
       moves.push({ file: from.file, rank: newRank });
 
       // Double forward from starting position
       if (from.rank === startRank) {
         const doubleRank = newRank + direction;
-        if (this.isInBounds(from.file, doubleRank) && !this.getPiece({ file: from.file, rank: doubleRank })) {
+        if (
+          this.isInBounds(from.file, doubleRank) &&
+          !this.getPiece({ file: from.file, rank: doubleRank })
+        ) {
           moves.push({ file: from.file, rank: doubleRank });
         }
       }
@@ -253,9 +269,11 @@ export class JSChessEngine {
           moves.push({ file: newFile, rank: newRank });
         }
         // En passant capture
-        else if (this.enPassantTarget &&
-                 this.enPassantTarget.file === newFile &&
-                 this.enPassantTarget.rank === newRank) {
+        else if (
+          this.enPassantTarget &&
+          this.enPassantTarget.file === newFile &&
+          this.enPassantTarget.rank === newRank
+        ) {
           moves.push({ file: newFile, rank: newRank });
         }
       }
@@ -263,14 +281,28 @@ export class JSChessEngine {
   }
 
   private addRookMoves(from: Position, color: Color, moves: Position[]): void {
-    const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const directions = [
+      [0, 1],
+      [0, -1],
+      [1, 0],
+      [-1, 0],
+    ];
     for (const [fileDir, rankDir] of directions) {
       this.addSlidingMoves(from, color, fileDir, rankDir, moves);
     }
   }
 
-  private addBishopMoves(from: Position, color: Color, moves: Position[]): void {
-    const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  private addBishopMoves(
+    from: Position,
+    color: Color,
+    moves: Position[]
+  ): void {
+    const directions = [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ];
     for (const [fileDir, rankDir] of directions) {
       this.addSlidingMoves(from, color, fileDir, rankDir, moves);
     }
@@ -281,10 +313,20 @@ export class JSChessEngine {
     this.addBishopMoves(from, color, moves);
   }
 
-  private addKnightMoves(from: Position, color: Color, moves: Position[]): void {
+  private addKnightMoves(
+    from: Position,
+    color: Color,
+    moves: Position[]
+  ): void {
     const knightMoves = [
-      [2, 1], [2, -1], [-2, 1], [-2, -1],
-      [1, 2], [1, -2], [-1, 2], [-1, -2]
+      [2, 1],
+      [2, -1],
+      [-2, 1],
+      [-2, -1],
+      [1, 2],
+      [1, -2],
+      [-1, 2],
+      [-1, -2],
     ];
 
     for (const [fileOffset, rankOffset] of knightMoves) {
@@ -302,8 +344,14 @@ export class JSChessEngine {
 
   private addKingMoves(from: Position, color: Color, moves: Position[]): void {
     const kingMoves = [
-      [1, 0], [-1, 0], [0, 1], [0, -1],
-      [1, 1], [1, -1], [-1, 1], [-1, -1]
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
     ];
 
     for (const [fileOffset, rankOffset] of kingMoves) {
@@ -322,7 +370,13 @@ export class JSChessEngine {
     this.addCastlingMoves(from, color, moves);
   }
 
-  private addSlidingMoves(from: Position, color: Color, fileDir: number, rankDir: number, moves: Position[]): void {
+  private addSlidingMoves(
+    from: Position,
+    color: Color,
+    fileDir: number,
+    rankDir: number,
+    moves: Position[]
+  ): void {
     let file = from.file + fileDir;
     let rank = from.rank + rankDir;
 
@@ -347,22 +401,38 @@ export class JSChessEngine {
     return file >= 0 && file <= 7 && rank >= 0 && rank <= 7;
   }
 
-  private addCastlingMoves(from: Position, color: Color, moves: Position[]): void {
+  private addCastlingMoves(
+    from: Position,
+    color: Color,
+    moves: Position[]
+  ): void {
     // Can only castle if king is on its starting square and not in check
     const startRank = color === Color.White ? 0 : 7;
-    if (from.file !== 4 || from.rank !== startRank || this.isKingInCheck(color)) {
+    if (
+      from.file !== 4 ||
+      from.rank !== startRank ||
+      this.isKingInCheck(color)
+    ) {
       return;
     }
 
     // Check king-side castling
-    if (color === Color.White ? this.castlingRights.whiteKingSide : this.castlingRights.blackKingSide) {
+    if (
+      color === Color.White
+        ? this.castlingRights.whiteKingSide
+        : this.castlingRights.blackKingSide
+    ) {
       if (this.canCastle(color, true)) {
         moves.push({ file: 6, rank: startRank });
       }
     }
 
     // Check queen-side castling
-    if (color === Color.White ? this.castlingRights.whiteQueenSide : this.castlingRights.blackQueenSide) {
+    if (
+      color === Color.White
+        ? this.castlingRights.whiteQueenSide
+        : this.castlingRights.blackQueenSide
+    ) {
       if (this.canCastle(color, false)) {
         moves.push({ file: 2, rank: startRank });
       }
@@ -392,7 +462,7 @@ export class JSChessEngine {
 
     // Check if king passes through or ends up in check
     for (let i = 0; i <= 2; i++) {
-      const testFile = kingFile + (i * direction);
+      const testFile = kingFile + i * direction;
       if (testFile < 0 || testFile > 7) continue;
 
       // Temporarily move king to test square
@@ -433,7 +503,12 @@ export class JSChessEngine {
     return false;
   }
 
-  private getValidMovesForPiece(file: number, rank: number, piece: Piece, includeCastling: boolean = true): Position[] {
+  private getValidMovesForPiece(
+    file: number,
+    rank: number,
+    piece: Piece,
+    includeCastling: boolean = true
+  ): Position[] {
     const moves: Position[] = [];
     const from = { file, rank };
 
@@ -456,8 +531,14 @@ export class JSChessEngine {
       case PieceType.King:
         // Add basic king moves
         const kingMoves = [
-          [1, 0], [-1, 0], [0, 1], [0, -1],
-          [1, 1], [1, -1], [-1, 1], [-1, -1]
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+          [1, 1],
+          [1, -1],
+          [-1, 1],
+          [-1, -1],
         ];
 
         for (const [fileOffset, rankOffset] of kingMoves) {
@@ -482,23 +563,31 @@ export class JSChessEngine {
     return moves;
   }
 
-  private analyzeMoveType(from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult {
+  private analyzeMoveType(
+    from: Position,
+    to: Position,
+    promotionPiece?: PieceType
+  ): ValidMoveResult {
     const piece = this.getPiece(from);
     if (!piece || piece.color !== this.currentPlayer) {
       return { valid: false };
     }
 
     const validMoves = this.getValidMoves(from);
-    const isValidMove = validMoves.some(move => move.file === to.file && move.rank === to.rank);
+    const isValidMove = validMoves.some(
+      move => move.file === to.file && move.rank === to.rank
+    );
 
     if (!isValidMove) {
       return { valid: false };
     }
 
     const targetPiece = this.getPiece(to);
-    let type: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion' = 'normal';
+    let type: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion' =
+      'normal';
     let capturedPiece: Piece | undefined;
-    let additionalMoves: Array<{from: Position, to: Position, piece: Piece}> = [];
+    let additionalMoves: Array<{ from: Position; to: Position; piece: Piece }> =
+      [];
     let promotionRequired = false;
 
     // Determine move type
@@ -513,7 +602,7 @@ export class JSChessEngine {
         additionalMoves.push({
           from: { file: rookFromFile, rank: from.rank },
           to: { file: rookToFile, rank: from.rank },
-          piece: rook
+          piece: rook,
         });
       }
     } else if (piece.type === PieceType.Pawn) {
@@ -521,12 +610,15 @@ export class JSChessEngine {
       const direction = piece.color === Color.White ? 1 : -1;
 
       // Check for en passant
-      if (this.enPassantTarget &&
-          to.file === this.enPassantTarget.file &&
-          to.rank === this.enPassantTarget.rank) {
+      if (
+        this.enPassantTarget &&
+        to.file === this.enPassantTarget.file &&
+        to.rank === this.enPassantTarget.rank
+      ) {
         type = 'enPassant';
         const capturedPawnRank = to.rank - direction;
-        capturedPiece = this.getPiece({ file: to.file, rank: capturedPawnRank }) || undefined;
+        capturedPiece =
+          this.getPiece({ file: to.file, rank: capturedPawnRank }) || undefined;
       }
       // Check for promotion
       else if (to.rank === promotionRank) {
@@ -552,22 +644,32 @@ export class JSChessEngine {
       type,
       capturedPiece,
       additionalMoves,
-      promotionRequired
+      promotionRequired,
     };
   }
 
-  public isValidMove(from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult {
+  public isValidMove(
+    from: Position,
+    to: Position,
+    promotionPiece?: PieceType
+  ): ValidMoveResult {
     return this.analyzeMoveType(from, to, promotionPiece);
   }
 
-  public makeMove(from: Position, to: Position, promotionPiece?: PieceType): MoveResult {
+  public makeMove(
+    from: Position,
+    to: Position,
+    promotionPiece?: PieceType
+  ): MoveResult {
     // First analyze the move to get rich information
-    console.log(`Making move from ${from.file},${from.rank} to ${to.file},${to.rank} with promotion: ${promotionPiece}`);
+    console.log(
+      `Making move from ${from.file},${from.rank} to ${to.file},${to.rank} with promotion: ${promotionPiece}`
+    );
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
     if (!analysis.valid) {
       return {
         success: false,
-        promotionRequired: analysis.promotionRequired
+        promotionRequired: analysis.promotionRequired,
       };
     }
 
@@ -602,12 +704,18 @@ export class JSChessEngine {
       this.board[from.rank][from.file] = null;
     } else if (type === 'promotion') {
       // Handle pawn promotion
-      this.board[to.rank][to.file] = { type: promotionPiece!, color: piece.color };
+      this.board[to.rank][to.file] = {
+        type: promotionPiece!,
+        color: piece.color,
+      };
       this.board[from.rank][from.file] = null;
     } else {
       // Handle normal moves and captures
       // Check for double pawn move (sets en passant target)
-      if (piece.type === PieceType.Pawn && Math.abs(to.rank - from.rank) === 2) {
+      if (
+        piece.type === PieceType.Pawn &&
+        Math.abs(to.rank - from.rank) === 2
+      ) {
         const direction = piece.color === Color.White ? 1 : -1;
         this.enPassantTarget = { file: to.file, rank: from.rank + direction };
       }
@@ -621,19 +729,30 @@ export class JSChessEngine {
     }
 
     // Update halfmove clock (resets on capture or pawn move)
-    if (piece.type === PieceType.Pawn || capturedPiece || type === 'capture' || type === 'enPassant') {
+    if (
+      piece.type === PieceType.Pawn ||
+      capturedPiece ||
+      type === 'capture' ||
+      type === 'enPassant'
+    ) {
       this.halfmoveClock = 0;
     } else {
       this.halfmoveClock++;
     }
 
     // Record the move
-    const moveRecord = { fromFile: from.file, fromRank: from.rank, toFile: to.file, toRank: to.rank };
+    const moveRecord = {
+      fromFile: from.file,
+      fromRank: from.rank,
+      toFile: to.file,
+      toRank: to.rank,
+    };
     this.lastMove = moveRecord;
     this.moveHistory.push(moveRecord);
 
     // Switch players and update fullmove number
-    this.currentPlayer = this.currentPlayer === Color.White ? Color.Black : Color.White;
+    this.currentPlayer =
+      this.currentPlayer === Color.White ? Color.Black : Color.White;
 
     // Increment fullmove number after black's move
     if (this.currentPlayer === Color.White) {
@@ -654,7 +773,7 @@ export class JSChessEngine {
       type,
       capturedPiece,
       additionalMoves,
-      checkStatus
+      checkStatus,
     };
   }
 
@@ -681,7 +800,13 @@ export class JSChessEngine {
         const piece = this.board[rank][file];
         if (piece && piece.color === enemyColor) {
           const moves = this.getValidMovesForPiece(file, rank, piece, false); // Use raw moves to avoid circular dependency
-          if (moves.some(move => move.file === kingPosition!.file && move.rank === kingPosition!.rank)) {
+          if (
+            moves.some(
+              move =>
+                move.file === kingPosition!.file &&
+                move.rank === kingPosition!.rank
+            )
+          ) {
             return true;
           }
         }
@@ -691,7 +816,11 @@ export class JSChessEngine {
     return false;
   }
 
-  private updateCastlingRights(fromFile: number, fromRank: number, piece: Piece): void {
+  private updateCastlingRights(
+    fromFile: number,
+    fromRank: number,
+    piece: Piece
+  ): void {
     // If king moves, lose all castling rights for that color
     if (piece.type === PieceType.King) {
       if (piece.color === Color.White) {
@@ -740,14 +869,19 @@ export class JSChessEngine {
 
             if (validation.promotionRequired) {
               // Generate all four promotion options
-              const promotionPieces = [PieceType.Queen, PieceType.Rook, PieceType.Bishop, PieceType.Knight];
+              const promotionPieces = [
+                PieceType.Queen,
+                PieceType.Rook,
+                PieceType.Bishop,
+                PieceType.Knight,
+              ];
               for (const promotionPiece of promotionPieces) {
                 validMoves.push({
                   fromFile: file,
                   fromRank: rank,
                   toFile: move.file,
                   toRank: move.rank,
-                  promotionPiece
+                  promotionPiece,
                 });
               }
             } else {
@@ -756,7 +890,7 @@ export class JSChessEngine {
                 fromFile: file,
                 fromRank: rank,
                 toFile: move.file,
-                toRank: move.rank
+                toRank: move.rank,
               });
             }
           }
@@ -775,8 +909,9 @@ export class JSChessEngine {
       if (this.isKingInCheck(this.currentPlayer)) {
         // Checkmate
         result = {
-          winner: this.currentPlayer === Color.White ? Color.Black : Color.White,
-          reason: 'checkmate'
+          winner:
+            this.currentPlayer === Color.White ? Color.Black : Color.White,
+          reason: 'checkmate',
         };
       } else {
         // Stalemate
@@ -792,7 +927,7 @@ export class JSChessEngine {
       isGameOver,
       result,
       moveHistory: this.moveHistory || [],
-      capturedPieces
+      capturedPieces,
     };
   }
 
@@ -805,7 +940,7 @@ export class JSChessEngine {
         { type: PieceType.Rook, count: 2 },
         { type: PieceType.Bishop, count: 2 },
         { type: PieceType.Knight, count: 2 },
-        { type: PieceType.Pawn, count: 8 }
+        { type: PieceType.Pawn, count: 8 },
       ],
       black: [
         { type: PieceType.King, count: 1 },
@@ -813,8 +948,8 @@ export class JSChessEngine {
         { type: PieceType.Rook, count: 2 },
         { type: PieceType.Bishop, count: 2 },
         { type: PieceType.Knight, count: 2 },
-        { type: PieceType.Pawn, count: 8 }
-      ]
+        { type: PieceType.Pawn, count: 8 },
+      ],
     };
 
     // Count current pieces
@@ -824,7 +959,8 @@ export class JSChessEngine {
         const piece = this.board[rank][file];
         if (piece) {
           const color = piece.color === Color.White ? 'white' : 'black';
-          currentPieces[color][piece.type] = (currentPieces[color][piece.type] || 0) + 1;
+          currentPieces[color][piece.type] =
+            (currentPieces[color][piece.type] || 0) + 1;
         }
       }
     }
@@ -984,13 +1120,20 @@ export class JSChessEngine {
     const color = char === lowerChar ? Color.Black : Color.White;
 
     switch (lowerChar) {
-      case 'p': return { type: PieceType.Pawn, color };
-      case 'r': return { type: PieceType.Rook, color };
-      case 'n': return { type: PieceType.Knight, color };
-      case 'b': return { type: PieceType.Bishop, color };
-      case 'q': return { type: PieceType.Queen, color };
-      case 'k': return { type: PieceType.King, color };
-      default: return null;
+      case 'p':
+        return { type: PieceType.Pawn, color };
+      case 'r':
+        return { type: PieceType.Rook, color };
+      case 'n':
+        return { type: PieceType.Knight, color };
+      case 'b':
+        return { type: PieceType.Bishop, color };
+      case 'q':
+        return { type: PieceType.Queen, color };
+      case 'k':
+        return { type: PieceType.King, color };
+      default:
+        return null;
     }
   }
 

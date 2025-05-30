@@ -1,5 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Color, Move, ChessError, ChessBoardCallbacks, GameState } from '../engine/jsChessEngine';
+import {
+  Color,
+  Move,
+  ChessError,
+  ChessBoardCallbacks,
+  GameState,
+} from '../engine/jsChessEngine';
 import { ChessEngineAPI } from './useJSChessEngine';
 
 interface UseChessGameProps {
@@ -28,7 +34,8 @@ export function useChessGame({
 
   // Determine if current player is external (non-human)
   const currentPlayer = chessEngine?.getCurrentPlayer();
-  const isCurrentPlayerExternal = currentPlayer === Color.White ? !whiteIsHuman : !blackIsHuman;
+  const isCurrentPlayerExternal =
+    currentPlayer === Color.White ? !whiteIsHuman : !blackIsHuman;
 
   const gameState = chessEngine?.getGameState();
   const isGameOver = gameState?.isGameOver || false;
@@ -56,48 +63,58 @@ export function useChessGame({
   }, [chessEngine, onPositionChange, notifyPositionChange]);
 
   // Simple move execution - no animation handling
-  const makeMove = useCallback((move: Move) => {
-    if (!chessEngine) return null;
+  const makeMove = useCallback(
+    (move: Move) => {
+      if (!chessEngine) return null;
 
-    const from = { file: move.fromFile, rank: move.fromRank };
-    const to = { file: move.toFile, rank: move.toRank };
-    const result = chessEngine.makeMove(from, to, move.promotionPiece);
+      const from = { file: move.fromFile, rank: move.fromRank };
+      const to = { file: move.toFile, rank: move.toRank };
+      const result = chessEngine.makeMove(from, to, move.promotionPiece);
 
-    if (result.success) {
-      notifyPositionChange();
-    }
+      if (result.success) {
+        notifyPositionChange();
+      }
 
-    return result;
-  }, [chessEngine, notifyPositionChange]);
+      return result;
+    },
+    [chessEngine, notifyPositionChange]
+  );
 
   // External move execution via ref method - validates and queues for execution
-  const executeExternalMove = useCallback((move: Move) => {
-    if (!chessEngine) return false;
+  const executeExternalMove = useCallback(
+    (move: Move) => {
+      if (!chessEngine) return false;
 
-    // Validate move
-    const from = { file: move.fromFile, rank: move.fromRank };
-    const to = { file: move.toFile, rank: move.toRank };
-    const validationResult = chessEngine.isValidMove(from, to, move.promotionPiece);
+      // Validate move
+      const from = { file: move.fromFile, rank: move.fromRank };
+      const to = { file: move.toFile, rank: move.toRank };
+      const validationResult = chessEngine.isValidMove(
+        from,
+        to,
+        move.promotionPiece
+      );
 
-    if (validationResult.valid) {
-      // Queue move for ChessBoard to execute (with sound and animation)
-      setLastExternalMove({
-        move,
-        timestamp: Date.now()
-      });
-      return true;
-    } else {
-      console.log('Invalid move attempt:', validationResult);
-      const error: ChessError = {
-        type: 'invalid_move',
-        player: currentPlayer!,
-        move,
-        message: 'Invalid move from external player'
-      };
-      onError?.(error);
-      return false;
-    }
-  }, [chessEngine, currentPlayer, onError]);
+      if (validationResult.valid) {
+        // Queue move for ChessBoard to execute (with sound and animation)
+        setLastExternalMove({
+          move,
+          timestamp: Date.now(),
+        });
+        return true;
+      } else {
+        console.log('Invalid move attempt:', validationResult);
+        const error: ChessError = {
+          type: 'invalid_move',
+          player: currentPlayer!,
+          move,
+          message: 'Invalid move from external player',
+        };
+        onError?.(error);
+        return false;
+      }
+    },
+    [chessEngine, currentPlayer, onError]
+  );
 
   // Clear last external move after animation is handled
   const clearLastExternalMove = useCallback(() => {
@@ -114,18 +131,21 @@ export function useChessGame({
     notifyPositionChange();
   }, [chessEngine, notifyPositionChange]);
 
-  const setPosition = useCallback((fen: string) => {
-    const success = chessEngine?.setPosition(fen);
-    if (success) {
-      setLastExternalMove(null);
-      setPreMoves([]);
-      isProcessingExternal.current = false;
-      lastProcessedTurn.current = '';
-      // Notify about the new position
-      notifyPositionChange();
-    }
-    return success || false;
-  }, [chessEngine, notifyPositionChange]);
+  const setPosition = useCallback(
+    (fen: string) => {
+      const success = chessEngine?.setPosition(fen);
+      if (success) {
+        setLastExternalMove(null);
+        setPreMoves([]);
+        isProcessingExternal.current = false;
+        lastProcessedTurn.current = '';
+        // Notify about the new position
+        notifyPositionChange();
+      }
+      return success || false;
+    },
+    [chessEngine, notifyPositionChange]
+  );
 
   // Pre-move management
   const addPreMove = useCallback((move: Move) => {
@@ -147,7 +167,11 @@ export function useChessGame({
       const from = { file: preMove.fromFile, rank: preMove.fromRank };
       const to = { file: preMove.toFile, rank: preMove.toRank };
 
-      const validation = currentBoardState.isValidMove(from, to, preMove.promotionPiece);
+      const validation = currentBoardState.isValidMove(
+        from,
+        to,
+        preMove.promotionPiece
+      );
       if (!validation.valid) {
         // If any pre-move is invalid, clear all and stop
         setPreMoves([]);

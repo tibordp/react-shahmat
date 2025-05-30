@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+
+# Build outputs
+build
+dist
+
+# Generated files
+public/stockfish.js
+public/stockfish-nnue-16-single.wasm
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Configuration files (optional)
+.env
+.env.*

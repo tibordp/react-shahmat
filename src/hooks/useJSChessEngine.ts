@@ -1,13 +1,31 @@
 import { useState, useCallback, useEffect } from 'react';
-import { JSChessEngine, Piece, Position, PieceType, Color, Move, MoveResult, ValidMoveResult, GameState } from '../engine/jsChessEngine';
+import {
+  JSChessEngine,
+  Piece,
+  Position,
+  PieceType,
+  Color,
+  Move,
+  MoveResult,
+  ValidMoveResult,
+  GameState,
+} from '../engine/jsChessEngine';
 
 export interface ChessEngineAPI {
   getBoardState: () => (Piece | null)[][];
   getCurrentPlayer: () => Color;
   getValidMoves: (from: Position) => Position[];
   getPiece: (position: Position) => Piece | null;
-  makeMove: (from: Position, to: Position, promotionPiece?: PieceType) => MoveResult;
-  isValidMove: (from: Position, to: Position, promotionPiece?: PieceType) => ValidMoveResult;
+  makeMove: (
+    from: Position,
+    to: Position,
+    promotionPiece?: PieceType
+  ) => MoveResult;
+  isValidMove: (
+    from: Position,
+    to: Position,
+    promotionPiece?: PieceType
+  ) => ValidMoveResult;
   isKingInCheck: (color: Color) => boolean;
   getLastMove: () => Move | null;
   getGameState: () => GameState;
@@ -37,29 +55,48 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     return engine.getCurrentPlayer();
   }, [engine]);
 
-  const getValidMoves = useCallback((from: Position): Position[] => {
-    return engine.getValidMoves(from);
-  }, [engine]);
+  const getValidMoves = useCallback(
+    (from: Position): Position[] => {
+      return engine.getValidMoves(from);
+    },
+    [engine]
+  );
 
-  const getPiece = useCallback((position: Position): Piece | null => {
-    return engine.getPiece(position);
-  }, [engine]);
+  const getPiece = useCallback(
+    (position: Position): Piece | null => {
+      return engine.getPiece(position);
+    },
+    [engine]
+  );
 
-  const makeMove = useCallback((from: Position, to: Position, promotionPiece?: PieceType): MoveResult => {
-    const result = engine.makeMove(from, to, promotionPiece);
-    if (result.success) {
-      triggerUpdate();
-    }
-    return result;
-  }, [engine, triggerUpdate]);
+  const makeMove = useCallback(
+    (from: Position, to: Position, promotionPiece?: PieceType): MoveResult => {
+      const result = engine.makeMove(from, to, promotionPiece);
+      if (result.success) {
+        triggerUpdate();
+      }
+      return result;
+    },
+    [engine, triggerUpdate]
+  );
 
-  const isValidMove = useCallback((from: Position, to: Position, promotionPiece?: PieceType): ValidMoveResult => {
-    return engine.isValidMove(from, to, promotionPiece);
-  }, [engine]);
+  const isValidMove = useCallback(
+    (
+      from: Position,
+      to: Position,
+      promotionPiece?: PieceType
+    ): ValidMoveResult => {
+      return engine.isValidMove(from, to, promotionPiece);
+    },
+    [engine]
+  );
 
-  const isKingInCheck = useCallback((color: Color): boolean => {
-    return engine.isKingInCheck(color);
-  }, [engine]);
+  const isKingInCheck = useCallback(
+    (color: Color): boolean => {
+      return engine.isKingInCheck(color);
+    },
+    [engine]
+  );
 
   const getLastMove = useCallback((): Move | null => {
     return engine.getLastMove();
@@ -74,13 +111,16 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     return engine.getGameState();
   }, [engine]);
 
-  const setPosition = useCallback((fen: string): boolean => {
-    const success = engine.setPosition(fen);
-    if (success) {
-      triggerUpdate();
-    }
-    return success;
-  }, [engine, triggerUpdate]);
+  const setPosition = useCallback(
+    (fen: string): boolean => {
+      const success = engine.setPosition(fen);
+      if (success) {
+        triggerUpdate();
+      }
+      return success;
+    },
+    [engine, triggerUpdate]
+  );
 
   // Trigger initial update to ensure React knows about the initial board state
   useEffect(() => {
@@ -98,6 +138,6 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getLastMove,
     getGameState,
     setPosition,
-    resetGame
+    resetGame,
   };
 };
