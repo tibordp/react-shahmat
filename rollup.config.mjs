@@ -5,7 +5,9 @@ import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import dts from 'rollup-plugin-dts';
 import postcss from 'rollup-plugin-postcss';
 import copy from 'rollup-plugin-copy';
+import audiosprite from 'audiosprite';
 import fs from 'fs';
+import { tmpdir } from 'os';
 
 import pkg from "./package.json" with { type: "json" };
 
@@ -39,6 +41,44 @@ function svgPlugin() {
   };
 }
 
+export function audiospritePlugin(opts = {}) {
+  return {
+    name: 'audiosprite',
+    async buildStart() {
+      const oggs = fs.globSync('src/sounds/*.ogg');
+      const tempDir = fs.mkdtempSync(`${tmpdir()}/audiosprite-`);
+
+      const { resources, spritemap } = await new Promise((resolve, reject) => audiosprite(oggs, {
+        bitrate: 56,
+        output: `${tempDir}/chess_sfx`,
+        samplerate: 44100,
+        ...opts
+      }, (err, result) => {
+        if (err) {
+           console.log(err);
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      }));
+
+      for (const res of resources) {
+        const buff = fs.readFileSync(res);
+        const filename = res.split('/').pop();
+        this.emitFile({ type: 'asset', fileName: `sounds/${filename}`, source: buff });
+      }
+
+      // emit JSON map as an asset so it can be imported
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sounds/chess_sfx.json',
+        source: JSON.stringify({ spritemap }, null, 2)
+      });
+
+    }
+  };
+}
+
 export default [
   {
     input: 'src/index.ts',
@@ -57,9 +97,14 @@ export default [
       peerDepsExternal(),
       resolve(),
       commonjs(),
+      audiospritePlugin(),
       postcss({
-        extract: 'ChessBoard.css',
+        modules: {
+          generateScopedName: '[name]__[local]___[hash:base64:5]',
+          localsConvention: 'camelCase',
+        },
         minimize: true,
+        inject: true
       }),
       svgPlugin(),
       copy({

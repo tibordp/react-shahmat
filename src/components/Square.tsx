@@ -4,6 +4,8 @@ import { getEmptyImage } from 'react-dnd-html5-backend';
 import { Piece } from '../engine/jsChessEngine';
 import { getPieceIcon } from '../utils/pieceIcons';
 
+import styles from './ChessBoard.module.css';
+
 export interface SquareProps {
   file: number;
   rank: number;
@@ -104,30 +106,30 @@ export const Square: React.FC<SquareProps> = ({
   );
 
   const isLight = (file + rank) % 2 === 1;
-  let squareClass = `square ${isLight ? 'light' : 'dark'}`;
+  let squareClass = `${styles.square} ${isLight ? styles.light : styles.dark}`;
 
   if (isSelected) {
-    squareClass += ' selected';
+    squareClass += ` ${styles.selected}`;
   }
 
   if (isOver) {
-    squareClass += ' drop-target';
+    squareClass += ` ${styles.dropTarget}`;
   }
 
   if (isLastMoveFrom || isLastMoveTo) {
-    squareClass += ' last-move';
+    squareClass += ` ${styles.lastMove}`;
   }
 
   if (isHighlighted) {
-    squareClass += ' highlighted';
+    squareClass += ` ${styles.highlighted}`;
   }
 
   if (isPreMove) {
-    squareClass += ' pre-move';
+    squareClass += ` ${styles.preMove}`;
   }
 
   if (isKingInCheck) {
-    squareClass += ' king-in-check';
+    squareClass += ` ${styles.kingInCheck}`;
   }
 
   const pieceIcon = piece ? getPieceIcon(piece) : null;
@@ -170,7 +172,7 @@ export const Square: React.FC<SquareProps> = ({
         <img
           src={pieceIcon}
           alt='chess piece'
-          className='piece'
+          className={styles.piece}
           style={{
             display:
               isDragging || isAnimatingFrom || isAnimatingTo ? 'none' : 'block',
@@ -179,19 +181,19 @@ export const Square: React.FC<SquareProps> = ({
       )}
       {isValidMove && (
         <div
-          className={`move-indicator ${isCapture ? 'capture-indicator' : 'normal-indicator'}`}
+          className={`${styles.moveIndicator} ${isCapture ? styles.captureIndicator : styles.normalIndicator}`}
         />
       )}
       {fileLabel && (
         <div
-          className={`file-label-inset ${isLight ? 'dark-text' : 'light-text'}`}
+          className={`${styles.fileLabelInset} ${isLight ? styles.darkText : styles.lightText}`}
         >
           {fileLabel}
         </div>
       )}
       {rankLabel && (
         <div
-          className={`rank-label-inset ${isLight ? 'dark-text' : 'light-text'}`}
+          className={`${styles.rankLabelInset} ${isLight ? styles.darkText : styles.lightText}`}
         >
           {rankLabel}
         </div>

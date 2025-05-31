@@ -18,7 +18,7 @@
     "react-dnd-touch-backend": "^16.0.1",
     "react-dom": "^19.1.0",
     "react-scripts": "5.0.1",
-    "react-shahmat": "file:..",
+    "react-shahmat": "../",
     "stockfish": "^16.0.0",
     "typescript": "^5.8.3",
     "web-vitals": "^5.0.2"

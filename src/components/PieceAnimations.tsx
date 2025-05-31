@@ -3,6 +3,8 @@ import { Piece, Position } from '../engine/jsChessEngine';
 import { AnimationState } from '../hooks/usePieceAnimations';
 import { getPieceIcon } from '../utils/pieceIcons';
 
+import styles from './ChessBoard.module.css';
+
 interface AnimatingPieceProps {
   piece: Piece;
   from: Position;
@@ -70,7 +72,7 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
   const scale = squareSize * 0.95; // Scale down to fit within the square
   return (
     <div
-      className='animating-piece'
+      className={styles.animatingPiece}
       style={{
         left: position.x - scale / 2,
         top: position.y - scale / 2,
@@ -81,7 +83,7 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
       <img
         src={pieceIcon}
         alt='animating piece'
-        className='animating-piece-img'
+        className={styles.animatingPieceImg}
       />
     </div>
   );

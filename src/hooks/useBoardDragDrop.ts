@@ -40,7 +40,7 @@ export interface UseBoardDragDropOptions {
     toFile: number,
     toRank: number
   ) => boolean;
-  playMoveSound: (result: any) => void;
+  playMove: (result: any) => void;
   animations: {
     isAnimating: boolean;
     startAnimation: (pieces: any[]) => void;
@@ -77,7 +77,7 @@ export function useBoardDragDrop(
     blackIsHuman,
     attemptMove,
     handlePreMoveAttempt,
-    playMoveSound,
+    playMove,
     animations,
     enableAnimations,
     handleInvalidMoveInCheck,
@@ -110,7 +110,7 @@ export function useBoardDragDrop(
             // Clear selection and play sound immediately
             setSelectedSquare(null);
             setValidMoves([]);
-            playMoveSound(result);
+            playMove(result);
 
             // Animate only the rook visually if animations enabled (move is already executed, king is in position)
             if (validationResult.additionalMoves && enableAnimations) {
@@ -147,7 +147,7 @@ export function useBoardDragDrop(
       game,
       handlePreMoveAttempt,
       enablePreMoves,
-      playMoveSound,
+      playMove,
       animations,
       enableAnimations,
       handleInvalidMoveInCheck,

@@ -2,6 +2,8 @@ import React from 'react';
 import { PieceType, Color } from '../engine/jsChessEngine';
 import { getPieceIconByType } from '../utils/pieceIcons';
 
+import styles from './ChessBoard.module.css';
+
 export interface PromotionDialogProps {
   isOpen: boolean;
   color: Color;
@@ -77,7 +79,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
     <>
       {/* Invisible overlay for click-outside-to-cancel */}
       <div
-        className='promotion-board-overlay'
+        className={styles.promotionBoardOverlay}
         style={{
           position: 'absolute',
           top: 0,
@@ -89,7 +91,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
         onClick={onCancel}
       />
       <div
-        className='promotion-dialog'
+        className={styles.promotionDialog}
         style={{
           position: 'absolute',
           left: dialogX,
@@ -103,17 +105,13 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
         {pieces.map(({ type, icon }) => (
           <button
             key={type}
-            className='promotion-piece'
-            style={{
-              width: squareSize,
-              height: squareSize,
-            }}
+            className={styles.promotionPiece}
             onClick={() => onSelect(type)}
           >
             <img
               src={icon}
               alt='promotion piece'
-              className='promotion-piece-img'
+              className={styles.promotionPieceImg}
             />
           </button>
         ))}

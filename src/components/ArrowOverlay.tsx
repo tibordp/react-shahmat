@@ -1,6 +1,8 @@
 import React from 'react';
 import { Position } from '../engine/jsChessEngine';
 
+import styles from './ChessBoard.module.css';
+
 interface ArrowComponentProps {
   fromX: number;
   fromY: number;
@@ -134,7 +136,7 @@ export const ArrowOverlay: React.FC<ArrowOverlayProps> = ({
 }) => {
   return (
     <svg
-      className='arrow-overlay'
+      className={styles.arrowOverlay}
       style={{
         position: 'absolute',
         top: 0,

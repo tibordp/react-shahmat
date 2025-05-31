@@ -30,7 +30,7 @@ import {
 } from '../engine/jsChessEngine';
 import { soundManager } from '../utils/soundManager';
 import { getPieceIcon, whiteKing } from '../utils/pieceIcons';
-import './ChessBoard.css';
+import styles from './ChessBoard.module.css';
 
 interface CustomDragLayerProps {
   squareSize: number;
@@ -57,9 +57,9 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
   const pieceIcon = getPieceIcon(piece);
 
   return (
-    <div className='custom-drag-layer'>
+    <div className={styles.customDragLayer}>
       <div
-        className='drag-preview-piece'
+        className={styles.dragPreviewPiece}
         style={{
           left: x - squareSize * 0.5,
           top: y - squareSize * 0.5,
@@ -71,7 +71,7 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
         <img
           src={pieceIcon}
           alt='chess piece'
-          className='drag-preview-piece-img'
+          className={styles.dragPreviewPieceImg}
         />
       </div>
     </div>
@@ -162,7 +162,7 @@ const GameEndBadge: React.FC<GameEndBadgeProps> = ({
 
   return (
     <div
-      className='game-end-badge'
+      className={styles.gameEndBadge}
       style={{
         position: 'absolute',
         left: badgeX,
@@ -228,31 +228,29 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
     const squareSize = boardSize / 8;
 
+    useEffect(() => {
+      if (enableSounds) {
+        soundManager.ensureReady();
+      }
+    }, [enableSounds]);
+
     // Helper function to play appropriate sound based on move result
-    const playMoveSound = useCallback(
-      (result: any, delay: number = 0) => {
+    const playMove = useCallback(
+      (result: any) => {
         if (!enableSounds) return;
 
-        console.log('playMoveSound called with result:', result);
+        console.log('playMove called with result:', result);
         const gameState = chessEngine.getGameState();
 
         // Game end conditions have highest priority
         if (gameState.isGameOver && gameState.result) {
           if (gameState.result.reason === 'checkmate') {
             // Checkmate - dramatic conclusion
-            if (delay > 0) {
-              setTimeout(() => soundManager.playCheckmateSound(), delay);
-            } else {
-              soundManager.playCheckmateSound();
-            }
+            soundManager.playCheckmate();
             return; // Don't play other sounds for game end
           } else if (gameState.result.reason === 'stalemate') {
             // Stalemate/Draw - peaceful resolution
-            if (delay > 0) {
-              setTimeout(() => soundManager.playDrawSound(), delay);
-            } else {
-              soundManager.playDrawSound();
-            }
+            soundManager.playDraw();
             return; // Don't play other sounds for game end
           }
         }
@@ -260,33 +258,17 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         // Regular game sounds (corrected priority order)
         if (gameState.isCheck) {
           // Check has highest priority among non-game-ending moves
-          if (delay > 0) {
-            setTimeout(() => soundManager.playCheckSound(), delay);
-          } else {
-            soundManager.playCheckSound();
-          }
+          soundManager.playCheck();
         } else if (result?.type === 'promotion') {
           // Promotion sound has second priority (before capture, since promotions can also capture)
           console.log('Playing promotion sound, result:', result);
-          if (delay > 0) {
-            setTimeout(() => soundManager.playPromotionSound(), delay);
-          } else {
-            soundManager.playPromotionSound();
-          }
+          soundManager.playPromotion();
         } else if (result?.capturedPiece) {
           // Capture sound has third priority
-          if (delay > 0) {
-            setTimeout(() => soundManager.playCaptureSound(), delay);
-          } else {
-            soundManager.playCaptureSound();
-          }
+          soundManager.playCapture();
         } else {
           // Regular move sound is default
-          if (delay > 0) {
-            setTimeout(() => soundManager.playMoveSound(), delay);
-          } else {
-            soundManager.playMoveSound();
-          }
+          soundManager.playMove();
         }
       },
       [enableSounds, chessEngine]
@@ -386,7 +368,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
             // Play error sound if enabled
             if (enableSounds) {
-              soundManager.playErrorSound();
+              soundManager.playError();
             }
           }
         }
@@ -518,7 +500,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
             // Play pre-move sound
             if (enableSounds) {
-              soundManager.playPreMoveSound();
+              soundManager.playPreMove();
             }
 
             // Clear UI indicators since the pre-move was successfully added
@@ -547,7 +529,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
           // Play pre-move sound
           if (enableSounds) {
-            soundManager.playPreMoveSound();
+            soundManager.playPreMove();
           }
         }
 
@@ -629,7 +611,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
         }
 
         // Play sound immediately
-        playMoveSound(result);
+        playMove(result);
 
         // Handle animation after move execution (purely visual)
         if (animate && enableAnimations && movingPiece) {
@@ -660,7 +642,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       [
         chessEngine,
         game,
-        playMoveSound,
+        playMove,
         enableAnimations,
         animations,
         handleInvalidMoveInCheck,
@@ -753,7 +735,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
 
           // Play pre-move sound
           if (enableSounds) {
-            soundManager.playPreMoveSound();
+            soundManager.playPreMove();
           }
 
           uiState.clearSelection();
@@ -797,7 +779,7 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
       blackIsHuman,
       attemptMove,
       handlePreMoveAttempt,
-      playMoveSound,
+      playMove,
       animations,
       enableAnimations,
       handleInvalidMoveInCheck,
@@ -939,10 +921,9 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
     return (
       <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
         <CustomDragLayer squareSize={squareSize} />
-        <div className={`chess-board-container ${className || ''}`}>
           <div
             ref={boardRef}
-            className='chess-board'
+            className={styles.chessBoard}
             style={{
               width: boardSize,
               height: boardSize,
@@ -1089,7 +1070,6 @@ export const ChessBoard = forwardRef<ChessBoardRef, ChessBoardProps>(
               return badges;
             })()}
           </div>
-        </div>
       </DndProvider>
     );
   }

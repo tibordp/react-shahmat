@@ -36,7 +36,6 @@ export interface MoveResult {
   capturedPiece?: Piece;
   additionalMoves?: Array<{ from: Position; to: Position; piece: Piece }>; // For castling rook move
   promotionRequired?: boolean; // When success=false due to missing promotion piece
-  checkStatus?: 'none' | 'check' | 'checkmate' | 'stalemate';
 }
 
 export interface ValidMoveResult {
@@ -45,7 +44,6 @@ export interface ValidMoveResult {
   capturedPiece?: Piece;
   additionalMoves?: Array<{ from: Position; to: Position; piece: Piece }>; // For castling rook move
   promotionRequired?: boolean; // If move requires promotion piece
-  resultingCheckStatus?: 'none' | 'check' | 'checkmate' | 'stalemate'; // Game state after this move
 }
 
 export interface GameState {
@@ -994,22 +992,11 @@ export class JSChessEngine {
     if (this.currentPlayer === Color.White) {
       this.fullmoveNumber++;
     }
-
-    // Determine check status after move
-    const opponentColor = this.currentPlayer;
-    let checkStatus: 'none' | 'check' | 'checkmate' | 'stalemate' = 'none';
-
-    if (this.isKingInCheck(opponentColor)) {
-      // TODO: Implement checkmate/stalemate detection
-      checkStatus = 'check';
-    }
-
     return {
       success: true,
       type,
       capturedPiece,
       additionalMoves,
-      checkStatus,
     };
   }
 
