@@ -18,14 +18,14 @@ export class SoundManager {
   setVolume(v: number) { this.masterVol = Math.max(0, Math.min(1, v)); }
 
   async playMove()      { await this.play('Move'); }
-  async playPreMove()   { await this.play('Move'); }
+  async playPreMove()   { await this.play('PreMove'); }
   async playCapture()   { await this.play('Capture'); }
   async playCheck()     { await this.play('Check'); }
-  async playPromotion() { await this.play('Castles'); }
+  async playPromotion() { await this.play('Promotion'); }
   async playError()     { await this.play('Error'); }
-  async playCheckmate() { await this.play('GenericNotify'); }
-  async playDraw()      { await this.play('GenericNotify'); }
-  async playGameStart() { await this.play('GenericNotify'); }
+  async playCheckmate() { await this.play('Win'); }
+  async playDraw()      { await this.play('Draw'); }
+  async playGameStart() { await this.play('GameStart'); }
 
   /* ------------------ core logic --------------------------------------- */
 
