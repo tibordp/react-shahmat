@@ -9,9 +9,9 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.27",
-    "@types/react": "^19.1.5",
-    "@types/react-dom": "^19.1.5",
+    "@types/node": "^24.0.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "react": "^19.1.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
@@ -21,7 +21,7 @@
     "react-shahmat": "../",
     "stockfish": "^16.0.0",
     "typescript": "^5.8.3",
-    "web-vitals": "^5.0.2"
+    "web-vitals": "^5.0.3"
   },
   "scripts": {
     "start": "npm run copy-stockfish && react-scripts start",
