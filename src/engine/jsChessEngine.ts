@@ -70,19 +70,6 @@ export interface ChessError {
   originalError?: Error;
 }
 
-export interface ChessBoardCallbacks {
-  onWhiteMove?: (gameState: GameState, opponentMove?: Move) => Promise<Move>;
-  onBlackMove?: (gameState: GameState, opponentMove?: Move) => Promise<Move>;
-  onError?: (error: ChessError) => void;
-  onGameStateChange?: (gameState: GameState) => void;
-}
-
-export interface ChessBoardRef {
-  resetGame: () => void;
-  setPosition: (fen: string) => boolean;
-  getGameState: () => GameState;
-  executeExternalMove: (move: Move) => boolean;
-}
 
 export class JSChessEngine {
   private board: (Piece | null)[][];
@@ -894,11 +881,7 @@ export class JSChessEngine {
     promotionPiece?: PieceType
   ): MoveResult {
     // First analyze the move to get rich information
-    console.log(
-      `Making move from ${from.file},${from.rank} to ${to.file},${to.rank} with promotion: ${promotionPiece}`
-    );
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
-    console.log('analyzeMoveType returned:', analysis);
     if (!analysis.valid) {
       return {
         success: false,
@@ -908,7 +891,6 @@ export class JSChessEngine {
 
     const piece = this.getPiece(from)!; // We know it exists from analysis
     const { type, capturedPiece, additionalMoves } = analysis;
-    console.log('Move analysis result:', analysis);
 
     // Clear en passant target from previous turn
     this.enPassantTarget = null;

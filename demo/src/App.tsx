@@ -2,22 +2,33 @@ import React from 'react';
 import './App.css';
 import {
   ChessBoard,
-  ChessBoardRef,
+  useChessGame,
+  moveToBoardMove,
+} from 'react-shahmat';
+import type {
   GameState,
-  Move,
+  BoardMove,
   ChessError,
-  PieceType
+  PromotionPiece,
 } from 'react-shahmat';
 import { useStockfish } from './hooks/useStockfish';
 
+const BOARD_THEMES: Record<string, { light: string; dark: string; name: string }> = {
+  green: { light: '#eeeed2', dark: '#769656', name: 'Green (Chess.com)' },
+  brown: { light: '#f0d9b5', dark: '#b58863', name: 'Brown (Lichess)' },
+  blue: { light: '#dee3e6', dark: '#8ca2ad', name: 'Blue' },
+  purple: { light: '#e8d0ff', dark: '#9b72cf', name: 'Purple' },
+  red: { light: '#f0d0d0', dark: '#c25050', name: 'Red' },
+};
+
 function App() {
-  const [flipped, setFlipped] = React.useState(false);
   const [controlsOpen, setControlsOpen] = React.useState(false);
+  const [orientation, setOrientation] = React.useState<'white' | 'black'>('white');
   const [enablePreMoves, setEnablePreMoves] = React.useState(true);
   const [blackAi, setBlackAi] = React.useState(true);
   const [whiteAi, setWhiteAi] = React.useState(false);
   const [autoPromotionPiece, setAutoPromotionPiece] = React.useState<
-    PieceType | undefined
+    PromotionPiece | undefined
   >(undefined);
   const [fenInput, setFenInput] = React.useState('');
   const [showCoordinates, setShowCoordinates] = React.useState(true);
@@ -26,61 +37,54 @@ function App() {
   const [enableSounds, setEnableSounds] = React.useState(true);
   const [enableArrows, setEnableArrows] = React.useState(true);
   const [enableHighlights, setEnableHighlights] = React.useState(true);
+  const [showMoveIndicators, setShowMoveIndicators] = React.useState(true);
   const [aiSkillLevel, setAiSkillLevel] = React.useState(5);
-  const chessBoardRef = React.useRef<ChessBoardRef>(null);
+  const [boardTheme, setBoardTheme] = React.useState('green');
+
   const stockfish = useStockfish();
 
+  // Use ref for game to avoid circular dependency with handlePositionChange
+  const gameRef = React.useRef<ReturnType<typeof useChessGame>>(null!);
+
   const handlePositionChange = React.useCallback(
-    async (gameState: GameState, lastMove?: Move) => {
-      // Determine if current player is AI
+    async (gameState: GameState, _lastMove?: BoardMove) => {
       const currentPlayerIsAi =
         gameState.currentPlayer === 0 ? whiteAi : blackAi;
-      // eslint-disable-next-line no-console
-      console.log('Position changed:', gameState, 'Last move:', lastMove);
+
+      if (!currentPlayerIsAi || gameState.isGameOver) return;
 
       const startTick = performance.now();
-      const sendMove = (move: Move) => {
-        const took = performance.now() - startTick;
-        if (took < 500) {
-          setTimeout(() => {
-            chessBoardRef.current?.executeExternalMove(move);
-          }, 500 - took);
-        } else {
-          chessBoardRef.current?.executeExternalMove(move);
+
+      try {
+        let move: BoardMove | null = null;
+
+        if (stockfish.isReady && !stockfish.isThinking) {
+          move = await stockfish.getBestMove(gameState.fen, aiSkillLevel);
         }
-      };
 
-      if (currentPlayerIsAi && !gameState.isGameOver && chessBoardRef.current) {
-        try {
-          let move: Move | null = null;
+        // Fallback to random move
+        if (!move && gameState.validMoves.length > 0) {
+          const randomIndex = Math.floor(
+            Math.random() * gameState.validMoves.length
+          );
+          move = moveToBoardMove(gameState.validMoves[randomIndex]);
+        }
 
-          if (stockfish.isReady && !stockfish.isThinking) {
-            // Try to get move from Stockfish
-            move = await stockfish.getBestMove(gameState.fen, aiSkillLevel);
+        if (move) {
+          // Ensure minimum delay for visual smoothness
+          const took = performance.now() - startTick;
+          if (took < 500) {
+            await new Promise(r => setTimeout(r, 500 - took));
           }
-
-          // Fallback to random move if Stockfish fails
-          if (!move && gameState.validMoves.length > 0) {
-            console.warn('Using fallback random move');
-            const randomIndex = Math.floor(
-              Math.random() * gameState.validMoves.length
-            );
-            move = gameState.validMoves[randomIndex];
-          }
-
-          if (move && chessBoardRef.current) {
-            sendMove(move);
-          }
-        } catch (error) {
-          console.error('AI move error:', error);
-          // Final fallback to random move
-          if (gameState.validMoves.length > 0) {
-            const randomIndex = Math.floor(
-              Math.random() * gameState.validMoves.length
-            );
-            const move = gameState.validMoves[randomIndex];
-            sendMove(move);
-          }
+          gameRef.current.makeMove(move);
+        }
+      } catch (error) {
+        console.error('AI move error:', error);
+        if (gameState.validMoves.length > 0) {
+          const randomIndex = Math.floor(
+            Math.random() * gameState.validMoves.length
+          );
+          gameRef.current.makeMove(moveToBoardMove(gameState.validMoves[randomIndex]));
         }
       }
     },
@@ -88,34 +92,48 @@ function App() {
   );
 
   const handleError = React.useCallback((error: ChessError) => {
-    console.error('Chess engine error:', error);
+    console.error('Chess error:', error);
   }, []);
+
+  const game = useChessGame({
+    whiteMovable: !whiteAi,
+    blackMovable: !blackAi,
+    onPositionChange: handlePositionChange,
+    onError: handleError,
+  });
+  gameRef.current = game;
 
   const handleReset = React.useCallback(() => {
-    chessBoardRef.current?.resetGame();
-  }, []);
+    game.resetGame();
+  }, [game]);
 
   const handleLoadPosition = React.useCallback(() => {
-    if (fenInput.trim() && chessBoardRef.current) {
-      const success = chessBoardRef.current.setPosition(fenInput.trim());
+    if (fenInput.trim()) {
+      const success = game.setPosition(fenInput.trim());
       if (!success) {
         console.error('Invalid FEN string');
       }
     }
-  }, [fenInput]);
+  }, [fenInput, game]);
 
   const handleLoadPreset = React.useCallback(
     (fen: string, description: string) => {
       setFenInput(fen);
-      if (chessBoardRef.current) {
-        const success = chessBoardRef.current.setPosition(fen);
-        if (!success) {
-          console.error(`Failed to load ${description}`);
-        }
+      const success = game.setPosition(fen);
+      if (!success) {
+        console.error(`Failed to load ${description}`);
       }
     },
-    []
+    [game]
   );
+
+  const theme = BOARD_THEMES[boardTheme] || BOARD_THEMES.green;
+  const boardStyle = {
+    '--light-square': theme.light,
+    '--dark-square': theme.dark,
+    '--coord-light-text': theme.light,
+    '--coord-dark-text': theme.dark,
+  } as React.CSSProperties;
 
   return (
     <div className='App'>
@@ -132,10 +150,28 @@ function App() {
           <button
             id='flipBoard'
             className='control-button'
-            onClick={() => setFlipped(!flipped)}
+            onClick={() =>
+              setOrientation(prev => (prev === 'white' ? 'black' : 'white'))
+            }
           >
-            {flipped ? 'Black Perspective' : 'White Perspective'}
+            {orientation === 'white' ? 'White Perspective' : 'Black Perspective'}
           </button>
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='boardTheme'>Board Theme:</label>
+          <select
+            id='boardTheme'
+            value={boardTheme}
+            onChange={e => setBoardTheme(e.target.value)}
+            className='control-select'
+          >
+            {Object.entries(BOARD_THEMES).map(([key, t]) => (
+              <option key={key} value={key}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className='control-group'>
@@ -178,18 +214,16 @@ function App() {
             value={autoPromotionPiece ?? ''}
             onChange={e =>
               setAutoPromotionPiece(
-                e.target.value
-                  ? (parseInt(e.target.value) as PieceType)
-                  : undefined
+                (e.target.value as PromotionPiece) || undefined
               )
             }
             className='control-select'
           >
             <option value=''>Manual (Show Dialog)</option>
-            <option value={PieceType.Queen}>Queen</option>
-            <option value={PieceType.Rook}>Rook</option>
-            <option value={PieceType.Bishop}>Bishop</option>
-            <option value={PieceType.Knight}>Knight</option>
+            <option value='queen'>Queen</option>
+            <option value='rook'>Rook</option>
+            <option value='bishop'>Bishop</option>
+            <option value='knight'>Knight</option>
           </select>
         </div>
 
@@ -359,6 +393,17 @@ function App() {
           />
           <label htmlFor='enableHighlights'>Enable Highlights</label>
         </div>
+
+        <div className='control-group'>
+          <input
+            type='checkbox'
+            checked={showMoveIndicators}
+            onChange={e => setShowMoveIndicators(e.target.checked)}
+            id='showMoveIndicators'
+            className='control-checkbox'
+          />
+          <label htmlFor='showMoveIndicators'>Show Move Indicators</label>
+        </div>
       </div>
       {controlsOpen && (
         <div
@@ -369,13 +414,9 @@ function App() {
 
       <div className='board-container'>
         <ChessBoard
-          ref={chessBoardRef}
-          flipped={flipped}
-          whiteIsHuman={!whiteAi}
-          blackIsHuman={!blackAi}
-          onPositionChange={handlePositionChange}
-          onError={handleError}
-          enablePreMoves={enablePreMoves}
+          {...game.boardProps}
+          orientation={orientation}
+          enablePremoves={enablePreMoves}
           autoPromotionPiece={autoPromotionPiece}
           showCoordinates={showCoordinates}
           animationDuration={animationDuration}
@@ -383,6 +424,9 @@ function App() {
           enableSounds={enableSounds}
           enableArrows={enableArrows}
           enableHighlights={enableHighlights}
+          showMoveIndicators={showMoveIndicators}
+          className='themed-board'
+          style={boardStyle}
         />
       </div>
     </div>

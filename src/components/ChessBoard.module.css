@@ -5,6 +5,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
 
 .chess-board {
+  /* Themeable colors via CSS custom properties */
+  --light-square: #eeeed2;
+  --dark-square: #769656;
+  --selected-light: #f7ec74;
+  --selected-dark: #baca44;
+  --highlight-light: #ff6b6b;
+  --highlight-dark: #e55555;
+  --premove-light: #dc2626;
+  --premove-dark: #b91c1c;
+  --check-light: #ff4444;
+  --check-dark: #cc3333;
+  --coord-light-text: var(--light-square);
+  --coord-dark-text: var(--dark-square);
+  --arrow-color: rgba(255, 170, 0, 0.6);
+
   display: grid;
   border-radius: 4px;
   overflow: hidden;
@@ -23,66 +38,65 @@
   cursor: pointer;
   user-select: none;
   position: relative;
-  transition: all 0.2s ease;
 }
 
-/* Square Color Variants - Chess.com inspired green theme */
+/* Square Color Variants */
 .square.light {
-  background-color: #eeeed2; /* Light cream/off-white for light squares */
+  background-color: var(--light-square);
 }
 
 .square.dark {
-  background-color: #769656; /* Rich forest green for dark squares */
+  background-color: var(--dark-square);
 }
 
 /* Square State Styles */
 .square.last-move.light,
 .square.selected.light {
-  background-color: #f7ec74; /* Bright yellow for selected/last move on light squares */
+  background-color: var(--selected-light);
 }
 
 .square.last-move.dark,
 .square.selected.dark {
-  background-color: #baca44; /* Much darker yellow that clearly contrasts with light squares */
+  background-color: var(--selected-dark);
 }
 
 .square.highlighted.light {
-  background-color: #ff6b6b;
+  background-color: var(--highlight-light);
 }
 
 .square.highlighted.dark {
-  background-color: #e55555;
+  background-color: var(--highlight-dark);
 }
 
 .square.pre-move.light {
-  background-color: #dc2626;
+  background-color: var(--premove-light);
 }
 
 .square.pre-move.dark {
-  background-color: #b91c1c;
+  background-color: var(--premove-dark);
 }
 
 .square.king-in-check.light {
-  background-color: #ff4444;
-  box-shadow: 0 0 20px rgba(255, 68, 68, 0.8);
+  background-color: var(--check-light);
+  box-shadow: 0 0 20px var(--check-light);
   animation: kingCheckPulse 0.6s ease-in-out;
 }
 
 .square.king-in-check.dark {
-  background-color: #cc3333;
-  box-shadow: 0 0 20px rgba(204, 51, 51, 0.8);
+  background-color: var(--check-dark);
+  box-shadow: 0 0 20px var(--check-dark);
   animation: kingCheckPulse 0.6s ease-in-out;
 }
 
 @keyframes kingCheckPulse {
   0% {
-    box-shadow: 0 0 0 rgba(255, 68, 68, 0.8);
+    box-shadow: 0 0 0 var(--check-light);
   }
   50% {
-    box-shadow: 0 0 25px rgba(255, 68, 68, 1);
+    box-shadow: 0 0 25px var(--check-light);
   }
   100% {
-    box-shadow: 0 0 20px rgba(255, 68, 68, 0.8);
+    box-shadow: 0 0 20px var(--check-light);
   }
 }
 
@@ -146,11 +160,11 @@
 }
 
 .light-text {
-  color: #eeeed2; /* Light cream text for dark squares */
+  color: var(--coord-light-text);
 }
 
 .dark-text {
-  color: #769656; /* Green text for light squares */
+  color: var(--coord-dark-text);
 }
 
 /* Piece Styles */
@@ -158,17 +172,12 @@
   width: 95%;
   height: 95%;
   cursor: grab;
-  transition: all 0.2s ease;
   filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
   position: relative;
   z-index: 2;
   object-fit: contain;
   -webkit-user-drag: none;
   pointer-events: none;
-}
-
-.piece:hover {
-  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 .piece:active {
@@ -248,4 +257,14 @@
 .promotion-piece-img {
   width: 95%;
   object-fit: contain;
+}
+
+/* Board overlay for non-interactive state */
+.promotion-board-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999;
 }

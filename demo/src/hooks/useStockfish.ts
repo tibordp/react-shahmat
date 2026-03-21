@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Move } from 'react-shahmat';
+import type { BoardMove, PromotionPiece } from 'react-shahmat';
 
 export interface StockfishAPI {
-  getBestMove: (fen: string, skillLevel?: number) => Promise<Move | null>;
+  getBestMove: (fen: string, skillLevel?: number) => Promise<BoardMove | null>;
   isReady: boolean;
   isThinking: boolean;
 }
@@ -11,7 +11,7 @@ export const useStockfish = (): StockfishAPI => {
   const [isReady, setIsReady] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const workerRef = useRef<Worker | null>(null);
-  const pendingMoveRef = useRef<((move: Move | null) => void) | null>(null);
+  const pendingMoveRef = useRef<((move: BoardMove | null) => void) | null>(null);
   const currentRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
@@ -19,24 +19,17 @@ export const useStockfish = (): StockfishAPI => {
 
     const initStockfish = async () => {
       try {
-        console.log('Initializing Stockfish Worker...');
-
-        // Create Web Worker with Stockfish
         const worker = new Worker('/stockfish.js');
         workerRef.current = worker;
 
-        // Set up message listener
         worker.onmessage = e => {
           const message = e.data;
-          console.log('Stockfish:', message);
 
           if (message === 'uciok') {
             setIsReady(true);
-            console.log('Stockfish UCI ready');
           } else if (message.startsWith('bestmove')) {
             setIsThinking(false);
 
-            // Only process the move if we still have a pending request
             if (pendingMoveRef.current) {
               const moveMatch = message.match(
                 /bestmove ([a-h][1-8][a-h][1-8])([qrbn])?/
@@ -49,8 +42,7 @@ export const useStockfish = (): StockfishAPI => {
                 try {
                   const move = parseUCIMove(moveStr, promotion);
                   pendingMoveRef.current(move);
-                } catch (error) {
-                  console.error('Failed to parse move:', moveStr, error);
+                } catch {
                   pendingMoveRef.current(null);
                 }
               } else {
@@ -61,17 +53,14 @@ export const useStockfish = (): StockfishAPI => {
           }
         };
 
-        worker.onerror = error => {
-          console.error('Stockfish Worker error:', error);
+        worker.onerror = () => {
           if (mounted) {
             setIsReady(false);
           }
         };
 
-        // Initialize UCI protocol
         worker.postMessage('uci');
-      } catch (error) {
-        console.error('Failed to initialize Stockfish:', error);
+      } catch {
         if (mounted) {
           setIsReady(false);
         }
@@ -90,12 +79,11 @@ export const useStockfish = (): StockfishAPI => {
   }, []);
 
   const getBestMove = useCallback(
-    async (fen: string, skillLevel: number = 5): Promise<Move | null> => {
+    async (fen: string, skillLevel: number = 5): Promise<BoardMove | null> => {
       if (!workerRef.current || !isReady || isThinking) {
         return null;
       }
 
-      // Cancel any previous request
       if (pendingMoveRef.current) {
         workerRef.current.postMessage('stop');
         pendingMoveRef.current(null);
@@ -106,22 +94,17 @@ export const useStockfish = (): StockfishAPI => {
 
       return new Promise(resolve => {
         setIsThinking(true);
-        pendingMoveRef.current = (move: Move | null) => {
-          // Only resolve if this is still the current request
+        pendingMoveRef.current = (move: BoardMove | null) => {
           if (requestId === currentRequestIdRef.current) {
             resolve(move);
           }
         };
 
-        // Set skill level (0-20)
         workerRef.current!.postMessage(
           `setoption name Skill Level value ${skillLevel}`
         );
-
-        // Set position
         workerRef.current!.postMessage(`position fen ${fen}`);
 
-        // Adjust search parameters based on skill level for better differentiation
         let searchCommand;
         if (skillLevel <= 1) {
           searchCommand = 'go depth 1';
@@ -139,13 +122,11 @@ export const useStockfish = (): StockfishAPI => {
 
         workerRef.current!.postMessage(searchCommand);
 
-        // Timeout after 8 seconds - send stop command to properly cancel
         setTimeout(() => {
           if (
             requestId === currentRequestIdRef.current &&
             pendingMoveRef.current
           ) {
-            console.log('Stockfish timeout - sending stop command');
             workerRef.current?.postMessage('stop');
             setIsThinking(false);
             pendingMoveRef.current(null);
@@ -165,33 +146,24 @@ export const useStockfish = (): StockfishAPI => {
   };
 };
 
-// Helper function to convert UCI notation to our Move format
-function parseUCIMove(uciMove: string, promotion?: string): Move {
+function parseUCIMove(uciMove: string, promotion?: string): BoardMove {
   if (uciMove.length < 4) {
     throw new Error(`Invalid UCI move: ${uciMove}`);
   }
 
-  const fromFile = uciMove.charCodeAt(0) - 97; // 'a' = 0
-  const fromRank = parseInt(uciMove[1]) - 1; // '1' = 0
-  const toFile = uciMove.charCodeAt(2) - 97;
-  const toRank = parseInt(uciMove[3]) - 1;
+  const from = uciMove.substring(0, 2); // e.g. "e2"
+  const to = uciMove.substring(2, 4); // e.g. "e4"
 
-  const move: Move = {
-    fromFile,
-    fromRank,
-    toFile,
-    toRank,
-  };
+  const move: BoardMove = { from, to };
 
-  // Handle promotion
   if (promotion) {
-    const promotionMap: { [key: string]: number } = {
-      q: 4, // Queen
-      r: 1, // Rook
-      b: 3, // Bishop
-      n: 2, // Knight
+    const promotionMap: Record<string, PromotionPiece> = {
+      q: 'queen',
+      r: 'rook',
+      b: 'bishop',
+      n: 'knight',
     };
-    move.promotionPiece = promotionMap[promotion];
+    move.promotion = promotionMap[promotion];
   }
 
   return move;

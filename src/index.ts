@@ -10,29 +10,59 @@ export { Square } from './components/Square';
 // Hooks
 export { useChessGame } from './hooks/useChessGame';
 export { useJSChessEngine } from './hooks/useJSChessEngine';
-export { useCustomDrag } from './hooks/useCustomDrag';
 export { useBoardClicks } from './hooks/useBoardClicks';
 export { useBoardDragDrop } from './hooks/useBoardDragDrop';
 export { useBoardUIState } from './hooks/useBoardUIState';
 export { usePieceAnimations } from './hooks/usePieceAnimations';
 
 // Engine
-export { JSChessEngine, PieceType, Color } from './engine/jsChessEngine';
+export { JSChessEngine } from './engine/jsChessEngine';
 
-// Types
+// Types - public API
+export type {
+  Square as SquareNotation,
+  PlayerColor,
+  PromotionPiece,
+  MoveSound,
+  BoardMove,
+  ValidMovesMap,
+  GameEndOverlay,
+} from './types';
+
+// Types - from component
+export type { ChessBoardProps } from './components/ChessBoard';
+export type { UseChessGameOptions, UseChessGameReturn } from './hooks/useChessGame';
+
+// Types - from engine (re-exported via types.ts)
+export {
+  PieceType,
+  Color,
+} from './types';
+
 export type {
   GameState,
   Move,
   ChessError,
   Position,
   Piece,
-  ChessBoardRef,
-  ChessBoardCallbacks
-} from './engine/jsChessEngine';
+  MoveResult,
+  GameResult,
+} from './types';
+
+// Conversion utilities
+export {
+  squareToPosition,
+  positionToSquare,
+  colorToPlayerColor,
+  playerColorToColor,
+  pieceTypeToPromotionPiece,
+  promotionPieceToPieceType,
+  moveToBoardMove,
+  boardMoveToInternal,
+  fenToPieceArray,
+  buildValidMovesMap,
+} from './types';
 
 // Utils
 export { soundManager } from './utils/soundManager';
 export { PIECE_ICONS, getPieceIcon, getPieceIconByType, getPieceTypeName } from './utils/pieceIcons';
-
-// CSS (consumers will need to import this separately)
-// import 'react-shahmat/dist/ChessBoard.css';

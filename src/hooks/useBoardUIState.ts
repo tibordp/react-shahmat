@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Position, Color } from '../engine/jsChessEngine';
+import { BoardMove } from '../types';
 
 interface Arrow {
   from: Position;
@@ -43,6 +44,12 @@ export interface UseBoardUIStateReturn {
     React.SetStateAction<PromotionDialogState>
   >;
 
+  // Premove state
+  premoves: BoardMove[];
+  addPremove: (move: BoardMove) => void;
+  clearPremoves: () => void;
+  shiftPremove: () => void;
+
   // Clear functions for convenience
   clearSelection: () => void;
   clearArrowsAndHighlights: () => void;
@@ -74,22 +81,40 @@ export function useBoardUIState(): UseBoardUIStateReturn {
     isPreMove: false,
   });
 
+  // Premove state
+  const [premoves, setPremoves] = useState<BoardMove[]>([]);
+
+  const addPremove = useCallback((move: BoardMove) => {
+    setPremoves(prev => [...prev, move]);
+  }, []);
+
+  const clearPremoves = useCallback(() => {
+    setPremoves([]);
+  }, []);
+
+  const shiftPremove = useCallback(() => {
+    setPremoves(prev => prev.slice(1));
+  }, []);
+
   // Clear functions for convenience
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedSquare(null);
     setValidMoves([]);
-  };
+  }, []);
 
-  const clearArrowsAndHighlights = () => {
+  const clearArrowsAndHighlights = useCallback(() => {
     setArrows([]);
     setHighlightedSquares([]);
-  };
+  }, []);
 
-  const clearAll = () => {
-    clearSelection();
-    clearArrowsAndHighlights();
+  const clearAll = useCallback(() => {
+    setSelectedSquare(null);
+    setValidMoves([]);
+    setArrows([]);
+    setHighlightedSquares([]);
     setArrowStart(null);
     setKingInCheckHighlight(null);
+    setPremoves([]);
     setPromotionDialog({
       isOpen: false,
       color: Color.White,
@@ -99,32 +124,27 @@ export function useBoardUIState(): UseBoardUIStateReturn {
       toRank: 0,
       isPreMove: false,
     });
-  };
+  }, []);
 
   return {
-    // Selection state
     selectedSquare,
     setSelectedSquare,
     validMoves,
     setValidMoves,
-
-    // Arrow and highlight state
     arrows,
     setArrows,
     arrowStart,
     setArrowStart,
     highlightedSquares,
     setHighlightedSquares,
-
-    // Check highlight state
     kingInCheckHighlight,
     setKingInCheckHighlight,
-
-    // Promotion dialog state
     promotionDialog,
     setPromotionDialog,
-
-    // Clear functions
+    premoves,
+    addPremove,
+    clearPremoves,
+    shiftPremove,
     clearSelection,
     clearArrowsAndHighlights,
     clearAll,
