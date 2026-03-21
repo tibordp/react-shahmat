@@ -62,6 +62,20 @@ export interface GameResult {
   reason: 'checkmate' | 'stalemate' | 'draw' | 'resignation' | 'timeout';
 }
 
+export type MoveType = 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
+
+export interface HistoryEntry {
+  move: Move;
+  piece: Piece;
+  moveType: MoveType;
+  capturedPiece?: Piece;
+  promotionPiece?: PieceType;
+  fen: string;
+  isCheck: boolean;
+  isCheckmate: boolean;
+  algebraic: string;
+}
+
 export interface ChessError {
   type: 'invalid_move' | 'callback_error' | 'timeout';
   player: Color;
@@ -77,6 +91,8 @@ export class JSChessEngine {
   private enPassantTarget: Position | null; // Square where en passant capture can happen
   private lastMove: Move | null; // Track the last move made
   private moveHistory: Move[]; // Track all moves made
+  private historyEntries: HistoryEntry[]; // Rich history with piece/capture/notation info
+  private fenHistory: string[]; // FEN at each position (index 0 = initial, index n = after move n)
   private halfmoveClock: number; // Moves since last capture or pawn move (for 50-move rule)
   private fullmoveNumber: number; // Increments after Black's move
   private castlingRights: {
@@ -92,6 +108,8 @@ export class JSChessEngine {
     this.enPassantTarget = null;
     this.lastMove = null;
     this.moveHistory = [];
+    this.historyEntries = [];
+    this.fenHistory = [];
     this.halfmoveClock = 0;
     this.fullmoveNumber = 1;
     this.castlingRights = {
@@ -101,6 +119,7 @@ export class JSChessEngine {
       blackQueenSide: true,
     };
     this.setupInitialPosition();
+    this.fenHistory.push(this.generateFEN());
   }
 
   private createEmptyBoard(): (Piece | null)[][] {
@@ -957,11 +976,12 @@ export class JSChessEngine {
     }
 
     // Record the move
-    const moveRecord = {
+    const moveRecord: Move = {
       fromFile: from.file,
       fromRank: from.rank,
       toFile: to.file,
       toRank: to.rank,
+      promotionPiece,
     };
     this.lastMove = moveRecord;
     this.moveHistory.push(moveRecord);
@@ -974,6 +994,27 @@ export class JSChessEngine {
     if (this.currentPlayer === Color.White) {
       this.fullmoveNumber++;
     }
+
+    // Build rich history entry
+    const fen = this.generateFEN();
+    const isCheck = this.isKingInCheck(this.currentPlayer);
+    const isCheckmate = isCheck && this.getGameState().isGameOver;
+    const algebraic = this.computeAlgebraic(
+      piece, from, to, type as MoveType, capturedPiece, promotionPiece, isCheck, isCheckmate
+    );
+    this.historyEntries.push({
+      move: moveRecord,
+      piece: { ...piece },
+      moveType: type as MoveType,
+      capturedPiece: capturedPiece ? { ...capturedPiece } : undefined,
+      promotionPiece,
+      fen,
+      isCheck,
+      isCheckmate,
+      algebraic,
+    });
+    this.fenHistory.push(fen);
+
     return {
       success: true,
       type,
@@ -1057,6 +1098,128 @@ export class JSChessEngine {
 
   public getLastMove(): Move | null {
     return this.lastMove;
+  }
+
+  public getHistory(): HistoryEntry[] {
+    return [...this.historyEntries];
+  }
+
+  public getFenHistory(): string[] {
+    return [...this.fenHistory];
+  }
+
+  public undoToFen(fen: string, plyCount: number): boolean {
+    // Save history before setPosition (which clears it)
+    const savedHistory = this.historyEntries.slice(0, plyCount);
+    const savedFenHistory = this.fenHistory.slice(0, plyCount + 1);
+    const savedMoveHistory = this.moveHistory.slice(0, plyCount);
+
+    const success = this.setPosition(fen);
+    if (success) {
+      this.historyEntries = savedHistory;
+      this.fenHistory = savedFenHistory;
+      this.moveHistory = savedMoveHistory;
+      this.lastMove = plyCount > 0 ? savedMoveHistory[plyCount - 1] : null;
+    }
+    return success;
+  }
+
+  private computeAlgebraic(
+    piece: Piece,
+    from: Position,
+    to: Position,
+    moveType: MoveType,
+    capturedPiece: Piece | undefined,
+    promotionPiece: PieceType | undefined,
+    isCheck: boolean,
+    isCheckmate: boolean
+  ): string {
+    const FILE_LETTERS = 'abcdefgh';
+    const toSquare = FILE_LETTERS[to.file] + (to.rank + 1);
+    const isCapture = !!capturedPiece || moveType === 'enPassant';
+    let notation = '';
+
+    if (moveType === 'castling') {
+      notation = to.file > from.file ? 'O-O' : 'O-O-O';
+    } else if (piece.type === PieceType.Pawn) {
+      if (isCapture) {
+        notation = FILE_LETTERS[from.file] + 'x' + toSquare;
+      } else {
+        notation = toSquare;
+      }
+      if (moveType === 'promotion' && promotionPiece !== undefined) {
+        const PIECE_LETTERS = ['', 'R', 'N', 'B', 'Q', 'K'];
+        notation += '=' + PIECE_LETTERS[promotionPiece];
+      }
+    } else {
+      const PIECE_LETTERS = ['', 'R', 'N', 'B', 'Q', 'K'];
+      notation = PIECE_LETTERS[piece.type];
+
+      // Disambiguation: check if another piece of the same type can reach the same square
+      // We check the board AFTER the move, but we need the board BEFORE.
+      // Since we already moved, use fenHistory to avoid recomputation.
+      // Simpler: check from the current board state if any same-type piece
+      // at a DIFFERENT position could also reach this square. But the board
+      // already has the move applied. Instead, just always disambiguate for knights
+      // and rooks which commonly need it — use both file and rank if needed.
+      // Actually, let's use the previous FEN to check properly.
+      const prevFen = this.fenHistory[this.fenHistory.length - 1]; // last FEN before this move was added
+      const disambig = this.getDisambiguation(piece, from, to, prevFen);
+      notation += disambig;
+
+      if (isCapture) {
+        notation += 'x';
+      }
+      notation += toSquare;
+    }
+
+    if (isCheckmate) {
+      notation += '#';
+    } else if (isCheck) {
+      notation += '+';
+    }
+
+    return notation;
+  }
+
+  private getDisambiguation(piece: Piece, from: Position, to: Position, prevFen: string): string {
+    // Parse the previous position to find other pieces of the same type that could reach the target
+    const tempEngine = new JSChessEngine();
+    tempEngine.setPosition(prevFen);
+    const board = tempEngine.board;
+
+    let sameTypePositions: Position[] = [];
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const p = board[rank][file];
+        if (
+          p &&
+          p.type === piece.type &&
+          p.color === piece.color &&
+          (rank !== from.rank || file !== from.file)
+        ) {
+          // Check if this piece can also reach the target square
+          const validation = tempEngine.isValidMove({ file, rank }, to);
+          if (validation.valid) {
+            sameTypePositions.push({ file, rank });
+          }
+        }
+      }
+    }
+
+    if (sameTypePositions.length === 0) return '';
+
+    const FILE_LETTERS = 'abcdefgh';
+    const sameFile = sameTypePositions.some(p => p.file === from.file);
+    const sameRank = sameTypePositions.some(p => p.rank === from.rank);
+
+    if (!sameFile) {
+      return FILE_LETTERS[from.file];
+    } else if (!sameRank) {
+      return (from.rank + 1).toString();
+    } else {
+      return FILE_LETTERS[from.file] + (from.rank + 1);
+    }
   }
 
   public getGameState(): GameState {
@@ -1313,6 +1476,8 @@ export class JSChessEngine {
       // Clear move history and last move when setting position
       this.lastMove = null;
       this.moveHistory = [];
+      this.historyEntries = [];
+      this.fenHistory = [fen];
 
       return true;
     } catch {
@@ -1348,6 +1513,8 @@ export class JSChessEngine {
     this.enPassantTarget = null;
     this.lastMove = null;
     this.moveHistory = [];
+    this.historyEntries = [];
+    this.fenHistory = [];
     this.halfmoveClock = 0;
     this.fullmoveNumber = 1;
     this.castlingRights = {
@@ -1357,5 +1524,6 @@ export class JSChessEngine {
       blackQueenSide: true,
     };
     this.setupInitialPosition();
+    this.fenHistory.push(this.generateFEN());
   }
 }

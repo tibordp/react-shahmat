@@ -308,6 +308,8 @@ export interface ChessBoardProps {
    *  Return destination squares the piece could potentially move to (ignoring blocking/check).
    *  Default: standard chess movement patterns. */
   premoveCandidates?: (piece: Piece, square: SquareNotation) => SquareNotation[];
+  /** When true, board is non-interactive with a translucent overlay. Default: false */
+  readonly?: boolean;
 }
 
 // ============================================================================
@@ -341,6 +343,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   premoveCandidates: premoveCandidatesFn,
   whiteMovable = true,
   blackMovable = true,
+  readonly: readonlyMode = false,
 }) => {
   const [boardSize, setBoardSize] = useState(size || 512);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -379,8 +382,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   }, [validMoves]);
 
   // Determine interactivity
-  const canMove = !!validMoves && validMoves.size > 0;
-  const canPremove = enablePremoves;
+  const canMove = !readonlyMode && !gameEndOverlay && !!validMoves && validMoves.size > 0;
+  const canPremove = !readonlyMode && !gameEndOverlay && enablePremoves;
 
   // Sound helper
   const playSound = useCallback(
@@ -1140,6 +1143,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
           return badges;
         })()}
+
+        {/* Readonly overlay */}
+        {readonlyMode && (
+          <div className={styles.readonlyOverlay} />
+        )}
       </div>
     </DndProvider>
   );

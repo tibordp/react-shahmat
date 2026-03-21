@@ -4,12 +4,15 @@ import {
   ChessBoard,
   useChessGame,
   moveToBoardMove,
+  toFigurine,
+  Color,
 } from 'react-shahmat';
 import type {
   GameState,
   BoardMove,
   ChessError,
   PromotionPiece,
+  GameHistoryEntry,
 } from 'react-shahmat';
 import { useStockfish } from './hooks/useStockfish';
 
@@ -20,6 +23,109 @@ const BOARD_THEMES: Record<string, { light: string; dark: string; name: string }
   purple: { light: '#e8d0ff', dark: '#9b72cf', name: 'Purple' },
   red: { light: '#f0d0d0', dark: '#c25050', name: 'Red' },
 };
+
+// Move history panel component
+function MoveHistory({
+  history,
+  viewingPly,
+  onNavigate,
+}: {
+  history: GameHistoryEntry[];
+  viewingPly: number | null;
+  onNavigate: (ply: number | null) => void;
+}) {
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new moves arrive (if viewing live)
+  React.useEffect(() => {
+    if (viewingPly === null && listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [history.length, viewingPly]);
+
+  // Group moves into pairs (white, black)
+  const movePairs: { number: number; white: GameHistoryEntry; black?: GameHistoryEntry }[] = [];
+  for (let i = 0; i < history.length; i += 2) {
+    movePairs.push({
+      number: Math.floor(i / 2) + 1,
+      white: history[i],
+      black: history[i + 1],
+    });
+  }
+
+  return (
+    <div className='move-history'>
+      <div className='move-history-header'>Moves</div>
+      <div className='move-history-list' ref={listRef}>
+        {movePairs.length === 0 && (
+          <div className='move-history-empty'>No moves yet</div>
+        )}
+        {movePairs.map((pair, pairIndex) => (
+          <div key={pairIndex} className='move-row'>
+            <span className='move-number'>{pair.number}.</span>
+            <button
+              className={`move-button ${viewingPly === pairIndex * 2 + 1 ? 'active' : ''} ${viewingPly === null && pairIndex * 2 + 1 === history.length ? 'current' : ''}`}
+              onClick={() => onNavigate(pairIndex * 2 + 1)}
+              title={pair.white.algebraic}
+            >
+              {toFigurine(pair.white.algebraic)}
+            </button>
+            {pair.black && (
+              <button
+                className={`move-button ${viewingPly === pairIndex * 2 + 2 ? 'active' : ''} ${viewingPly === null && pairIndex * 2 + 2 === history.length ? 'current' : ''}`}
+                onClick={() => onNavigate(pairIndex * 2 + 2)}
+                title={pair.black.algebraic}
+              >
+                {toFigurine(pair.black.algebraic)}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Navigation buttons */}
+      <div className='move-nav'>
+        <button
+          className='nav-button'
+          onClick={() => onNavigate(0)}
+          disabled={history.length === 0}
+          title='First position'
+        >
+          &#x23EE;
+        </button>
+        <button
+          className='nav-button'
+          onClick={() => {
+            const current = viewingPly ?? history.length;
+            if (current > 0) onNavigate(current - 1);
+          }}
+          disabled={history.length === 0 || (viewingPly !== null && viewingPly <= 0)}
+          title='Previous move'
+        >
+          &#x23F4;
+        </button>
+        <button
+          className='nav-button'
+          onClick={() => {
+            const current = viewingPly ?? history.length;
+            if (current < history.length) onNavigate(current + 1 >= history.length ? null : current + 1);
+          }}
+          disabled={viewingPly === null}
+          title='Next move'
+        >
+          &#x23F5;
+        </button>
+        <button
+          className='nav-button'
+          onClick={() => onNavigate(null)}
+          disabled={viewingPly === null}
+          title='Live position'
+        >
+          &#x23ED;
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [controlsOpen, setControlsOpen] = React.useState(false);
@@ -41,9 +147,11 @@ function App() {
   const [aiSkillLevel, setAiSkillLevel] = React.useState(5);
   const [boardTheme, setBoardTheme] = React.useState('green');
 
+  // History navigation: null = live position, number = viewing ply N
+  const [viewingPly, setViewingPly] = React.useState<number | null>(null);
+
   const stockfish = useStockfish();
 
-  // Use ref for game to avoid circular dependency with handlePositionChange
   const gameRef = React.useRef<ReturnType<typeof useChessGame>>(null!);
 
   const handlePositionChange = React.useCallback(
@@ -62,7 +170,6 @@ function App() {
           move = await stockfish.getBestMove(gameState.fen, aiSkillLevel);
         }
 
-        // Fallback to random move
         if (!move && gameState.validMoves.length > 0) {
           const randomIndex = Math.floor(
             Math.random() * gameState.validMoves.length
@@ -71,7 +178,6 @@ function App() {
         }
 
         if (move) {
-          // Ensure minimum delay for visual smoothness
           const took = performance.now() - startTick;
           if (took < 500) {
             await new Promise(r => setTimeout(r, 500 - took));
@@ -105,6 +211,7 @@ function App() {
 
   const handleReset = React.useCallback(() => {
     game.resetGame();
+    setViewingPly(null);
   }, [game]);
 
   const handleLoadPosition = React.useCallback(() => {
@@ -113,6 +220,7 @@ function App() {
       if (!success) {
         console.error('Invalid FEN string');
       }
+      setViewingPly(null);
     }
   }, [fenInput, game]);
 
@@ -123,9 +231,61 @@ function App() {
       if (!success) {
         console.error(`Failed to load ${description}`);
       }
+      setViewingPly(null);
     },
     [game]
   );
+
+  // Handle history navigation
+  const handleNavigate = React.useCallback((ply: number | null) => {
+    if (ply === null || ply >= game.history.length) {
+      setViewingPly(null);
+    } else {
+      setViewingPly(Math.max(0, ply));
+    }
+  }, [game.history.length]);
+
+  // Keyboard navigation for history
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const current = viewingPly ?? game.history.length;
+        if (current > 0) handleNavigate(current - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (viewingPly !== null) {
+          handleNavigate(viewingPly + 1 >= game.history.length ? null : viewingPly + 1);
+        }
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        if (game.history.length > 0) handleNavigate(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        handleNavigate(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewingPly, game.history.length, handleNavigate]);
+
+  // When viewing history, override board props
+  const isViewingHistory = viewingPly !== null;
+  const viewedEntry = isViewingHistory && viewingPly > 0
+    ? game.history[viewingPly - 1]
+    : undefined;
+
+  // Get the FEN for the viewed position
+  const viewedPosition = React.useMemo(() => {
+    if (!isViewingHistory) return undefined;
+    if (viewingPly === 0) {
+      // Initial position — get from engine's FEN history
+      return game.engine.getFenHistory()[0];
+    }
+    return game.history[viewingPly - 1]?.fen;
+  }, [isViewingHistory, viewingPly, game.history, game.engine]);
 
   const theme = BOARD_THEMES[boardTheme] || BOARD_THEMES.green;
   const boardStyle = {
@@ -134,6 +294,18 @@ function App() {
     '--coord-light-text': theme.light,
     '--coord-dark-text': theme.dark,
   } as React.CSSProperties;
+
+  // Build board props: use history position if viewing, live otherwise
+  const boardProps = isViewingHistory
+    ? {
+        ...game.boardProps,
+        position: viewedPosition || game.boardProps.position,
+        lastMove: viewedEntry?.move,
+        check: viewedEntry?.isCheck ? undefined : undefined, // TODO: extract check square from history
+        validMoves: undefined, // No moves in history view
+        gameEndOverlay: undefined,
+      }
+    : game.boardProps;
 
   return (
     <div className='App'>
@@ -145,26 +317,128 @@ function App() {
         ☰
       </button>
       <div className={`controls-panel ${controlsOpen ? 'controls-open' : ''}`}>
+        <div className='controls-section-title'>Game</div>
+
         <div className='control-group'>
-          <label htmlFor='flipBoard'>Board Orientation:</label>
+          <button className='control-button reset-button' onClick={handleReset}>
+            Reset Game
+          </button>
+        </div>
+
+        <div className='control-group' style={{ gap: 6 }}>
           <button
-            id='flipBoard'
             className='control-button'
-            onClick={() =>
-              setOrientation(prev => (prev === 'white' ? 'black' : 'white'))
-            }
+            style={{ background: '#7b6b2e', flex: 1 }}
+            onClick={() => game.undo()}
+            disabled={game.history.length === 0}
           >
-            {orientation === 'white' ? 'White Perspective' : 'Black Perspective'}
+            Undo
+          </button>
+          <button
+            className='control-button'
+            style={{ background: '#555', flex: 1 }}
+            onClick={() => game.endGame({ reason: 'draw' })}
+            disabled={game.getGameState().isGameOver}
+          >
+            Draw
+          </button>
+          <button
+            className='control-button reset-button'
+            style={{ flex: 1 }}
+            onClick={() => {
+              const current = game.getGameState().currentPlayer;
+              game.endGame({
+                reason: 'resignation',
+                winner: current === Color.White ? Color.Black : Color.White,
+              });
+            }}
+            disabled={game.getGameState().isGameOver}
+          >
+            Resign
           </button>
         </div>
 
         <div className='control-group'>
-          <label htmlFor='boardTheme'>Board Theme:</label>
+          <label htmlFor='blackAi'>Black AI</label>
+          <input
+            type='checkbox'
+            checked={blackAi}
+            onChange={e => setBlackAi(e.target.checked)}
+            id='blackAi'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='whiteAi'>White AI</label>
+          <input
+            type='checkbox'
+            checked={whiteAi}
+            onChange={e => setWhiteAi(e.target.checked)}
+            id='whiteAi'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='aiSkillLevel'>Stockfish Level</label>
+          <select
+            id='aiSkillLevel'
+            value={aiSkillLevel}
+            onChange={e => setAiSkillLevel(parseInt(e.target.value))}
+            className='control-select-small'
+          >
+            <option value={1}>1 (depth 1)</option>
+            <option value={3}>3 (depth 2)</option>
+            <option value={5}>5 (depth 3)</option>
+            <option value={8}>8 (500ms)</option>
+            <option value={15}>15 (1s)</option>
+            <option value={20}>20 (2s)</option>
+          </select>
+        </div>
+
+        <div className='control-group'>
+          <label>Stockfish</label>
+          <span
+            className={`stockfish-status ${stockfish.isReady ? 'ready' : 'loading'}`}
+          >
+            {stockfish.isThinking
+              ? 'Thinking...'
+              : stockfish.isReady
+                ? 'Ready'
+                : 'Loading...'}
+          </span>
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='autoPromotion'>Auto-Promote</label>
+          <select
+            id='autoPromotion'
+            value={autoPromotionPiece ?? ''}
+            onChange={e =>
+              setAutoPromotionPiece(
+                (e.target.value as PromotionPiece) || undefined
+              )
+            }
+            className='control-select-small'
+          >
+            <option value=''>Dialog</option>
+            <option value='queen'>Queen</option>
+            <option value='rook'>Rook</option>
+            <option value='bishop'>Bishop</option>
+            <option value='knight'>Knight</option>
+          </select>
+        </div>
+
+        <div className='controls-section-title'>Board</div>
+
+        <div className='control-group'>
+          <label htmlFor='boardTheme'>Theme</label>
           <select
             id='boardTheme'
             value={boardTheme}
             onChange={e => setBoardTheme(e.target.value)}
-            className='control-select'
+            className='control-select-small'
           >
             {Object.entries(BOARD_THEMES).map(([key, t]) => (
               <option key={key} value={key}>
@@ -175,6 +449,42 @@ function App() {
         </div>
 
         <div className='control-group'>
+          <label>Orientation</label>
+          <button
+            className='control-button'
+            onClick={() =>
+              setOrientation(prev => (prev === 'white' ? 'black' : 'white'))
+            }
+            style={{ width: 'auto', padding: '5px 12px', fontSize: '12px' }}
+          >
+            {orientation === 'white' ? 'White' : 'Black'}
+          </button>
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='showCoordinates'>Coordinates</label>
+          <input
+            type='checkbox'
+            checked={showCoordinates}
+            onChange={e => setShowCoordinates(e.target.checked)}
+            id='showCoordinates'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='showMoveIndicators'>Move indicators</label>
+          <input
+            type='checkbox'
+            checked={showMoveIndicators}
+            onChange={e => setShowMoveIndicators(e.target.checked)}
+            id='showMoveIndicators'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='enablePreMoves'>Pre-moves</label>
           <input
             type='checkbox'
             checked={enablePreMoves}
@@ -182,56 +492,70 @@ function App() {
             id='enablePreMoves'
             className='control-checkbox'
           />
-          <label htmlFor='enablePreMoves'>Enable Pre-Moves</label>
         </div>
 
         <div className='control-group'>
+          <label htmlFor='enableAnimations'>Animations</label>
           <input
             type='checkbox'
-            checked={blackAi}
-            onChange={e => setBlackAi(e.target.checked)}
-            id='blackAi'
+            checked={enableAnimations}
+            onChange={e => setEnableAnimations(e.target.checked)}
+            id='enableAnimations'
             className='control-checkbox'
           />
-          <label htmlFor='blackAi'>Black AI</label>
         </div>
 
         <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={whiteAi}
-            onChange={e => setWhiteAi(e.target.checked)}
-            id='whiteAi'
-            className='control-checkbox'
-          />
-          <label htmlFor='whiteAi'>White AI</label>
-        </div>
-
-        <div className='control-group'>
-          <label htmlFor='autoPromotion'>Auto-Promotion:</label>
+          <label htmlFor='animationDuration'>Anim. speed</label>
           <select
-            id='autoPromotion'
-            value={autoPromotionPiece ?? ''}
-            onChange={e =>
-              setAutoPromotionPiece(
-                (e.target.value as PromotionPiece) || undefined
-              )
-            }
-            className='control-select'
+            id='animationDuration'
+            value={animationDuration}
+            onChange={e => setAnimationDuration(parseInt(e.target.value))}
+            className='control-select-small'
+            disabled={!enableAnimations}
           >
-            <option value=''>Manual (Show Dialog)</option>
-            <option value='queen'>Queen</option>
-            <option value='rook'>Rook</option>
-            <option value='bishop'>Bishop</option>
-            <option value='knight'>Knight</option>
+            <option value={100}>100ms</option>
+            <option value={200}>200ms</option>
+            <option value={300}>300ms</option>
+            <option value={500}>500ms</option>
+            <option value={800}>800ms</option>
           </select>
         </div>
 
         <div className='control-group'>
-          <button className='control-button reset-button' onClick={handleReset}>
-            Reset Game
-          </button>
+          <label htmlFor='enableSounds'>Sounds</label>
+          <input
+            type='checkbox'
+            checked={enableSounds}
+            onChange={e => setEnableSounds(e.target.checked)}
+            id='enableSounds'
+            className='control-checkbox'
+          />
         </div>
+
+        <div className='control-group'>
+          <label htmlFor='enableArrows'>Arrows</label>
+          <input
+            type='checkbox'
+            checked={enableArrows}
+            onChange={e => setEnableArrows(e.target.checked)}
+            id='enableArrows'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='control-group'>
+          <label htmlFor='enableHighlights'>Highlights</label>
+          <input
+            type='checkbox'
+            checked={enableHighlights}
+            onChange={e => setEnableHighlights(e.target.checked)}
+            id='enableHighlights'
+            className='control-checkbox'
+          />
+        </div>
+
+        <div className='controls-section-title'>Position</div>
 
         <div className='control-group fen-group'>
           <label htmlFor='fenInput'>Load Position:</label>
@@ -291,119 +615,6 @@ function App() {
           </div>
         </div>
 
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={showCoordinates}
-            onChange={e => setShowCoordinates(e.target.checked)}
-            id='showCoordinates'
-            className='control-checkbox'
-          />
-          <label htmlFor='showCoordinates'>Show Coordinates</label>
-        </div>
-
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={enableAnimations}
-            onChange={e => setEnableAnimations(e.target.checked)}
-            id='enableAnimations'
-            className='control-checkbox'
-          />
-          <label htmlFor='enableAnimations'>Enable Animations</label>
-        </div>
-
-        <div className='control-group'>
-          <label htmlFor='animationDuration'>Animation Speed:</label>
-          <select
-            id='animationDuration'
-            value={animationDuration}
-            onChange={e => setAnimationDuration(parseInt(e.target.value))}
-            className='control-select-small'
-            disabled={!enableAnimations}
-          >
-            <option value={100}>Very Fast (100ms)</option>
-            <option value={200}>Fast (200ms)</option>
-            <option value={300}>Normal (300ms)</option>
-            <option value={500}>Slow (500ms)</option>
-            <option value={800}>Very Slow (800ms)</option>
-          </select>
-        </div>
-
-        <div className='control-group'>
-          <label htmlFor='aiSkillLevel'>Stockfish Skill Level:</label>
-          <select
-            id='aiSkillLevel'
-            value={aiSkillLevel}
-            onChange={e => setAiSkillLevel(parseInt(e.target.value))}
-            className='control-select-small'
-          >
-            <option value={1}>Level 1 (1-ply depth)</option>
-            <option value={3}>Level 3 (2-ply depth)</option>
-            <option value={5}>Level 5 (3-ply depth)</option>
-            <option value={8}>Level 8 (500ms time)</option>
-            <option value={15}>Level 15 (1000ms time)</option>
-            <option value={20}>Level 20 (2000ms time)</option>
-          </select>
-        </div>
-
-        <div className='control-group'>
-          <label>Stockfish Status:</label>
-          <span
-            className={`stockfish-status ${stockfish.isReady ? 'ready' : 'loading'}`}
-            style={{ display: 'inline-block', minWidth: '80px' }}
-          >
-            {stockfish.isThinking
-              ? 'Thinking...'
-              : stockfish.isReady
-                ? 'Ready'
-                : 'Loading...'}
-          </span>
-        </div>
-
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={enableSounds}
-            onChange={e => setEnableSounds(e.target.checked)}
-            id='enableSounds'
-            className='control-checkbox'
-          />
-          <label htmlFor='enableSounds'>Enable Sounds</label>
-        </div>
-
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={enableArrows}
-            onChange={e => setEnableArrows(e.target.checked)}
-            id='enableArrows'
-            className='control-checkbox'
-          />
-          <label htmlFor='enableArrows'>Enable Arrows</label>
-        </div>
-
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={enableHighlights}
-            onChange={e => setEnableHighlights(e.target.checked)}
-            id='enableHighlights'
-            className='control-checkbox'
-          />
-          <label htmlFor='enableHighlights'>Enable Highlights</label>
-        </div>
-
-        <div className='control-group'>
-          <input
-            type='checkbox'
-            checked={showMoveIndicators}
-            onChange={e => setShowMoveIndicators(e.target.checked)}
-            id='showMoveIndicators'
-            className='control-checkbox'
-          />
-          <label htmlFor='showMoveIndicators'>Show Move Indicators</label>
-        </div>
       </div>
       {controlsOpen && (
         <div
@@ -412,23 +623,31 @@ function App() {
         />
       )}
 
-      <div className='board-container'>
-        <ChessBoard
-          {...game.boardProps}
-          orientation={orientation}
-          enablePremoves={enablePreMoves}
-          autoPromotionPiece={autoPromotionPiece}
-          showCoordinates={showCoordinates}
-          animationDuration={animationDuration}
-          enableAnimations={enableAnimations}
-          enableSounds={enableSounds}
-          enableArrows={enableArrows}
-          enableHighlights={enableHighlights}
-          showMoveIndicators={showMoveIndicators}
-          className='themed-board'
-          style={boardStyle}
-        />
+      <div className='board-area'>
+        <div className='board-container'>
+          <ChessBoard
+            {...boardProps}
+            orientation={orientation}
+            enablePremoves={enablePreMoves}
+            autoPromotionPiece={autoPromotionPiece}
+            showCoordinates={showCoordinates}
+            animationDuration={animationDuration}
+            enableAnimations={enableAnimations}
+            enableSounds={enableSounds}
+            enableArrows={enableArrows}
+            enableHighlights={enableHighlights}
+            showMoveIndicators={showMoveIndicators}
+            readonly={isViewingHistory}
+            className='themed-board'
+            style={boardStyle}
+          />
+        </div>
       </div>
+      <MoveHistory
+        history={game.history}
+        viewingPly={viewingPly}
+        onNavigate={handleNavigate}
+      />
     </div>
   );
 }

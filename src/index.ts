@@ -47,6 +47,9 @@ export type {
   Piece,
   MoveResult,
   GameResult,
+  HistoryEntry,
+  MoveType,
+  GameHistoryEntry,
 } from './types';
 
 // Conversion utilities
@@ -61,6 +64,7 @@ export {
   boardMoveToInternal,
   fenToPieceArray,
   buildValidMovesMap,
+  toFigurine,
 } from './types';
 
 // Utils

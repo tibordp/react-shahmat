@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   PieceType,
   GameState,
+  GameResult,
 } from '../engine/jsChessEngine';
 import { ChessEngineAPI } from './useJSChessEngine';
 import { useJSChessEngine } from './useJSChessEngine';
@@ -12,7 +13,10 @@ import {
   ValidMovesMap,
   GameEndOverlay,
   MoveSound,
+  GameHistoryEntry,
   colorToPlayerColor,
+  moveToBoardMove,
+  pieceTypeToPromotionPiece,
   positionToSquare,
   boardMoveToInternal,
   buildValidMovesMap,
@@ -56,6 +60,12 @@ export interface UseChessGameReturn {
   setPosition: (fen: string) => boolean;
   /** Get the current game state */
   getGameState: () => GameState;
+  /** Full move history with piece/capture/check info and algebraic notation */
+  history: GameHistoryEntry[];
+  /** Roll back to a specific ply (0 = initial position). No arg = undo last move. */
+  undo: (toPly?: number) => boolean;
+  /** End the game manually (resignation, draw agreement, timeout/flag) */
+  endGame: (result: GameResult) => void;
   /** Direct access to the chess engine API */
   engine: ChessEngineAPI;
 }
@@ -67,6 +77,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
 
   // Track last move for highlighting and animation
   const [lastMove, setLastMove] = useState<BoardMove | undefined>(undefined);
+  // Manual game result (resignation, draw agreement, flag)
+  const [manualGameResult, setManualGameResult] = useState<GameResult | null>(null);
   // Force re-render counter (engine is mutable)
   const [, setRenderCount] = useState(0);
 
@@ -103,48 +115,54 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
     return undefined;
   }, [gameState.isCheck, chessEngine]);
 
-  // Only provide valid moves when it's a human-movable turn
+  const isGameOver = gameState.isGameOver || !!manualGameResult;
+  const effectiveResult = manualGameResult || gameState.result;
+
+  // Only provide valid moves when it's a human-movable turn and game isn't over
   const validMoves = useMemo((): ValidMovesMap => {
-    if (gameState.isGameOver || !isHumanTurn) return new Map();
+    if (isGameOver || !isHumanTurn) return new Map();
     return buildValidMovesMap(gameState);
-  }, [gameState, isHumanTurn]);
+  }, [gameState, isHumanTurn, isGameOver]);
 
   const gameEndOverlay = useMemo((): GameEndOverlay | undefined => {
-    if (!gameState.isGameOver || !gameState.result) return undefined;
-    if (gameState.result.reason === 'checkmate' && gameState.result.winner !== undefined) {
+    if (!isGameOver || !effectiveResult) return undefined;
+    if (effectiveResult.reason === 'checkmate' && effectiveResult.winner !== undefined) {
       return {
         type: 'checkmate',
-        winner: colorToPlayerColor(gameState.result.winner),
+        winner: colorToPlayerColor(effectiveResult.winner),
       };
-    } else if (gameState.result.reason === 'stalemate') {
+    } else if (effectiveResult.reason === 'stalemate') {
       return { type: 'stalemate' };
+    } else if (effectiveResult.reason === 'resignation' && effectiveResult.winner !== undefined) {
+      return { type: 'checkmate', winner: colorToPlayerColor(effectiveResult.winner) };
     } else {
       return { type: 'draw' };
     }
-  }, [gameState]);
+  }, [isGameOver, effectiveResult]);
 
-  // Determine what sound to play for a move result
+  // Determine what sound(s) to play for a move result
   const playSoundForMove = useCallback(
     (moveResult: { type?: string; capturedPiece?: unknown }) => {
       const state = chessEngine.getGameState();
 
+      // Play the move sound first
+      if (moveResult.type === 'promotion') {
+        soundManager.playPromotion();
+      } else if (moveResult.capturedPiece) {
+        soundManager.playCapture();
+      } else {
+        soundManager.playMove();
+      }
+
+      // Layer the game-end or check sound on top
       if (state.isGameOver && state.result) {
         if (state.result.reason === 'checkmate') {
           soundManager.playCheckmate();
         } else {
           soundManager.playDraw();
         }
-        return;
-      }
-
-      if (state.isCheck) {
+      } else if (state.isCheck) {
         soundManager.playCheck();
-      } else if (moveResult.type === 'promotion') {
-        soundManager.playPromotion();
-      } else if (moveResult.capturedPiece) {
-        soundManager.playCapture();
-      } else {
-        soundManager.playMove();
       }
     },
     [chessEngine]
@@ -260,6 +278,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
   const resetGame = useCallback(() => {
     chessEngine.resetGame();
     setLastMove(undefined);
+    setManualGameResult(null);
     forceUpdate();
     notifyPositionChange();
   }, [chessEngine, forceUpdate, notifyPositionChange]);
@@ -270,6 +289,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
       const success = chessEngine.setPosition(fen);
       if (success) {
         setLastMove(undefined);
+        setManualGameResult(null);
         forceUpdate();
         notifyPositionChange();
       }
@@ -278,10 +298,63 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
     [chessEngine, forceUpdate, notifyPositionChange]
   );
 
+  // Public API: end the game manually (resignation, draw agreement, flag)
+  const endGame = useCallback(
+    (result: GameResult) => {
+      setManualGameResult(result);
+      forceUpdate();
+      notifyPositionChange();
+    },
+    [forceUpdate, notifyPositionChange]
+  );
+
   // Public API: get game state
   const getGameState = useCallback(
     (): GameState => chessEngine.getGameState(),
     [chessEngine]
+  );
+
+  // Public API: history
+  const history = useMemo((): GameHistoryEntry[] => {
+    return chessEngine.getHistory().map(entry => ({
+      move: moveToBoardMove(entry.move),
+      piece: { ...entry.piece },
+      moveType: entry.moveType,
+      capturedPiece: entry.capturedPiece ? { ...entry.capturedPiece } : undefined,
+      promotionPiece: entry.promotionPiece !== undefined
+        ? pieceTypeToPromotionPiece(entry.promotionPiece)
+        : undefined,
+      fen: entry.fen,
+      isCheck: entry.isCheck,
+      isCheckmate: entry.isCheckmate,
+      algebraic: entry.algebraic,
+    }));
+  }, [chessEngine, gameState]); // gameState dep ensures re-computation after moves
+
+  // Public API: undo to a specific ply
+  const undo = useCallback(
+    (toPly?: number): boolean => {
+      const fenHist = chessEngine.getFenHistory();
+      const targetPly = toPly ?? (fenHist.length - 2); // default: undo last move
+      if (targetPly < 0 || targetPly >= fenHist.length) return false;
+
+      const targetFen = fenHist[targetPly];
+      const success = chessEngine.undoToFen(targetFen, targetPly);
+      if (success) {
+        setManualGameResult(null);
+        if (targetPly > 0) {
+          const prevHistory = chessEngine.getHistory();
+          const lastEntry = prevHistory[prevHistory.length - 1];
+          setLastMove(lastEntry ? moveToBoardMove(lastEntry.move) : undefined);
+        } else {
+          setLastMove(undefined);
+        }
+        forceUpdate();
+        notifyPositionChange();
+      }
+      return success;
+    },
+    [chessEngine, forceUpdate, notifyPositionChange]
   );
 
   const boardProps = useMemo(
@@ -317,6 +390,9 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
     resetGame,
     setPosition,
     getGameState,
+    history,
+    undo,
+    endGame,
     engine: chessEngine,
   };
 }

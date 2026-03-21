@@ -198,5 +198,46 @@ export function buildValidMovesMap(gameState: GameState): ValidMovesMap {
 }
 
 // Re-export engine types that consumers may need
-export type { GameState, Move, Piece, Position, GameResult, MoveResult, ValidMoveResult, ChessError } from './engine/jsChessEngine';
+export type { GameState, Move, Piece, Position, GameResult, MoveResult, ValidMoveResult, ChessError, HistoryEntry, MoveType } from './engine/jsChessEngine';
 export { PieceType, Color } from './engine/jsChessEngine';
+
+/** Public-facing history entry with algebraic notation */
+export interface GameHistoryEntry {
+  move: BoardMove;
+  piece: { type: PieceType; color: Color };
+  moveType: 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
+  capturedPiece?: { type: PieceType; color: Color };
+  promotionPiece?: PromotionPiece;
+  fen: string;
+  isCheck: boolean;
+  isCheckmate: boolean;
+  algebraic: string;
+}
+
+/** Piece symbols for figurine algebraic notation */
+const FIGURINE_SYMBOLS: Record<number, string> = {
+  [PieceType.King]: '\u2654',
+  [PieceType.Queen]: '\u2655',
+  [PieceType.Rook]: '\u2656',
+  [PieceType.Bishop]: '\u2657',
+  [PieceType.Knight]: '\u2658',
+};
+
+/** Convert algebraic notation to figurine algebraic notation (with piece symbols) */
+export function toFigurine(algebraic: string): string {
+  // Replace leading piece letter with unicode symbol
+  const pieceLetters: Record<string, string> = {
+    K: FIGURINE_SYMBOLS[PieceType.King],
+    Q: FIGURINE_SYMBOLS[PieceType.Queen],
+    R: FIGURINE_SYMBOLS[PieceType.Rook],
+    B: FIGURINE_SYMBOLS[PieceType.Bishop],
+    N: FIGURINE_SYMBOLS[PieceType.Knight],
+  };
+
+  if (algebraic.startsWith('O-')) return algebraic; // castling
+  const firstChar = algebraic[0];
+  if (pieceLetters[firstChar]) {
+    return pieceLetters[firstChar] + algebraic.slice(1);
+  }
+  return algebraic; // pawn moves don't have a piece letter
+}

@@ -9,6 +9,7 @@ import {
   MoveResult,
   ValidMoveResult,
   GameState,
+  HistoryEntry,
 } from '../engine/jsChessEngine';
 
 export interface ChessEngineAPI {
@@ -41,6 +42,9 @@ export interface ChessEngineAPI {
   getGameState: () => GameState;
   setPosition: (fen: string) => boolean;
   resetGame: () => void;
+  getHistory: () => HistoryEntry[];
+  getFenHistory: () => string[];
+  undoToFen: (fen: string, plyCount: number) => boolean;
 }
 
 export const useJSChessEngine = (): ChessEngineAPI => {
@@ -147,6 +151,25 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     [engine, triggerUpdate]
   );
 
+  const getHistory = useCallback((): HistoryEntry[] => {
+    return engine.getHistory();
+  }, [engine]);
+
+  const getFenHistory = useCallback((): string[] => {
+    return engine.getFenHistory();
+  }, [engine]);
+
+  const undoToFen = useCallback(
+    (fen: string, plyCount: number): boolean => {
+      const success = engine.undoToFen(fen, plyCount);
+      if (success) {
+        triggerUpdate();
+      }
+      return success;
+    },
+    [engine, triggerUpdate]
+  );
+
   // Trigger initial update to ensure React knows about the initial board state
   useEffect(() => {
     triggerUpdate();
@@ -165,5 +188,8 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getGameState,
     setPosition,
     resetGame,
+    getHistory,
+    getFenHistory,
+    undoToFen,
   };
 };
