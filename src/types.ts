@@ -32,6 +32,12 @@ export interface BoardMove {
   promotion?: PromotionPiece;
 }
 
+/** An arrow drawn on the board */
+export interface BoardArrow {
+  from: Square;
+  to: Square;
+}
+
 /** Map of valid moves: from-square -> list of to-squares */
 export type ValidMovesMap = Map<Square, Square[]>;
 

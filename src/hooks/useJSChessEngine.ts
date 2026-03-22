@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   JSChessEngine,
   Piece,
@@ -175,7 +175,7 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     triggerUpdate();
   }, [triggerUpdate]);
 
-  return {
+  return useMemo(() => ({
     getBoardState,
     getCurrentPlayer,
     getValidMoves,
@@ -191,5 +191,9 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     getHistory,
     getFenHistory,
     undoToFen,
-  };
+  }), [
+    getBoardState, getCurrentPlayer, getValidMoves, getPotentialMoves,
+    getPiece, makeMove, isValidMove, isKingInCheck, getLastMove,
+    getGameState, setPosition, resetGame, getHistory, getFenHistory, undoToFen,
+  ]);
 };

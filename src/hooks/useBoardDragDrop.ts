@@ -54,7 +54,6 @@ export function useBoardDragDrop(options: UseBoardDragDropOptions): UseBoardDrag
 
   const handleDrop = useCallback(
     (fromFile: number, fromRank: number, toFile: number, toRank: number) => {
-      // Decide normal move vs premove based on the dragged piece's color
       const piece = boardState[fromRank]?.[fromFile];
       const turnColorEnum = turnColor === 'white' ? Color.White : Color.Black;
       const isTurnPiece = piece && piece.color === turnColorEnum;
@@ -64,8 +63,9 @@ export function useBoardDragDrop(options: UseBoardDragDropOptions): UseBoardDrag
       } else if (!isTurnPiece && canPremove) {
         onPremoveAttempt(fromFile, fromRank, toFile, toRank);
       }
-      setSelectedSquare(null);
-      setValidMoves([]);
+      // Keep piece selected — if the drop was a valid move, handleMoveAttempt
+      // already clears selection. If invalid, selection stays so the user
+      // can click a valid destination instead.
     },
     [boardState, turnColor, canMove, canPremove, onMoveAttempt, onPremoveAttempt, setSelectedSquare, setValidMoves]
   );

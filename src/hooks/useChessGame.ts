@@ -302,6 +302,12 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGameRet
   const endGame = useCallback(
     (result: GameResult) => {
       setManualGameResult(result);
+      soundManager.ensureReady();
+      if (result.reason === 'resignation' || result.reason === 'checkmate') {
+        soundManager.playCheckmate();
+      } else {
+        soundManager.playDraw();
+      }
       forceUpdate();
       notifyPositionChange();
     },

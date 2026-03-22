@@ -25,6 +25,7 @@ export type {
   PromotionPiece,
   MoveSound,
   BoardMove,
+  BoardArrow,
   ValidMovesMap,
   GameEndOverlay,
 } from './types';

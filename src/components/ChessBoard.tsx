@@ -6,7 +6,7 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
-import { DndProvider, useDragLayer } from 'react-dnd';
+import { DndProvider, useDragLayer, useDragDropManager } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { Square } from './Square';
 import { ArrowOverlay } from './ArrowOverlay';
@@ -35,6 +35,7 @@ import {
   positionToSquare,
   fenToPieceArray,
   promotionPieceToPieceType,
+  BoardArrow,
 } from '../types';
 import type { Square as SquareNotation } from '../types';
 import styles from './ChessBoard.module.css';
@@ -45,16 +46,18 @@ import styles from './ChessBoard.module.css';
 
 interface CustomDragLayerProps {
   squareSize: number;
+  boardId: string;
 }
 
-const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
+const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize, boardId }) => {
   const { isDragging, item, currentOffset } = useDragLayer((monitor: unknown) => ({
-    item: (monitor as { getItem(): { piece?: Piece } }).getItem(),
+    item: (monitor as { getItem(): { piece?: Piece; boardId?: string } }).getItem(),
     currentOffset: (monitor as { getClientOffset(): { x: number; y: number } | null }).getClientOffset(),
     isDragging: (monitor as { isDragging(): boolean }).isDragging(),
   }));
 
-  if (!isDragging || !currentOffset) return null;
+  // Only render the ghost for drags originating from this board
+  if (!isDragging || !currentOffset || item?.boardId !== boardId) return null;
 
   const { x, y } = currentOffset;
   const piece = item?.piece;
@@ -78,11 +81,25 @@ const CustomDragLayer: React.FC<CustomDragLayerProps> = ({ squareSize }) => {
           src={pieceIcon}
           alt='chess piece'
           className={styles.dragPreviewPieceImg}
+          style={{
+            filter: `drop-shadow(${Math.max(1, squareSize * 0.03)}px ${Math.max(1, squareSize * 0.03)}px ${Math.max(2, squareSize * 0.06)}px rgba(0, 0, 0, 0.6))`,
+          }}
         />
       </div>
     </div>
   );
 };
+
+/** Provides a programmatic drag cancel function via ref. Must be inside DndProvider. */
+function DragCanceller({ cancelRef }: { cancelRef: React.MutableRefObject<() => void> }) {
+  const manager = useDragDropManager();
+  cancelRef.current = useCallback(() => {
+    if (manager.getMonitor().isDragging()) {
+      manager.dispatch({ type: 'dnd-core/END_DRAG' });
+    }
+  }, [manager]);
+  return null;
+}
 
 interface GameEndBadgeProps {
   kingPosition: Position;
@@ -276,12 +293,13 @@ export interface ChessBoardProps {
   /** Called to play a sound. If not provided and enableSounds is true, uses built-in sounds. */
   onPlaySound?: (sound: MoveSound) => void;
 
-  /** Board size in pixels (default: fills container) */
-  size?: number;
+  /** Board size in pixels, or "contain" to fit the largest square within the parent.
+   *  Default: sizes to parent width. */
+  size?: number | 'contain';
   /** Additional CSS class */
   className?: string;
   /** Inline styles (useful for CSS custom properties / theming) */
-  style?: React.CSSProperties;
+  style?: Record<string, string | number | undefined>;
   /** Show rank and file labels. Default: true */
   showCoordinates?: boolean;
   /** Enable move animations. Default: true */
@@ -290,11 +308,15 @@ export interface ChessBoardProps {
   animationDuration?: number;
   /** Enable built-in sound effects (used when onPlaySound is not provided). Default: true */
   enableSounds?: boolean;
-  /** Enable right-click arrows. Default: true */
-  enableArrows?: boolean;
-  /** Enable right-click square highlights. Default: true */
-  enableHighlights?: boolean;
-  /** Enable premove functionality. Default: true */
+  /** Arrows drawn on the board. Provide with onArrowsChange to enable right-click arrow drawing. */
+  arrows?: BoardArrow[];
+  /** Called when arrows change (added/removed via right-click drag). */
+  onArrowsChange?: (arrows: BoardArrow[]) => void;
+  /** Highlighted squares. Provide with onHighlightsChange to enable right-click square highlighting. */
+  highlights?: SquareNotation[];
+  /** Called when highlights change (toggled via right-click). */
+  onHighlightsChange?: (highlights: SquareNotation[]) => void;
+  /** Enable premove functionality. Default: false */
   enablePremoves?: boolean;
   /** Show valid move indicators (dots/rings) on the board. Default: true */
   showMoveIndicators?: boolean;
@@ -335,9 +357,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   enableAnimations = true,
   animationDuration = 300,
   enableSounds = true,
-  enableArrows = true,
-  enableHighlights = true,
-  enablePremoves = true,
+  arrows: arrowsProp,
+  onArrowsChange,
+  highlights: highlightsProp,
+  onHighlightsChange,
+  enablePremoves = false,
   showMoveIndicators = true,
   autoPromotionPiece,
   premoveCandidates: premoveCandidatesFn,
@@ -345,11 +369,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   blackMovable = true,
   readonly: readonlyMode = false,
 }) => {
-  const [boardSize, setBoardSize] = useState(size || 512);
+  const boardId = React.useId();
+  const [boardSize, setBoardSize] = useState(typeof size === 'number' ? size : 512);
   const boardRef = useRef<HTMLDivElement>(null);
   const prevPositionRef = useRef<string | null>(null);
   const prevBoardRef = useRef<(Piece | null)[][] | null>(null);
   const wasDragMoveRef = useRef(false);
+  // Tracks whether a drag is active — used to suppress click events that fire after drop
+  const dragActiveRef = useRef(false);
+  // Populated by DragCanceller component inside DndProvider context
+  const cancelDragRef = useRef<() => void>(() => {});
 
   const squareSize = boardSize / 8;
   const flipped = orientation === 'black';
@@ -436,6 +465,45 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   // UI State
   const uiState = useBoardUIState();
 
+  // Convert controlled arrows/highlights from algebraic to internal Position format.
+  const enableArrows = !!onArrowsChange;
+  const enableHighlights = !!onHighlightsChange;
+
+  const effectiveArrows = useMemo(() => {
+    if (!arrowsProp) return [];
+    return arrowsProp.map(a => ({
+      from: squareToPosition(a.from),
+      to: squareToPosition(a.to),
+    }));
+  }, [arrowsProp]);
+
+  const effectiveHighlights = useMemo(() => {
+    if (!highlightsProp) return [];
+    return highlightsProp.map(s => squareToPosition(s));
+  }, [highlightsProp]);
+
+  // Setters that convert internal Position back to algebraic and fire callbacks.
+  const setArrowsControlled: typeof uiState.setArrows = useCallback(
+    (value) => {
+      if (!onArrowsChange) return;
+      const newArrows = typeof value === 'function' ? value(effectiveArrows) : value;
+      onArrowsChange(newArrows.map(a => ({
+        from: positionToSquare(a.from),
+        to: positionToSquare(a.to),
+      })));
+    },
+    [onArrowsChange, effectiveArrows]
+  );
+
+  const setHighlightsControlled: typeof uiState.setHighlightedSquares = useCallback(
+    (value) => {
+      if (!onHighlightsChange) return;
+      const newHighlights = typeof value === 'function' ? value(effectiveHighlights) : value;
+      onHighlightsChange(newHighlights.map(p => positionToSquare(p)));
+    },
+    [onHighlightsChange, effectiveHighlights]
+  );
+
   // Animation system
   const animations = usePieceAnimations({
     enableAnimations,
@@ -499,9 +567,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       }
     }
 
-    // Clear selection on any position change
+    // When position changes, update valid moves for the selected piece
+    // instead of clearing selection (preserves user's selection during opponent moves)
     if (prevPositionRef.current && prevPositionRef.current !== position) {
-      uiState.clearSelection();
+      if (uiState.selectedSquare) {
+        const newMoves = validMovesForSquare(
+          uiState.selectedSquare.file,
+          uiState.selectedSquare.rank
+        );
+        uiState.setValidMoves(newMoves);
+      }
     }
 
     wasDragMoveRef.current = false;
@@ -510,15 +585,21 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   }, [position, lastMove, enableAnimations, boardState, animations, uiState]);
 
   // Handle responsive sizing
+  // - No size prop: size to parent width (most common layout)
+  // - size="contain": fit the largest square within parent (for full-viewport layouts)
+  // - size={number}: fixed pixel size, no observer
   useEffect(() => {
-    if (size) return;
+    if (typeof size === 'number') return;
+
+    const useContain = size === 'contain';
 
     const handleResize = () => {
       if (boardRef.current && boardRef.current.parentElement) {
         const parentWidth = boardRef.current.parentElement.clientWidth;
-        const parentHeight = boardRef.current.parentElement.clientHeight;
-        const availableSize = Math.min(parentWidth, parentHeight) - 20;
-        setBoardSize(Math.max(200, availableSize));
+        const available = useContain
+          ? Math.min(parentWidth, boardRef.current.parentElement.clientHeight) - 20
+          : parentWidth;
+        setBoardSize(Math.max(200, available));
       }
     };
 
@@ -847,8 +928,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     validMovesForSquare,
     setSelectedSquare: uiState.setSelectedSquare,
     setValidMoves: uiState.setValidMoves,
-    setArrows: uiState.setArrows,
-    setHighlightedSquares: uiState.setHighlightedSquares,
+    setArrows: setArrowsControlled,
+    setHighlightedSquares: setHighlightsControlled,
     onMoveAttempt: handleMoveAttempt,
     onPremoveAttempt: handlePremoveAttempt,
     canMove,
@@ -864,8 +945,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     selectedSquare: uiState.selectedSquare,
     setSelectedSquare: uiState.setSelectedSquare,
     setValidMoves: uiState.setValidMoves,
-    setArrows: uiState.setArrows,
-    setHighlightedSquares: uiState.setHighlightedSquares,
+    setArrows: setArrowsControlled,
+    setHighlightedSquares: setHighlightsControlled,
     arrowStart: uiState.arrowStart,
     setArrowStart: uiState.setArrowStart,
     onMoveAttempt: handleMoveAttempt,
@@ -951,8 +1032,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
   const isHighlighted = useCallback(
     (file: number, rank: number) =>
-      uiState.highlightedSquares.some(sq => sq.file === file && sq.rank === rank),
-    [uiState.highlightedSquares]
+      effectiveHighlights.some(sq => sq.file === file && sq.rank === rank),
+    [effectiveHighlights]
   );
 
   // Check highlight from props
@@ -998,6 +1079,19 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     return kings;
   }, [boardState]);
 
+  // Determine if a piece at a given square is draggable
+  const isPieceDraggable = useCallback(
+    (file: number, rank: number): boolean => {
+      const piece = visualBoardState[rank]?.[file];
+      if (!piece) return false;
+      const pieceColor: PlayerColor = piece.color === Color.White ? 'white' : 'black';
+      if (movableColor !== 'both' && movableColor !== pieceColor) return false;
+      const isTurn = piece.color === turnColorEnum;
+      return (isTurn && canMove) || (!isTurn && canPremove);
+    },
+    [visualBoardState, movableColor, turnColorEnum, canMove, canPremove]
+  );
+
   // Prepare display board (apply flipping)
   let displayBoard = visualBoardState.map(row => [...row]);
   // Convert from rank-indexed to display-indexed (rank 7 at top)
@@ -1009,7 +1103,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
   return (
     <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
-      <CustomDragLayer squareSize={squareSize} />
+      <CustomDragLayer squareSize={squareSize} boardId={boardId} />
+      <DragCanceller cancelRef={cancelDragRef} />
       <div
         ref={boardRef}
         className={`${styles.chessBoard}${className ? ` ${className}` : ''}`}
@@ -1045,12 +1140,33 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                 isHighlighted={isHighlighted(actualFile, actualRank)}
                 isPreMove={isPreMoveSquare(actualFile, actualRank)}
                 isKingInCheck={isKingInCheck(actualFile, actualRank)}
-                onSquareClick={clickHandlers.handleSquareClick}
+                onSquareClick={(f, r) => {
+                  if (dragActiveRef.current) return;
+                  clickHandlers.handleSquareClick(f, r);
+                }}
                 onDrop={dragDropHandlers.handleDrop}
-                onDragStart={dragDropHandlers.handleDragStart}
-                onDragEnd={dragDropHandlers.handleDragEnd}
-                onRightMouseDown={clickHandlers.handleRightMouseDown}
-                onRightMouseUp={clickHandlers.handleRightMouseUp}
+                onDragStart={(f, r) => {
+                  dragActiveRef.current = true;
+                  dragDropHandlers.handleDragStart(f, r);
+                }}
+                onDragEnd={(f, r) => {
+                  dragDropHandlers.handleDragEnd(f, r);
+                  // Clear on next frame — after any click events that fire on mouseup
+                  requestAnimationFrame(() => { dragActiveRef.current = false; });
+                }}
+                onRightMouseDown={(f, r) => {
+                  if (dragActiveRef.current) {
+                    cancelDragRef.current();
+                    return;
+                  }
+                  clickHandlers.handleRightMouseDown(f, r);
+                }}
+                onRightMouseUp={(f, r) => {
+                  if (dragActiveRef.current) return;
+                  clickHandlers.handleRightMouseUp(f, r);
+                }}
+                boardId={boardId}
+                draggable={isPieceDraggable(actualFile, actualRank)}
               />
             );
           })
@@ -1058,7 +1174,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
         {/* Arrow overlay */}
         <ArrowOverlay
-          arrows={uiState.arrows}
+          arrows={effectiveArrows}
           boardSize={boardSize}
           squareSize={squareSize}
           flipped={flipped}

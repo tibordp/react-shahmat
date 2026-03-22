@@ -33,6 +33,8 @@ export interface SquareProps {
   onDragEnd: (file: number, rank: number) => void;
   onRightMouseDown: (file: number, rank: number) => void;
   onRightMouseUp: (file: number, rank: number) => void;
+  boardId: string;
+  draggable: boolean;
 }
 
 export interface DragItem {
@@ -40,6 +42,7 @@ export interface DragItem {
   file: number;
   rank: number;
   piece: Piece;
+  boardId: string;
 }
 
 export const Square: React.FC<SquareProps> = ({
@@ -64,19 +67,21 @@ export const Square: React.FC<SquareProps> = ({
   onRightMouseUp,
   flipped,
   showCoordinates,
+  boardId,
+  draggable,
 }) => {
   const squareRef = useRef<HTMLDivElement>(null);
   const [{ isDragging }, drag, preview] = useDrag(
     () => ({
       type: 'piece',
       item: () => {
-        if (piece) {
+        if (piece && draggable) {
           onDragStart(file, rank);
-          return { type: 'piece', file, rank, piece };
+          return { type: 'piece', file, rank, piece, boardId };
         }
         return null;
       },
-      canDrag: () => !!piece,
+      canDrag: () => !!piece && draggable,
       end: () => {
         onDragEnd(file, rank);
       },
@@ -84,7 +89,7 @@ export const Square: React.FC<SquareProps> = ({
         isDragging: monitor.isDragging(),
       }),
     }),
-    [piece, file, rank, onDragStart, onDragEnd]
+    [piece, file, rank, onDragStart, onDragEnd, boardId, draggable]
   );
 
   // Setup drag preview to prevent native drag behavior
