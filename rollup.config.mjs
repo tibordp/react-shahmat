@@ -45,7 +45,7 @@ export function audiospritePlugin(opts = {}) {
   return {
     name: 'audiosprite',
     async buildStart() {
-      const oggs = fs.globSync('src/sounds/*.ogg');
+      const oggs = fs.readdirSync('src/sounds').filter(f => f.endsWith('.ogg')).map(f => `src/sounds/${f}`);
       const tempDir = fs.mkdtempSync(`${tmpdir()}/audiosprite-`);
 
       const { resources, spritemap } = await new Promise((resolve, reject) => audiosprite(oggs, {
