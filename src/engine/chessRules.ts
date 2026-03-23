@@ -103,7 +103,7 @@ export interface ChessError {
   originalError?: Error;
 }
 
-export class JSChessEngine {
+export class ChessRules {
   private board: (Piece | null)[][];
   private currentPlayer: Color;
   private enPassantTarget: Position | null; // Square where en passant capture can happen
@@ -1214,7 +1214,7 @@ export class JSChessEngine {
     prevFen: string
   ): string {
     // Parse the previous position to find other pieces of the same type that could reach the target
-    const tempEngine = new JSChessEngine();
+    const tempEngine = new ChessRules();
     tempEngine.setPosition(prevFen);
     const board = tempEngine.board;
 

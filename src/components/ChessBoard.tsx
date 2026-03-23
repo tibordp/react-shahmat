@@ -16,7 +16,7 @@ import { usePieceAnimations } from '../hooks/usePieceAnimations';
 import { useBoardDragDrop } from '../hooks/useBoardDragDrop';
 import { useBoardClicks } from '../hooks/useBoardClicks';
 import { useBoardUIState } from '../hooks/useBoardUIState';
-import { Piece, Position, PieceType, Color } from '../engine/jsChessEngine';
+import { Piece, Position, PieceType, Color } from '../engine/chessRules';
 import { getPieceIcon, whiteKing, defaultPieceSet } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
 import {

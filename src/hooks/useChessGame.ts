@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { PieceType, GameState, GameResult } from '../engine/jsChessEngine';
-import { ChessEngineAPI } from './useJSChessEngine';
-import { useJSChessEngine } from './useJSChessEngine';
+import { PieceType, GameState, GameResult } from '../engine/chessRules';
+import { ChessRulesAPI } from './useChessRules';
+import { useChessRules } from './useChessRules';
 import { soundManager, SoundManager } from '../utils/soundManager';
 import {
   BoardMove,
@@ -78,8 +78,8 @@ export interface UseChessGameReturn {
   undo: (toPly?: number) => boolean;
   /** End the game manually (resignation, draw agreement, timeout/flag) */
   endGame: (result: GameResult) => void;
-  /** Direct access to the chess engine API */
-  engine: ChessEngineAPI;
+  /** Direct access to the chess rules API */
+  rules: ChessRulesAPI;
 }
 
 export function useChessGame(
@@ -145,7 +145,7 @@ export function useChessGame(
     [enableSounds, onSound, sm]
   );
 
-  const chessEngine = useJSChessEngine();
+  const chessEngine = useChessRules();
 
   // Track last move for highlighting and animation
   const [lastMove, setLastMove] = useState<BoardMove | undefined>(undefined);
@@ -488,6 +488,6 @@ export function useChessGame(
     history,
     undo,
     endGame,
-    engine: chessEngine,
+    rules: chessEngine,
   };
 }

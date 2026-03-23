@@ -832,9 +832,9 @@ function useHistoryNavigation(game: ReturnType<typeof useChessGame>) {
 
   const viewedPosition = React.useMemo(() => {
     if (!isViewingHistory) return undefined;
-    if (viewingPly === 0) return game.engine.getFenHistory()[0];
+    if (viewingPly === 0) return game.rules.getFenHistory()[0];
     return game.history[viewingPly - 1]?.fen;
-  }, [isViewingHistory, viewingPly, game.history, game.engine]);
+  }, [isViewingHistory, viewingPly, game.history, game.rules]);
 
   // Override board props to show the historical position in readonly mode
   const boardPropsOverride = isViewingHistory

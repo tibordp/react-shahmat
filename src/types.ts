@@ -5,7 +5,7 @@ import {
   Position,
   Move,
   GameState,
-} from './engine/jsChessEngine';
+} from './engine/chessRules';
 
 // ============================================================================
 // Public API Types
@@ -255,8 +255,8 @@ export type {
   ChessError,
   HistoryEntry,
   MoveType,
-} from './engine/jsChessEngine';
-export { PieceType, Color } from './engine/jsChessEngine';
+} from './engine/chessRules';
+export { PieceType, Color } from './engine/chessRules';
 
 /** Public-facing history entry with algebraic notation */
 export interface GameHistoryEntry {

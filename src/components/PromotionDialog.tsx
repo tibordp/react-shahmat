@@ -1,5 +1,5 @@
 import React from 'react';
-import { Piece, PieceType, Color } from '../engine/jsChessEngine';
+import { Piece, PieceType, Color } from '../engine/chessRules';
 import { getPieceIconByType } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
 

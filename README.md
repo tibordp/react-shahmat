@@ -1,6 +1,6 @@
 # react-shahmat
 
-A controlled React chess board component with smooth animations, sound effects, Chess.com-style premoves, and a built-in engine for quick prototyping.
+A controlled React chess board component with smooth animations, sound effects, Chess.com-style premoves, and a built-in chess rules for quick prototyping.
 
 **[Live Demo](https://tibordp.github.io/react-shahmat/)** | **[npm](https://www.npmjs.com/package/react-shahmat)**
 
@@ -59,7 +59,7 @@ function ServerBoard() {
 ## Features
 
 - **Controlled component** -- you own game state, the board is a pure view layer
-- **Built-in engine** (optional) -- `useChessGame` hook for quick setup with full game logic
+- **Built-in game logic** (optional) -- `useChessGame` hook for quick setup with full game logic
 - **Premoves** -- Chess.com-style premove queueing with stacking support (off by default)
 - **Animations** -- smooth piece movement with configurable easing and duration
 - **Sound effects** -- move, capture, check, checkmate, promotion, premove sounds via `useChessGame` or custom handler
@@ -116,7 +116,7 @@ All props at a glance:
 
 ## useChessGame
 
-Wraps the built-in chess engine and produces all the props `ChessBoard` needs:
+Wraps the built-in chess rules and produces all the props `ChessBoard` needs:
 
 ```tsx
 const game = useChessGame({
@@ -142,7 +142,7 @@ game.history;                      // GameHistoryEntry[]
 game.undo();                       // undo last move
 game.undo(toPly);                  // roll back to specific ply
 game.endGame(result);              // resign, draw, timeout
-game.engine;                       // direct engine access
+game.rules;                       // direct rules access
 ```
 
 ## Theming
@@ -242,7 +242,7 @@ Conversion utilities are also exported: `squareToPosition`, `positionToSquare`, 
 
 ## Examples
 
-See the **[live demo](https://tibordp.github.io/react-shahmat/)** for interactive examples including two-player boards, custom themes, custom pieces, puzzles, arrows/highlights, premoves, history navigation, and playing against an engine.
+See the **[live demo](https://tibordp.github.io/react-shahmat/)** for interactive examples including two-player boards, custom themes, custom pieces, puzzles, arrows/highlights, premoves, history navigation, and playing against Stockfish.
 
 ## License
 

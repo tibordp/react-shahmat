@@ -172,7 +172,7 @@ export default function Examples() {
         <h1 className='hero-title'>react-shahmat</h1>
         <p className='hero-tagline'>
           A controlled React chess board component with animations, sound
-          effects, premoves, and a built-in engine.
+          effects, premoves, and a built-in game logic.
         </p>
         <div className='hero-install'>
           <code>npm install react-shahmat</code>

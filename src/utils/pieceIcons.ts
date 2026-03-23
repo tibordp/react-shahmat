@@ -1,4 +1,4 @@
-import { Piece, Color, PieceType } from '../engine/jsChessEngine';
+import { Piece, Color, PieceType } from '../engine/chessRules';
 import type { PieceSet } from '../types';
 import { pieceKey, pieceKeyByType } from '../types';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Piece, Position } from '../engine/jsChessEngine';
+import { Piece, Position } from '../engine/chessRules';
 import { AnimationState } from '../hooks/usePieceAnimations';
 import { getPieceIcon } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';

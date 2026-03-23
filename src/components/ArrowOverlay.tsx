@@ -1,5 +1,5 @@
 import React from 'react';
-import { Position } from '../engine/jsChessEngine';
+import { Position } from '../engine/chessRules';
 
 import styles from './ChessBoard.module.css';
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  JSChessEngine,
+  ChessRules,
   Piece,
   Position,
   PieceType,
@@ -10,9 +10,9 @@ import {
   ValidMoveResult,
   GameState,
   HistoryEntry,
-} from '../engine/jsChessEngine';
+} from '../engine/chessRules';
 
-export interface ChessEngineAPI {
+export interface ChessRulesAPI {
   getBoardState: () => (Piece | null)[][];
   getCurrentPlayer: () => Color;
   getValidMoves: (from: Position) => Position[];
@@ -47,8 +47,8 @@ export interface ChessEngineAPI {
   undoToFen: (fen: string, plyCount: number) => boolean;
 }
 
-export const useJSChessEngine = (): ChessEngineAPI => {
-  const [engine] = useState(() => new JSChessEngine());
+export const useChessRules = (): ChessRulesAPI => {
+  const [engine] = useState(() => new ChessRules());
   const [, forceUpdate] = useState({});
 
   const triggerUpdate = useCallback(() => {

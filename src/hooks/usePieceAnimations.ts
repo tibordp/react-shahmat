@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Piece, Position } from '../engine/jsChessEngine';
+import { Piece, Position } from '../engine/chessRules';
 
 export interface AnimatingPiece {
   piece: Piece;

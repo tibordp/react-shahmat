@@ -9,14 +9,14 @@ export { Square } from './components/Square';
 
 // Hooks
 export { useChessGame } from './hooks/useChessGame';
-export { useJSChessEngine } from './hooks/useJSChessEngine';
+export { useChessRules } from './hooks/useChessRules';
 export { useBoardClicks } from './hooks/useBoardClicks';
 export { useBoardDragDrop } from './hooks/useBoardDragDrop';
 export { useBoardUIState } from './hooks/useBoardUIState';
 export { usePieceAnimations } from './hooks/usePieceAnimations';
 
 // Engine
-export { JSChessEngine } from './engine/jsChessEngine';
+export { ChessRules } from './engine/chessRules';
 
 // Types - public API
 export type {

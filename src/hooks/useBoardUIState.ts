@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Position, Color } from '../engine/jsChessEngine';
+import { Position, Color } from '../engine/chessRules';
 import { BoardMove } from '../types';
 
 interface Arrow {

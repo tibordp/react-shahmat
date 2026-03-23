@@ -15,7 +15,7 @@ function HistoryNavigation() {
   const viewedEntry = viewPly !== null && viewPly > 0
     ? game.history[viewPly - 1] : undefined;
   const viewedFen = viewPly === 0
-    ? game.engine.getFenHistory()[0]
+    ? game.rules.getFenHistory()[0]
     : viewedEntry?.fen;
 
   return (
@@ -67,7 +67,7 @@ export default function HistoryNavigation() {
   const viewedEntry =
     viewPly !== null && viewPly > 0 ? game.history[viewPly - 1] : undefined;
   const viewedFen =
-    viewPly === 0 ? game.engine.getFenHistory()[0] : viewedEntry?.fen;
+    viewPly === 0 ? game.rules.getFenHistory()[0] : viewedEntry?.fen;
 
   const boardProps =
     viewPly !== null
