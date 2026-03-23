@@ -78,6 +78,10 @@ export interface UseChessGameReturn {
   undo: (toPly?: number) => boolean;
   /** End the game manually (resignation, draw agreement, timeout/flag) */
   endGame: (result: GameResult) => void;
+  /** Export the game as a PGN string */
+  toPGN: (headers?: Record<string, string>) => string;
+  /** Load a game from a PGN string. Returns true if successful. */
+  loadPGN: (pgn: string) => boolean;
   /** Direct access to the chess rules API */
   rules: ChessRulesAPI;
 }
@@ -452,6 +456,118 @@ export function useChessGame(
     [chessEngine, forceUpdate, notifyPositionChange]
   );
 
+  // Public API: export as PGN
+  const toPGN = useCallback(
+    (headers?: Record<string, string>): string => {
+      const h = {
+        Event: '?',
+        Site: '?',
+        Date: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
+        Round: '?',
+        White: '?',
+        Black: '?',
+        Result: '*',
+        ...headers,
+      };
+
+      const state = chessEngine.getGameState();
+      if (state.isGameOver && state.result) {
+        if (state.result.reason === 'checkmate') {
+          h.Result = state.result.winner === 0 ? '1-0' : '0-1';
+        } else if (state.result.reason === 'stalemate') {
+          h.Result = '1/2-1/2';
+        }
+      }
+      if (manualGameResultRef.current) {
+        const r = manualGameResultRef.current;
+        if (r.reason === 'resignation' && r.winner !== undefined) {
+          h.Result = r.winner === 0 ? '1-0' : '0-1';
+        } else if (r.reason === 'draw' || r.reason === 'stalemate' ||
+                   r.reason === 'repetition' || r.reason === 'fifty_moves' ||
+                   r.reason === 'insufficient_material') {
+          h.Result = '1/2-1/2';
+        }
+      }
+
+      const headerStr = Object.entries(h)
+        .map(([k, v]) => `[${k} "${v}"]`)
+        .join('\n');
+
+      const entries = chessEngine.getHistory();
+      let moveText = '';
+      for (let i = 0; i < entries.length; i++) {
+        if (i % 2 === 0) moveText += `${Math.floor(i / 2) + 1}. `;
+        moveText += entries[i].algebraic + ' ';
+      }
+      moveText += h.Result;
+
+      return headerStr + '\n\n' + moveText.trim();
+    },
+    [chessEngine]
+  );
+
+  // Public API: load from PGN
+  const loadPGN = useCallback(
+    (pgn: string): boolean => {
+      // Strip headers
+      const lines = pgn.split('\n');
+      const moveLines = lines.filter(l => !l.startsWith('[') && l.trim() !== '');
+      const moveText = moveLines.join(' ');
+
+      // Extract individual moves (strip move numbers, results, comments)
+      const tokens = moveText
+        .replace(/\{[^}]*\}/g, '') // remove comments
+        .replace(/\([^)]*\)/g, '') // remove variations
+        .split(/\s+/)
+        .filter(t =>
+          t &&
+          !t.match(/^\d+\.+$/) && // move numbers
+          t !== '1-0' && t !== '0-1' && t !== '1/2-1/2' && t !== '*'
+        );
+
+      // Reset and replay
+      chessEngine.resetGame();
+
+      for (const token of tokens) {
+        const move = chessEngine.parseSAN(token);
+        if (!move) {
+          // Parse failed — reset and return false
+          chessEngine.resetGame();
+          setLastMove(undefined);
+          setManualGameResult(null);
+          forceUpdate();
+          return false;
+        }
+        const result = chessEngine.makeMove(
+          { file: move.fromFile, rank: move.fromRank },
+          { file: move.toFile, rank: move.toRank },
+          move.promotionPiece
+        );
+        if (!result.success) {
+          chessEngine.resetGame();
+          setLastMove(undefined);
+          setManualGameResult(null);
+          forceUpdate();
+          return false;
+        }
+      }
+
+      // Update state to reflect loaded game
+      const hist = chessEngine.getHistory();
+      if (hist.length > 0) {
+        const last = hist[hist.length - 1];
+        setLastMove(moveToBoardMove(last.move));
+      } else {
+        setLastMove(undefined);
+      }
+      setManualGameResult(null);
+      forceUpdate();
+      notifyPositionChange();
+      return true;
+    },
+    [chessEngine, forceUpdate, notifyPositionChange]
+  );
+
   const boardProps = useMemo(
     () => ({
       position: gameState.fen,
@@ -488,6 +604,8 @@ export function useChessGame(
     history,
     undo,
     endGame,
+    toPGN,
+    loadPGN,
     rules: chessEngine,
   };
 }

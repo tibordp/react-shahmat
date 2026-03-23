@@ -1334,6 +1334,89 @@ export class ChessRules {
     return false;
   }
 
+  /**
+   * Parse a SAN (Standard Algebraic Notation) move and find the matching legal move.
+   * Returns the matching Move or null if no legal move matches.
+   */
+  public parseSAN(san: string): Move | null {
+    const FILE_CHARS = 'abcdefgh';
+    const cleaned = san.replace(/[+#!?]+$/, ''); // strip check/mate/annotation markers
+
+    // Castling
+    if (cleaned === 'O-O' || cleaned === '0-0') {
+      const rank = this.currentPlayer === Color.White ? 0 : 7;
+      return this.isValidMove({ file: 4, rank }, { file: 6, rank }).valid
+        ? { fromFile: 4, fromRank: rank, toFile: 6, toRank: rank }
+        : null;
+    }
+    if (cleaned === 'O-O-O' || cleaned === '0-0-0') {
+      const rank = this.currentPlayer === Color.White ? 0 : 7;
+      return this.isValidMove({ file: 4, rank }, { file: 2, rank }).valid
+        ? { fromFile: 4, fromRank: rank, toFile: 2, toRank: rank }
+        : null;
+    }
+
+    // Parse promotion (e.g., "e8=Q" or "exd8=Q")
+    let promotionPiece: PieceType | undefined;
+    let rest = cleaned;
+    const promoMatch = rest.match(/=([QRBN])$/);
+    if (promoMatch) {
+      const promoMap: Record<string, PieceType> = {
+        Q: PieceType.Queen, R: PieceType.Rook, B: PieceType.Bishop, N: PieceType.Knight,
+      };
+      promotionPiece = promoMap[promoMatch[1]];
+      rest = rest.slice(0, -2);
+    }
+
+    // Remove capture indicator
+    rest = rest.replace('x', '');
+
+    // Determine piece type
+    let pieceType = PieceType.Pawn;
+    if (rest.length > 0 && 'KQRBN'.includes(rest[0])) {
+      const pieceMap: Record<string, PieceType> = {
+        K: PieceType.King, Q: PieceType.Queen, R: PieceType.Rook,
+        B: PieceType.Bishop, N: PieceType.Knight,
+      };
+      pieceType = pieceMap[rest[0]];
+      rest = rest.slice(1);
+    }
+
+    // Last two characters are the destination square
+    if (rest.length < 2) return null;
+    const toFile = FILE_CHARS.indexOf(rest[rest.length - 2]);
+    const toRank = parseInt(rest[rest.length - 1]) - 1;
+    if (toFile < 0 || toRank < 0 || toRank > 7) return null;
+
+    // Disambiguation (remaining characters before destination)
+    const disambig = rest.slice(0, -2);
+    let disambigFile = -1;
+    let disambigRank = -1;
+    for (const ch of disambig) {
+      if (FILE_CHARS.includes(ch)) disambigFile = FILE_CHARS.indexOf(ch);
+      else if (ch >= '1' && ch <= '8') disambigRank = parseInt(ch) - 1;
+    }
+
+    // Find matching legal move
+    const to = { file: toFile, rank: toRank };
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (!piece || piece.color !== this.currentPlayer || piece.type !== pieceType) continue;
+        if (disambigFile >= 0 && file !== disambigFile) continue;
+        if (disambigRank >= 0 && rank !== disambigRank) continue;
+
+        const from = { file, rank };
+        const validation = this.isValidMove(from, to, promotionPiece);
+        if (validation.valid) {
+          return { fromFile: file, fromRank: rank, toFile: toFile, toRank: toRank, promotionPiece };
+        }
+      }
+    }
+
+    return null;
+  }
+
   public getGameState(): GameState {
     // Get all valid moves for current player
     const validMoves: Move[] = [];

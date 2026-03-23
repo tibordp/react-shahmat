@@ -49,6 +49,27 @@ const TEST_POSITIONS = [
 const AI_MOVE_DELAY_MS = 500;
 
 // ============================================================================
+// Section — collapsible settings section
+// ============================================================================
+
+function Section({ title, defaultOpen = false, children }: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div className='settings-section'>
+      <button className='controls-section-title' onClick={() => setOpen(!open)}>
+        <span>{title}</span>
+        <span className='section-chevron'>{open ? '\u25B4' : '\u25BE'}</span>
+      </button>
+      {open && <div className='section-content'>{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
 // Toggle — reusable checkbox control
 // ============================================================================
 
@@ -130,11 +151,20 @@ function MoveHistory({
   history,
   viewingPly,
   onNavigate,
+  onExportPGN,
+  onImportPGN,
+  turnColor,
 }: {
   history: GameHistoryEntry[];
   viewingPly: number | null;
   onNavigate: (ply: number | null) => void;
+  turnColor: 'white' | 'black';
+  onExportPGN: () => void;
+  onImportPGN: (pgn: string) => boolean;
 }) {
+  const [showImport, setShowImport] = React.useState(false);
+  const [pgnInput, setPgnInput] = React.useState('');
+  const [mobileExpanded, setMobileExpanded] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to latest move when viewing live
@@ -170,8 +200,14 @@ function MoveHistory({
   }
 
   return (
-    <div className='move-history'>
-      <div className='move-history-header'>Moves</div>
+    <div className={`move-history ${mobileExpanded ? 'mobile-expanded' : ''}`}>
+      <button className='move-history-header' onClick={() => setMobileExpanded(!mobileExpanded)}>
+        <span>
+          <span className={`turn-indicator ${turnColor}`} />
+          Moves
+        </span>
+        <span className='mobile-expand-chevron'>{mobileExpanded ? '\u25BE' : '\u25B4'}</span>
+      </button>
 
       <div className='move-history-list' ref={listRef}>
         {movePairs.length === 0 ? (
@@ -242,6 +278,39 @@ function MoveHistory({
           onClick={() => onNavigate(null)}
         />
       </div>
+
+      <div className='pgn-actions'>
+        <button className='pgn-button' onClick={onExportPGN} title='Copy PGN'>
+          Export
+        </button>
+        <button className='pgn-button' onClick={() => setShowImport(!showImport)} title='Load PGN'>
+          Import
+        </button>
+      </div>
+
+      {showImport && (
+        <div className='pgn-import'>
+          <textarea
+            className='pgn-input'
+            value={pgnInput}
+            onChange={e => setPgnInput(e.target.value)}
+            placeholder='Paste PGN here...'
+            rows={4}
+          />
+          <button
+            className='pgn-button'
+            disabled={!pgnInput.trim()}
+            onClick={() => {
+              if (onImportPGN(pgnInput.trim())) {
+                setPgnInput('');
+                setShowImport(false);
+              }
+            }}
+          >
+            Load
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -289,8 +358,8 @@ function SettingsPanel({
 
   return (
     <div className={`controls-panel ${isOpen ? 'controls-open' : ''}`}>
-      {/* ---- Game actions ---- */}
-      <div className='controls-section-title'>Game</div>
+      {/* ---- Game actions (always visible) ---- */}
+      <div className='controls-section-label'>Game</div>
 
       <div className='control-group'>
         <button className='control-button reset-button' onClick={s.onReset}>
@@ -391,161 +460,73 @@ function SettingsPanel({
         ]}
       />
 
-      {/* ---- Draw rules ---- */}
-      <div className='controls-section-title'>Draw Rules</div>
+      <Section title='Draw Rules'>
+        <Select id='repetitionRule' label='Repetition' value={s.repetitionRule}
+          onChange={s.setRepetitionRule}
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: '3', label: 'Threefold' },
+            { value: '5', label: 'Fivefold (FIDE)' },
+          ]} />
+        <Select id='moveRule' label='Move rule' value={s.moveRule}
+          onChange={s.setMoveRule}
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: '50', label: '50-move' },
+            { value: '75', label: '75-move (FIDE)' },
+          ]} />
+        <Toggle id='insufficientMaterial' label='Insufficient material'
+          checked={s.insufficientMaterial} onChange={s.setInsufficientMaterial} />
+      </Section>
 
-      <Select
-        id='repetitionRule'
-        label='Repetition'
-        value={s.repetitionRule}
-        onChange={s.setRepetitionRule}
-        options={[
-          { value: 'off', label: 'Off' },
-          { value: '3', label: 'Threefold' },
-          { value: '5', label: 'Fivefold (FIDE)' },
-        ]}
-      />
-
-      <Select
-        id='moveRule'
-        label='Move rule'
-        value={s.moveRule}
-        onChange={s.setMoveRule}
-        options={[
-          { value: 'off', label: 'Off' },
-          { value: '50', label: '50-move' },
-          { value: '75', label: '75-move (FIDE)' },
-        ]}
-      />
-
-      <Toggle
-        id='insufficientMaterial'
-        label='Insufficient material'
-        checked={s.insufficientMaterial}
-        onChange={s.setInsufficientMaterial}
-      />
-
-      {/* ---- Board appearance ---- */}
-      <div className='controls-section-title'>Board</div>
-
-      <Select
-        id='boardTheme'
-        label='Theme'
-        value={s.boardTheme}
-        onChange={v => s.setBoardTheme(v as ThemeKey)}
-        options={Object.entries(BOARD_THEMES).map(([key, t]) => ({
-          value: key,
-          label: t.name,
-        }))}
-      />
-
-      <div className='control-group'>
-        <label>Orientation</label>
-        <button
-          className='control-button flip-button'
-          onClick={() =>
-            s.setOrientation(prev => (prev === 'white' ? 'black' : 'white'))
-          }
-        >
-          {s.orientation === 'white' ? 'White' : 'Black'}
-        </button>
-      </div>
-
-      <Toggle
-        id='showCoordinates'
-        label='Coordinates'
-        checked={s.showCoordinates}
-        onChange={s.setShowCoordinates}
-      />
-      <Toggle
-        id='showMoveIndicators'
-        label='Move indicators'
-        checked={s.showMoveIndicators}
-        onChange={s.setShowMoveIndicators}
-      />
-      <Toggle
-        id='enablePreMoves'
-        label='Pre-moves'
-        checked={s.enablePreMoves}
-        onChange={s.setEnablePreMoves}
-      />
-      <Toggle
-        id='enableAnimations'
-        label='Animations'
-        checked={s.enableAnimations}
-        onChange={s.setEnableAnimations}
-      />
-
-      <Select
-        id='animationDuration'
-        label='Anim. speed'
-        value={s.animationDuration}
-        onChange={s.setAnimationDuration}
-        disabled={!s.enableAnimations}
-        options={[
-          { value: 100, label: '100ms' },
-          { value: 200, label: '200ms' },
-          { value: 300, label: '300ms' },
-          { value: 500, label: '500ms' },
-          { value: 800, label: '800ms' },
-        ]}
-      />
-
-      <Toggle
-        id='enableSounds'
-        label='Sounds'
-        checked={s.enableSounds}
-        onChange={s.setEnableSounds}
-      />
-      <Toggle
-        id='enableArrows'
-        label='Arrows'
-        checked={s.enableArrows}
-        onChange={s.setEnableArrows}
-      />
-      <Toggle
-        id='enableHighlights'
-        label='Highlights'
-        checked={s.enableHighlights}
-        onChange={s.setEnableHighlights}
-      />
-
-      {/* ---- Position loading ---- */}
-      <div className='controls-section-title'>Position</div>
-
-      <div className='control-group fen-group'>
-        <label htmlFor='fenInput'>Load Position:</label>
-        <input
-          id='fenInput'
-          type='text'
-          value={s.fenInput}
-          onChange={e => s.setFenInput(e.target.value)}
-          placeholder='Enter FEN string...'
-          className='fen-input'
-        />
-        <button
-          className='control-button load-button'
-          onClick={s.onLoadFen}
-          disabled={!s.fenInput.trim()}
-        >
-          Load
-        </button>
-      </div>
-
-      <div className='control-group'>
-        <label>Test Positions:</label>
-        <div className='preset-buttons'>
-          {TEST_POSITIONS.map(pos => (
-            <button
-              key={pos.label}
-              className='preset-button'
-              onClick={() => s.onLoadPreset(pos.fen)}
-            >
-              {pos.label}
-            </button>
-          ))}
+      <Section title='Board' defaultOpen>
+        <Select id='boardTheme' label='Theme' value={s.boardTheme}
+          onChange={v => s.setBoardTheme(v as ThemeKey)}
+          options={Object.entries(BOARD_THEMES).map(([key, t]) => ({ value: key, label: t.name }))} />
+        <div className='control-group'>
+          <label>Orientation</label>
+          <button className='control-button flip-button'
+            onClick={() => s.setOrientation(prev => prev === 'white' ? 'black' : 'white')}>
+            {s.orientation === 'white' ? 'White' : 'Black'}
+          </button>
         </div>
-      </div>
+        <Toggle id='showCoordinates' label='Coordinates' checked={s.showCoordinates} onChange={s.setShowCoordinates} />
+        <Toggle id='showMoveIndicators' label='Move indicators' checked={s.showMoveIndicators} onChange={s.setShowMoveIndicators} />
+        <Toggle id='enablePreMoves' label='Pre-moves' checked={s.enablePreMoves} onChange={s.setEnablePreMoves} />
+        {s.enablePreMoves && (
+          <Toggle id='stackPremoves' label='Stack pre-moves' checked={s.stackPremoves} onChange={s.setStackPremoves} />
+        )}
+        <Toggle id='enableAnimations' label='Animations' checked={s.enableAnimations} onChange={s.setEnableAnimations} />
+        <Select id='animationDuration' label='Anim. speed' value={s.animationDuration}
+          onChange={s.setAnimationDuration} disabled={!s.enableAnimations}
+          options={[
+            { value: 100, label: '100ms' },
+            { value: 200, label: '200ms' },
+            { value: 300, label: '300ms' },
+            { value: 500, label: '500ms' },
+            { value: 800, label: '800ms' },
+          ]} />
+        <Toggle id='enableSounds' label='Sounds' checked={s.enableSounds} onChange={s.setEnableSounds} />
+        <Toggle id='enableArrows' label='Arrows' checked={s.enableArrows} onChange={s.setEnableArrows} />
+        <Toggle id='enableHighlights' label='Highlights' checked={s.enableHighlights} onChange={s.setEnableHighlights} />
+      </Section>
+
+      <Section title='Position'>
+        <div className='control-group fen-group'>
+          <input id='fenInput' type='text' value={s.fenInput}
+            onChange={e => s.setFenInput(e.target.value)}
+            placeholder='Enter FEN string...' className='fen-input' />
+          <button className='control-button load-button' onClick={s.onLoadFen} disabled={!s.fenInput.trim()}>
+            Load
+          </button>
+        </div>
+        <Select id='testPosition' label='Presets' value=''
+          onChange={v => { if (v) s.onLoadPreset(v as string); }}
+          options={[
+            { value: '', label: 'Select...' },
+            ...TEST_POSITIONS.map(p => ({ value: p.fen, label: p.label })),
+          ]} />
+      </Section>
     </div>
   );
 }
@@ -559,6 +540,8 @@ interface SettingsState {
   setOrientation: React.Dispatch<React.SetStateAction<'white' | 'black'>>;
   enablePreMoves: boolean;
   setEnablePreMoves: (v: boolean) => void;
+  stackPremoves: boolean;
+  setStackPremoves: (v: boolean) => void;
   blackAi: boolean;
   setBlackAi: (v: boolean) => void;
   whiteAi: boolean;
@@ -597,6 +580,7 @@ interface SettingsState {
   setInsufficientMaterial: (v: boolean) => void;
   boardTheme: ThemeKey;
   setBoardTheme: (v: ThemeKey) => void;
+  boardKey: number;
   onReset: () => void;
   onLoadFen: () => void;
   onLoadPreset: (fen: string) => void;
@@ -609,6 +593,7 @@ function useSettings(): SettingsState {
     'white'
   );
   const [enablePreMoves, setEnablePreMoves] = React.useState(true);
+  const [stackPremoves, setStackPremoves] = React.useState(true);
   const [blackAi, setBlackAi] = React.useState(true);
   const [whiteAi, setWhiteAi] = React.useState(false);
   const [autoPromotionPiece, setAutoPromotionPiece] = React.useState<
@@ -636,13 +621,21 @@ function useSettings(): SettingsState {
   const gameRef = React.useRef<ReturnType<typeof useChessGame>>(null!);
   const navRef = React.useRef<{ setViewingPly: (v: null) => void }>(null!);
 
+  const [boardKey, setBoardKey] = React.useState(0);
+
   const onReset = React.useCallback(() => {
     gameRef.current.resetGame();
     navRef.current.setViewingPly(null);
+    setArrows([]);
+    setHighlights([]);
+    setBoardKey(k => k + 1);
   }, []);
 
   const onLoadFen = React.useCallback(() => {
     if (fenInput.trim()) {
+      setArrows([]);
+      setHighlights([]);
+      setBoardKey(k => k + 1);
       gameRef.current.setPosition(fenInput.trim());
       navRef.current.setViewingPly(null);
     }
@@ -650,6 +643,9 @@ function useSettings(): SettingsState {
 
   const onLoadPreset = React.useCallback((fen: string) => {
     setFenInput(fen);
+    setArrows([]);
+    setHighlights([]);
+    setBoardKey(k => k + 1);
     gameRef.current.setPosition(fen);
     navRef.current.setViewingPly(null);
   }, []);
@@ -659,6 +655,8 @@ function useSettings(): SettingsState {
     setOrientation,
     enablePreMoves,
     setEnablePreMoves,
+    stackPremoves,
+    setStackPremoves,
     blackAi,
     setBlackAi,
     whiteAi,
@@ -695,6 +693,7 @@ function useSettings(): SettingsState {
     setInsufficientMaterial,
     boardTheme,
     setBoardTheme,
+    boardKey,
     onReset,
     onLoadFen,
     onLoadPreset,
@@ -917,6 +916,17 @@ function Playground() {
   );
   onPositionChangeRef.current = handleAIMove;
 
+  // Trigger AI when toggling AI on for the current turn's color
+  React.useEffect(() => {
+    const state = game.getGameState();
+    const isAiTurn =
+      state.currentPlayer === 0 ? settings.whiteAi : settings.blackAi;
+    if (isAiTurn && !state.isGameOver) {
+      handleAIMove(state);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.whiteAi, settings.blackAi]);
+
   // Build board theme as CSS custom properties
   const theme = BOARD_THEMES[settings.boardTheme];
   const boardStyle: Record<string, string> = {
@@ -948,11 +958,13 @@ function Playground() {
       <div className='board-area'>
         <div className='board-container'>
           <ChessBoard
+            key={settings.boardKey}
             {...game.boardProps}
             {...nav.boardPropsOverride}
             size='contain'
             orientation={settings.orientation}
             enablePremoves={settings.enablePreMoves}
+            stackPremoves={settings.stackPremoves}
             autoPromotionPiece={settings.autoPromotionPiece}
             showCoordinates={settings.showCoordinates}
             animationDuration={settings.animationDuration}
@@ -977,6 +989,19 @@ function Playground() {
         history={game.history}
         viewingPly={nav.viewingPly}
         onNavigate={nav.navigate}
+        onExportPGN={() => {
+          const pgn = game.toPGN();
+          navigator.clipboard.writeText(pgn).catch(() => {
+            // Fallback: prompt
+            window.prompt('PGN:', pgn);
+          });
+        }}
+        onImportPGN={(pgn) => {
+          const success = game.loadPGN(pgn);
+          if (success) nav.setViewingPly(null);
+          return success;
+        }}
+        turnColor={game.boardProps.turnColor || 'white'}
       />
     </div>
   );

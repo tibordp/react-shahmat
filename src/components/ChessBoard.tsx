@@ -367,6 +367,9 @@ export interface ChessBoardProps {
   onHighlightsChange?: (highlights: SquareNotation[]) => void;
   /** Enable premove functionality. Default: false */
   enablePremoves?: boolean;
+  /** Allow stacking multiple premoves. When false, only one premove at a time
+   *  (new premove replaces existing). Default: true */
+  stackPremoves?: boolean;
   /** Show valid move indicators (dots/rings) on the board. Default: true */
   showMoveIndicators?: boolean;
   /** Custom piece image set. Maps piece keys (wK, bQ, etc.) to image URLs.
@@ -377,6 +380,8 @@ export interface ChessBoardProps {
   renderPiece?: (piece: Piece, size: number) => React.ReactNode;
   /** Auto-promote pawns to this piece (skip dialog) */
   autoPromotionPiece?: PromotionPiece;
+  /** Allow castling by dragging/clicking the king more than 1 square along the home rank. Default: true */
+  looseCastling?: boolean;
   /** Whether white pieces are interactive. Default: true */
   whiteMovable?: boolean;
   /** Whether black pieces are interactive. Default: true */
@@ -419,10 +424,12 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   highlights: highlightsProp,
   onHighlightsChange,
   enablePremoves = false,
+  stackPremoves = true,
   showMoveIndicators = true,
   pieceSet,
   renderPiece,
   autoPromotionPiece,
+  looseCastling = true,
   premoveCandidates: premoveCandidatesFn,
   whiteMovable = true,
   blackMovable = true,
@@ -608,6 +615,10 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         );
         uiState.setValidMoves(newMoves);
       }
+      // Close promotion dialog — the position it was opened for has changed
+      if (uiState.promotionDialog.isOpen) {
+        uiState.setPromotionDialog(prev => ({ ...prev, isOpen: false }));
+      }
     }
 
     wasDragMoveRef.current = false;
@@ -682,6 +693,15 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     [turnColor]
   );
 
+  // Premove squares for highlighting (must be before validMovesForSquare which uses it)
+  const preMoveSquares = useMemo(() => {
+    return uiState.premoves.flatMap(pm => {
+      const from = squareToPosition(pm.from);
+      const to = squareToPosition(pm.to);
+      return [from, to];
+    });
+  }, [uiState.premoves]);
+
   const validMovesForSquare = useCallback(
     (file: number, rank: number): Position[] => {
       const piece = visualBoardState[rank]?.[file];
@@ -694,6 +714,10 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       }
 
       if (piece.color !== turnColorEnum && canPremove) {
+        // In single-premove mode, don't allow selecting pieces at premove destinations
+        if (!stackPremoves && uiState.premoves.length > 0 &&
+            preMoveSquares.some(sq => sq.file === file && sq.rank === rank)) return [];
+
         // Non-turn player's piece — use movement pattern for premoves,
         // but only if this color is movable (not AI-controlled)
         const pieceColor: PlayerColor =
@@ -713,6 +737,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       turnColorEnum,
       canMove,
       canPremove,
+      stackPremoves,
+      preMoveSquares,
+      uiState.premoves.length,
       validMovesInternal,
       visualBoardState,
       movableColor,
@@ -743,13 +770,30 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       if (!onMove) return;
 
       const fromSq = positionToSquare({ file: fromFile, rank: fromRank });
-      const toSq = positionToSquare({ file: toFile, rank: toRank });
+      let effectiveToFile = toFile;
+      let effectiveToRank = toRank;
 
-      // Check if this is a valid move
+      // Chess.com-style castling: if the king is dragged/clicked more than 1 square
+      // along its home rank, try the castling destination first, fall back to original.
+      const piece = visualBoardState[fromRank]?.[fromFile];
       const validDests = validMovesInternal.get(fromSq);
       if (
+        looseCastling &&
+        piece?.type === PieceType.King &&
+        fromRank === toRank &&
+        Math.abs(toFile - fromFile) > 1
+      ) {
+        const castleFile = toFile > fromFile ? 6 : 2;
+        if (validDests?.some(p => p.file === castleFile && p.rank === fromRank)) {
+          effectiveToFile = castleFile;
+          effectiveToRank = fromRank;
+        }
+        // Otherwise keep original destination — it'll fail validation normally
+      }
+
+      if (
         !validDests ||
-        !validDests.some(p => p.file === toFile && p.rank === toRank)
+        !validDests.some(p => p.file === effectiveToFile && p.rank === effectiveToRank)
       ) {
         // Invalid move — show check feedback if applicable
         if (check) {
@@ -761,6 +805,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         return;
       }
 
+      const toSq = positionToSquare({ file: effectiveToFile, rank: effectiveToRank });
       wasDragMoveRef.current = isDrag;
 
       // Check for promotion
@@ -791,6 +836,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       check,
       isPawnPromotion,
       autoPromotionPiece,
+      looseCastling,
       visualBoardState,
       uiState,
       playSound,
@@ -808,6 +854,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
       const fromSq = positionToSquare({ file: fromFile, rank: fromRank });
       const toSq = positionToSquare({ file: toFile, rank: toRank });
+
+      // In single-premove mode, replace existing premove
+      if (!stackPremoves) uiState.clearPremoves();
 
       // Check for promotion
       if (isPawnPromotion(fromFile, fromRank, toRank)) {
@@ -845,6 +894,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       validMovesForSquare,
       isPawnPromotion,
       autoPromotionPiece,
+      stackPremoves,
       visualBoardState,
       uiState,
       onPremove,
@@ -875,7 +925,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     }
 
     if (!lastMove) {
-      // Position changed without a move (reset/load) — clear premoves
+      // Position changed without a move, or lastMove cleared (reset/load) — clear premoves
       uiState.clearPremoves();
       onPremoveClear?.();
       executedPremoveRef.current = false;
@@ -957,8 +1007,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         rank: uiState.promotionDialog.toRank,
       });
 
-      if (uiState.promotionDialog.isPreMove) {
+      // Check the current state, not the stale isPreMove flag from when the
+      // dialog opened — the turn may have changed while the dialog was open.
+      if (!canMove && canPremove) {
         const move: BoardMove = { from: fromSq, to: toSq, promotion };
+        if (!stackPremoves) uiState.clearPremoves();
         uiState.addPremove(move);
         onPremove?.(move);
         playSound('premove');
@@ -969,7 +1022,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       uiState.setPromotionDialog(prev => ({ ...prev, isOpen: false }));
       uiState.clearSelection();
     },
-    [uiState, onMove, onPremove, playSound]
+    [uiState, onMove, onPremove, playSound, canMove, canPremove, stackPremoves]
   );
 
   const handlePromotionCancel = useCallback(() => {
@@ -977,14 +1030,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   }, [uiState]);
 
   // Premove squares for highlighting
-  const preMoveSquares = useMemo(() => {
-    return uiState.premoves.flatMap(pm => {
-      const from = squareToPosition(pm.from);
-      const to = squareToPosition(pm.to);
-      return [from, to];
-    });
-  }, [uiState.premoves]);
-
   // Drag and drop handlers
   const dragDropHandlers = useBoardDragDrop({
     boardState: visualBoardState,
@@ -1142,9 +1187,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         piece.color === Color.White ? 'white' : 'black';
       if (movableColor !== 'both' && movableColor !== pieceColor) return false;
       const isTurn = piece.color === turnColorEnum;
-      return (isTurn && canMove) || (!isTurn && canPremove);
+      if (isTurn && canMove) return true;
+      if (!isTurn && canPremove) {
+        // In single-premove mode, don't allow dragging pieces at premove destinations
+        // (they're only there visually — dragging them would premove from a phantom position)
+        if (!stackPremoves && preMoveSet.has(sqKey(file, rank))) return false;
+        return true;
+      }
+      return false;
     },
-    [visualBoardState, movableColor, turnColorEnum, canMove, canPremove]
+    [visualBoardState, movableColor, turnColorEnum, canMove, canPremove, stackPremoves, preMoveSet]
   );
 
   // Stable wrapped handlers for Square (avoids inline arrow functions defeating React.memo)
@@ -1299,6 +1351,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           flipped={flipped}
           onSelect={handlePromotion}
           onCancel={handlePromotionCancel}
+          onRightClickCancel={() => {
+            handlePromotionCancel();
+            uiState.clearPremoves();
+            onPremoveClear?.();
+          }}
           pieceSet={effectivePieceSet}
           renderPiece={renderPiece}
         />
@@ -1368,7 +1425,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           })()}
 
         {/* Readonly overlay */}
-        {readonlyMode && <div className={styles.readonlyOverlay} />}
+        {readonlyMode && (
+          <div className={styles.readonlyOverlay} onContextMenu={e => e.preventDefault()} />
+        )}
       </div>
     </DndProvider>
   );

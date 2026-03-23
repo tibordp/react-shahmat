@@ -45,6 +45,7 @@ export interface ChessRulesAPI {
   getHistory: () => HistoryEntry[];
   getFenHistory: () => string[];
   undoToFen: (fen: string, plyCount: number) => boolean;
+  parseSAN: (san: string) => Move | null;
 }
 
 export const useChessRules = (): ChessRulesAPI => {
@@ -170,6 +171,13 @@ export const useChessRules = (): ChessRulesAPI => {
     [engine, triggerUpdate]
   );
 
+  const parseSAN = useCallback(
+    (san: string): Move | null => {
+      return engine.parseSAN(san);
+    },
+    [engine]
+  );
+
   // Trigger initial update to ensure React knows about the initial board state
   useEffect(() => {
     triggerUpdate();
@@ -192,6 +200,7 @@ export const useChessRules = (): ChessRulesAPI => {
       getHistory,
       getFenHistory,
       undoToFen,
+      parseSAN,
     }),
     [
       getBoardState,
@@ -209,6 +218,7 @@ export const useChessRules = (): ChessRulesAPI => {
       getHistory,
       getFenHistory,
       undoToFen,
+      parseSAN,
     ]
   );
 };

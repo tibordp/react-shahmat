@@ -90,6 +90,10 @@ export function useBoardUIState(): UseBoardUIStateReturn {
 
   const clearPremoves = useCallback(() => {
     setPremoves([]);
+    // Also close the promotion dialog if it was opened for a premove
+    setPromotionDialog(prev =>
+      prev.isOpen && prev.isPreMove ? { ...prev, isOpen: false } : prev
+    );
   }, []);
 
   const shiftPremove = useCallback(() => {

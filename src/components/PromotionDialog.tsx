@@ -13,6 +13,8 @@ export interface PromotionDialogProps {
   flipped?: boolean;
   onSelect: (pieceType: PieceType) => void;
   onCancel: () => void;
+  /** Called on right-click (cancel + clear premoves) */
+  onRightClickCancel?: () => void;
   pieceSet: PieceSet;
   renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
@@ -25,6 +27,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
   flipped,
   onSelect,
   onCancel,
+  onRightClickCancel,
   pieceSet,
   renderPiece,
 }) => {
@@ -65,6 +68,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
           zIndex: 999,
         }}
         onClick={onCancel}
+        onContextMenu={e => { e.preventDefault(); (onRightClickCancel ?? onCancel)(); }}
       />
       <div
         className={styles.promotionDialog}
@@ -77,6 +81,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
           zIndex: 1000,
         }}
         onClick={e => e.stopPropagation()}
+        onContextMenu={e => e.preventDefault()}
       >
         {orderedTypes.map(type => (
           <button
