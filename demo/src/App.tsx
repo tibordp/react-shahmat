@@ -1,5 +1,5 @@
 import {
-  BrowserRouter,
+  HashRouter,
   Routes,
   Route,
   NavLink,
@@ -56,7 +56,7 @@ function NavBar() {
 
 function App() {
   return (
-    <BrowserRouter basename='/react-shahmat'>
+    <HashRouter>
       <div
         style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}
       >
@@ -68,7 +68,7 @@ function App() {
           </Routes>
         </div>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
