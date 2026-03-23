@@ -175,25 +175,40 @@ export const useJSChessEngine = (): ChessEngineAPI => {
     triggerUpdate();
   }, [triggerUpdate]);
 
-  return useMemo(() => ({
-    getBoardState,
-    getCurrentPlayer,
-    getValidMoves,
-    getPotentialMoves,
-    getPiece,
-    makeMove,
-    isValidMove,
-    isKingInCheck,
-    getLastMove,
-    getGameState,
-    setPosition,
-    resetGame,
-    getHistory,
-    getFenHistory,
-    undoToFen,
-  }), [
-    getBoardState, getCurrentPlayer, getValidMoves, getPotentialMoves,
-    getPiece, makeMove, isValidMove, isKingInCheck, getLastMove,
-    getGameState, setPosition, resetGame, getHistory, getFenHistory, undoToFen,
-  ]);
+  return useMemo(
+    () => ({
+      getBoardState,
+      getCurrentPlayer,
+      getValidMoves,
+      getPotentialMoves,
+      getPiece,
+      makeMove,
+      isValidMove,
+      isKingInCheck,
+      getLastMove,
+      getGameState,
+      setPosition,
+      resetGame,
+      getHistory,
+      getFenHistory,
+      undoToFen,
+    }),
+    [
+      getBoardState,
+      getCurrentPlayer,
+      getValidMoves,
+      getPotentialMoves,
+      getPiece,
+      makeMove,
+      isValidMove,
+      isKingInCheck,
+      getLastMove,
+      getGameState,
+      setPosition,
+      resetGame,
+      getHistory,
+      getFenHistory,
+      undoToFen,
+    ]
+  );
 };

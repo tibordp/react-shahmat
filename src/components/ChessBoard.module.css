@@ -35,9 +35,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   position: relative;
+}
+
+.square.draggable {
+  cursor: grab;
+}
+
+.chess-board.dragging,
+.chess-board.dragging .square {
+  cursor: grabbing;
 }
 
 /* Square Color Variants */
@@ -171,7 +180,9 @@
 .piece {
   width: 95%;
   height: 95%;
-  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
   position: relative;
   z-index: 2;

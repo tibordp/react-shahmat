@@ -1,6 +1,7 @@
 import React from 'react';
-import { PieceType, Color } from '../engine/jsChessEngine';
+import { Piece, PieceType, Color } from '../engine/jsChessEngine';
 import { getPieceIconByType } from '../utils/pieceIcons';
+import type { PieceSet } from '../types';
 
 import styles from './ChessBoard.module.css';
 
@@ -12,6 +13,8 @@ export interface PromotionDialogProps {
   flipped?: boolean;
   onSelect: (pieceType: PieceType) => void;
   onCancel: () => void;
+  pieceSet: PieceSet;
+  renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
 
 export const PromotionDialog: React.FC<PromotionDialogProps> = ({
@@ -22,10 +25,11 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
   flipped,
   onSelect,
   onCancel,
+  pieceSet,
+  renderPiece,
 }) => {
   if (!isOpen) return null;
 
-  // Calculate position based on promotion square
   const effectiveSquare = flipped
     ? { file: 7 - promotionSquare.file, rank: 7 - promotionSquare.rank }
     : promotionSquare;
@@ -33,51 +37,23 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
   const squareX = effectiveSquare.file * squareSize;
   const squareY = (7 - effectiveSquare.rank) * squareSize;
 
-  // Determine visual position based on effective square (accounts for board flipping)
-  const isVisuallyAtTop = squareY === 0; // Top of the visual board
-  const isVisuallyAtBottom = squareY === 7 * squareSize; // Bottom of the visual board
+  const isVisuallyAtBottom = squareY === 7 * squareSize;
 
-  let pieces = [
-    {
-      type: PieceType.Queen,
-      icon: getPieceIconByType(color, PieceType.Queen),
-    },
-    {
-      type: PieceType.Rook,
-      icon: getPieceIconByType(color, PieceType.Rook),
-    },
-    {
-      type: PieceType.Bishop,
-      icon: getPieceIconByType(color, PieceType.Bishop),
-    },
-    {
-      type: PieceType.Knight,
-      icon: getPieceIconByType(color, PieceType.Knight),
-    },
+  const promotionTypes = [
+    PieceType.Queen,
+    PieceType.Rook,
+    PieceType.Bishop,
+    PieceType.Knight,
   ];
-
-  // Reverse piece order for bottom promotions so Queen is closest to promotion square
-  if (isVisuallyAtBottom) {
-    pieces = pieces.reverse();
-  }
+  const orderedTypes = isVisuallyAtBottom
+    ? [...promotionTypes].reverse()
+    : promotionTypes;
 
   const dialogX = squareX;
-  let dialogY;
-
-  if (isVisuallyAtTop) {
-    // Visually at top - show dialog going down from promotion square
-    dialogY = squareY;
-  } else if (isVisuallyAtBottom) {
-    // Visually at bottom - show dialog going up (position so it ends at promotion square)
-    dialogY = squareY - 3 * squareSize;
-  } else {
-    // Fallback (shouldn't happen in normal chess)
-    dialogY = squareY;
-  }
+  const dialogY = isVisuallyAtBottom ? squareY - 3 * squareSize : squareY;
 
   return (
     <>
-      {/* Invisible overlay for click-outside-to-cancel */}
       <div
         className={styles.promotionBoardOverlay}
         style={{
@@ -102,17 +78,21 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
         }}
         onClick={e => e.stopPropagation()}
       >
-        {pieces.map(({ type, icon }) => (
+        {orderedTypes.map(type => (
           <button
             key={type}
             className={styles.promotionPiece}
             onClick={() => onSelect(type)}
           >
-            <img
-              src={icon}
-              alt='promotion piece'
-              className={styles.promotionPieceImg}
-            />
+            {renderPiece ? (
+              renderPiece({ type, color }, squareSize)
+            ) : (
+              <img
+                src={getPieceIconByType(color, type, pieceSet)}
+                alt='promotion piece'
+                className={styles.promotionPieceImg}
+              />
+            )}
           </button>
         ))}
       </div>

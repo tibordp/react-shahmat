@@ -1,170 +1,211 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { BoardMove, PromotionPiece } from 'react-shahmat';
 
+export type AiMode =
+  | 'random'
+  | 'worstfish'
+  | 'easy'
+  | 'medium'
+  | 'hard'
+  | 'maximum';
+
 export interface StockfishAPI {
-  getBestMove: (fen: string, skillLevel?: number) => Promise<BoardMove | null>;
+  /** Search for a move. Mode determines strategy. */
+  getMove: (fen: string, mode: AiMode) => Promise<BoardMove | null>;
   isReady: boolean;
   isThinking: boolean;
 }
 
+interface PendingRequest {
+  resolve: (move: BoardMove | null) => void;
+  requestId: number;
+  timeoutId: ReturnType<typeof setTimeout>;
+  worstMove?: BoardMove;
+  isWorstfish: boolean;
+}
+
 export const useStockfish = (): StockfishAPI => {
+  const workerRef = useRef<Worker | null>(null);
+  const pendingRef = useRef<PendingRequest | null>(null);
+  const nextRequestId = useRef(0);
+  const readyRef = useRef(false);
+
   const [isReady, setIsReady] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const workerRef = useRef<Worker | null>(null);
-  const pendingMoveRef = useRef<((move: BoardMove | null) => void) | null>(null);
-  const currentRequestIdRef = useRef<number>(0);
+
+  const cancelPending = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    clearTimeout(pending.timeoutId);
+    pending.resolve(null);
+    pendingRef.current = null;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    const initStockfish = async () => {
-      try {
-        const worker = new Worker('/stockfish.js');
-        workerRef.current = worker;
+    const worker = new Worker(import.meta.env.BASE_URL + 'stockfish.js');
+    workerRef.current = worker;
 
-        worker.onmessage = e => {
-          const message = e.data;
+    worker.onmessage = e => {
+      const message = e.data as string;
 
-          if (message === 'uciok') {
-            setIsReady(true);
-          } else if (message.startsWith('bestmove')) {
-            setIsThinking(false);
-
-            if (pendingMoveRef.current) {
-              const moveMatch = message.match(
-                /bestmove ([a-h][1-8][a-h][1-8])([qrbn])?/
-              );
-
-              if (moveMatch) {
-                const moveStr = moveMatch[1];
-                const promotion = moveMatch[2];
-
-                try {
-                  const move = parseUCIMove(moveStr, promotion);
-                  pendingMoveRef.current(move);
-                } catch {
-                  pendingMoveRef.current(null);
-                }
-              } else {
-                pendingMoveRef.current(null);
-              }
-              pendingMoveRef.current = null;
+      if (message === 'uciok') {
+        readyRef.current = true;
+        if (mounted) setIsReady(true);
+      } else if (message.startsWith('info') && message.includes(' pv ')) {
+        // Track MultiPV info lines for worstfish mode
+        const pending = pendingRef.current;
+        if (pending?.isWorstfish) {
+          const pvMatch = message.match(/ pv ([a-h][1-8][a-h][1-8])([qrbn])?/);
+          if (pvMatch) {
+            // Each successive multipv line is worse — keep overwriting to get the last (worst)
+            try {
+              pending.worstMove = parseUCIMove(pvMatch[1], pvMatch[2]);
+            } catch {
+              /* ignore */
             }
           }
-        };
-
-        worker.onerror = () => {
-          if (mounted) {
-            setIsReady(false);
-          }
-        };
-
-        worker.postMessage('uci');
-      } catch {
-        if (mounted) {
-          setIsReady(false);
         }
+      } else if (message.startsWith('bestmove')) {
+        const pending = pendingRef.current;
+        if (pending) {
+          clearTimeout(pending.timeoutId);
+
+          if (pending.isWorstfish && pending.worstMove) {
+            pending.resolve(pending.worstMove);
+          } else {
+            const match = message.match(
+              /bestmove ([a-h][1-8][a-h][1-8])([qrbn])?/
+            );
+            if (match) {
+              try {
+                pending.resolve(parseUCIMove(match[1], match[2]));
+              } catch {
+                pending.resolve(null);
+              }
+            } else {
+              pending.resolve(null);
+            }
+          }
+          pendingRef.current = null;
+        }
+        if (mounted) setIsThinking(false);
       }
     };
 
-    initStockfish();
+    worker.onerror = () => {
+      cancelPending();
+      readyRef.current = false;
+      if (mounted) {
+        setIsReady(false);
+        setIsThinking(false);
+      }
+    };
+
+    worker.postMessage('uci');
 
     return () => {
       mounted = false;
-      if (workerRef.current) {
-        workerRef.current.terminate();
-        workerRef.current = null;
-      }
+      cancelPending();
+      worker.terminate();
+      workerRef.current = null;
+      readyRef.current = false;
     };
-  }, []);
+  }, [cancelPending]);
 
-  const getBestMove = useCallback(
-    async (fen: string, skillLevel: number = 5): Promise<BoardMove | null> => {
-      if (!workerRef.current || !isReady || isThinking) {
-        return null;
+  const getMove = useCallback(
+    (fen: string, mode: AiMode): Promise<BoardMove | null> => {
+      const worker = workerRef.current;
+      if (!worker || !readyRef.current) return Promise.resolve(null);
+
+      // Cancel any in-flight search
+      if (pendingRef.current) {
+        worker.postMessage('stop');
+        cancelPending();
       }
 
-      if (pendingMoveRef.current) {
-        workerRef.current.postMessage('stop');
-        pendingMoveRef.current(null);
-        pendingMoveRef.current = null;
-      }
+      const requestId = ++nextRequestId.current;
+      const isWorstfish = mode === 'worstfish';
+      setIsThinking(true);
 
-      const requestId = ++currentRequestIdRef.current;
-
-      return new Promise(resolve => {
-        setIsThinking(true);
-        pendingMoveRef.current = (move: BoardMove | null) => {
-          if (requestId === currentRequestIdRef.current) {
-            resolve(move);
-          }
-        };
-
-        workerRef.current!.postMessage(
-          `setoption name Skill Level value ${skillLevel}`
-        );
-        workerRef.current!.postMessage(`position fen ${fen}`);
-
-        let searchCommand;
-        if (skillLevel <= 1) {
-          searchCommand = 'go depth 1';
-        } else if (skillLevel <= 3) {
-          searchCommand = 'go depth 2';
-        } else if (skillLevel <= 5) {
-          searchCommand = 'go depth 3';
-        } else if (skillLevel <= 8) {
-          searchCommand = 'go movetime 500';
-        } else if (skillLevel <= 15) {
-          searchCommand = 'go movetime 1000';
-        } else {
-          searchCommand = 'go movetime 2000';
-        }
-
-        workerRef.current!.postMessage(searchCommand);
-
-        setTimeout(() => {
-          if (
-            requestId === currentRequestIdRef.current &&
-            pendingMoveRef.current
-          ) {
-            workerRef.current?.postMessage('stop');
-            setIsThinking(false);
-            pendingMoveRef.current(null);
-            pendingMoveRef.current = null;
-            resolve(null);
+      return new Promise<BoardMove | null>(resolve => {
+        const timeoutId = setTimeout(() => {
+          if (pendingRef.current?.requestId === requestId) {
+            worker.postMessage('stop');
+            const forceId = setTimeout(() => {
+              if (pendingRef.current?.requestId === requestId) {
+                cancelPending();
+                setIsThinking(false);
+              }
+            }, 1000);
+            if (pendingRef.current) pendingRef.current.timeoutId = forceId;
           }
         }, 8000);
+
+        pendingRef.current = { resolve, requestId, timeoutId, isWorstfish };
+
+        // Configure engine based on mode
+        if (isWorstfish) {
+          worker.postMessage('setoption name Skill Level value 20');
+          worker.postMessage('setoption name MultiPV value 200');
+        } else {
+          const skillLevel =
+            mode === 'easy'
+              ? 1
+              : mode === 'medium'
+              ? 8
+              : mode === 'hard'
+              ? 15
+              : 20;
+          worker.postMessage(`setoption name Skill Level value ${skillLevel}`);
+          worker.postMessage('setoption name MultiPV value 1');
+        }
+
+        worker.postMessage(`position fen ${fen}`);
+        worker.postMessage('isready');
+
+        const onReady = (e: MessageEvent) => {
+          if (e.data !== 'readyok') return;
+          if (pendingRef.current?.requestId !== requestId) {
+            worker.removeEventListener('message', onReady);
+            return;
+          }
+          worker.removeEventListener('message', onReady);
+
+          const goCommand = isWorstfish
+            ? 'go depth 5'
+            : mode === 'easy'
+            ? 'go depth 1'
+            : mode === 'medium'
+            ? 'go depth 5'
+            : mode === 'hard'
+            ? 'go movetime 1000'
+            : 'go movetime 2000';
+
+          worker.postMessage(goCommand);
+        };
+        worker.addEventListener('message', onReady);
       });
     },
-    [isReady, isThinking]
+    [cancelPending]
   );
 
-  return {
-    getBestMove,
-    isReady,
-    isThinking,
-  };
+  return { getMove, isReady, isThinking };
 };
 
 function parseUCIMove(uciMove: string, promotion?: string): BoardMove {
-  if (uciMove.length < 4) {
-    throw new Error(`Invalid UCI move: ${uciMove}`);
-  }
-
-  const from = uciMove.substring(0, 2); // e.g. "e2"
-  const to = uciMove.substring(2, 4); // e.g. "e4"
-
+  const from = uciMove.substring(0, 2);
+  const to = uciMove.substring(2, 4);
   const move: BoardMove = { from, to };
-
   if (promotion) {
-    const promotionMap: Record<string, PromotionPiece> = {
+    const map: Record<string, PromotionPiece> = {
       q: 'queen',
       r: 'rook',
       b: 'bishop',
       n: 'knight',
     };
-    move.promotion = promotionMap[promotion];
+    move.promotion = map[promotion];
   }
-
   return move;
 }

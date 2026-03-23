@@ -52,7 +52,7 @@ The demo uses the official Stockfish WASM build for chess analysis and AI moves.
 ## Available Scripts
 
 - `npm start` - Start development server
-- `npm run build` - Build for production  
+- `npm run build` - Build for production
 - `npm test` - Run tests
 - `npm run lint` - Run ESLint
 - `npm run format` - Format code with Prettier

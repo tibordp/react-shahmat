@@ -26,7 +26,8 @@ function ArrowsAndHighlights() {
 }`;
 
 export const TITLE = 'Arrows & Highlights';
-export const DESCRIPTION = 'Right-click drag draws arrows, right-click a square toggles highlights. State is fully controlled — provide arrows/onArrowsChange and highlights/onHighlightsChange. Left-click clears all. Omit the props entirely to disable.';
+export const DESCRIPTION =
+  'Right-click drag draws arrows, right-click a square toggles highlights. State is fully controlled — provide arrows/onArrowsChange and highlights/onHighlightsChange. Left-click clears all. Omit the props entirely to disable.';
 
 export default function ArrowsAndHighlights() {
   const game = useChessGame();
@@ -42,18 +43,35 @@ export default function ArrowsAndHighlights() {
         highlights={highlights}
         onHighlightsChange={setHighlights}
       />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          marginTop: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <button
-          onClick={() => { setArrows([]); setHighlights([]); }}
+          onClick={() => {
+            setArrows([]);
+            setHighlights([]);
+          }}
           style={{
-            background: '#555', color: '#ddd', border: '1px solid #666',
-            borderRadius: 4, padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+            background: '#555',
+            color: '#ddd',
+            border: '1px solid #666',
+            borderRadius: 4,
+            padding: '6px 14px',
+            cursor: 'pointer',
+            fontSize: 13,
           }}
         >
           Clear All
         </button>
         <span style={{ color: '#888', fontSize: 12 }}>
-          {arrows.length} arrow{arrows.length !== 1 ? 's' : ''}, {highlights.length} highlight{highlights.length !== 1 ? 's' : ''}
+          {arrows.length} arrow{arrows.length !== 1 ? 's' : ''},{' '}
+          {highlights.length} highlight{highlights.length !== 1 ? 's' : ''}
         </span>
       </div>
     </div>

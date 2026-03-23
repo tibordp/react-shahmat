@@ -40,7 +40,8 @@ function ControlledBoard() {
 }`;
 
 export const TITLE = 'Controlled Board';
-export const DESCRIPTION = 'A board driven entirely by props, without useChessGame. You provide the position (FEN), valid moves, and handle onMove yourself. This is the pattern for connecting to a chess server or custom engine.';
+export const DESCRIPTION =
+  'A board driven entirely by props, without useChessGame. You provide the position (FEN), valid moves, and handle onMove yourself. This is the pattern for connecting to a chess server or custom engine.';
 
 export default function ControlledBoard() {
   const [position] = React.useState(

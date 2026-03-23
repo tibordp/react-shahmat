@@ -1,4 +1,11 @@
-import { PieceType, Color, Piece, Position, Move, GameState } from './engine/jsChessEngine';
+import {
+  PieceType,
+  Color,
+  Piece,
+  Position,
+  Move,
+  GameState,
+} from './engine/jsChessEngine';
 
 // ============================================================================
 // Public API Types
@@ -30,6 +37,39 @@ export interface BoardMove {
   from: Square;
   to: Square;
   promotion?: PromotionPiece;
+}
+
+/** Piece image set: maps piece key to image URL (from bundler imports) */
+export interface PieceSet {
+  wK: string;
+  wQ: string;
+  wR: string;
+  wB: string;
+  wN: string;
+  wP: string;
+  bK: string;
+  bQ: string;
+  bR: string;
+  bB: string;
+  bN: string;
+  bP: string;
+}
+
+/** Get the piece key for a Piece object */
+export function pieceKey(piece: Piece): keyof PieceSet {
+  const color = piece.color === Color.White ? 'w' : 'b';
+  const type = ['P', 'R', 'N', 'B', 'Q', 'K'][piece.type];
+  return (color + type) as keyof PieceSet;
+}
+
+/** Get the piece key by color and type */
+export function pieceKeyByType(
+  color: Color,
+  pieceType: PieceType
+): keyof PieceSet {
+  const c = color === Color.White ? 'w' : 'b';
+  const t = ['P', 'R', 'N', 'B', 'Q', 'K'][pieceType];
+  return (c + t) as keyof PieceSet;
 }
 
 /** An arrow drawn on the board */
@@ -204,7 +244,18 @@ export function buildValidMovesMap(gameState: GameState): ValidMovesMap {
 }
 
 // Re-export engine types that consumers may need
-export type { GameState, Move, Piece, Position, GameResult, MoveResult, ValidMoveResult, ChessError, HistoryEntry, MoveType } from './engine/jsChessEngine';
+export type {
+  GameState,
+  Move,
+  Piece,
+  Position,
+  GameResult,
+  MoveResult,
+  ValidMoveResult,
+  ChessError,
+  HistoryEntry,
+  MoveType,
+} from './engine/jsChessEngine';
 export { PieceType, Color } from './engine/jsChessEngine';
 
 /** Public-facing history entry with algebraic notation */

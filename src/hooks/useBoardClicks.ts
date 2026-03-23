@@ -19,8 +19,19 @@ export interface UseBoardClicksOptions {
   setHighlightedSquares: React.Dispatch<React.SetStateAction<Position[]>>;
   arrowStart: Position | null;
   setArrowStart: (position: Position | null) => void;
-  onMoveAttempt: (fromFile: number, fromRank: number, toFile: number, toRank: number, isDrag?: boolean) => void;
-  onPremoveAttempt: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
+  onMoveAttempt: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number,
+    isDrag?: boolean
+  ) => void;
+  onPremoveAttempt: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number
+  ) => void;
   canMove: boolean;
   canPremove: boolean;
   enableArrows: boolean;
@@ -35,7 +46,9 @@ export interface UseBoardClicksReturn {
   handleRightMouseUp: (file: number, rank: number) => void;
 }
 
-export function useBoardClicks(options: UseBoardClicksOptions): UseBoardClicksReturn {
+export function useBoardClicks(
+  options: UseBoardClicksOptions
+): UseBoardClicksReturn {
   const {
     boardState,
     turnColor,
@@ -75,12 +88,19 @@ export function useBoardClicks(options: UseBoardClicksOptions): UseBoardClicksRe
       setHighlightedSquares([]);
 
       const piece = boardState[rank]?.[file];
-      const isTurnPiece = piece && piece.color === turnColorEnum && isMovableColor(piece.color);
-      const isPremovePiece = piece && piece.color !== turnColorEnum && isMovableColor(piece.color) && canPremove;
+      const isTurnPiece =
+        piece && piece.color === turnColorEnum && isMovableColor(piece.color);
+      const isPremovePiece =
+        piece &&
+        piece.color !== turnColorEnum &&
+        isMovableColor(piece.color) &&
+        canPremove;
 
       if (selectedSquare) {
-        const selectedPiece = boardState[selectedSquare.rank]?.[selectedSquare.file];
-        const selectedIsTurn = selectedPiece && selectedPiece.color === turnColorEnum;
+        const selectedPiece =
+          boardState[selectedSquare.rank]?.[selectedSquare.file];
+        const selectedIsTurn =
+          selectedPiece && selectedPiece.color === turnColorEnum;
 
         if (selectedSquare.file === file && selectedSquare.rank === rank) {
           // Clicking same square — deselect
@@ -101,7 +121,12 @@ export function useBoardClicks(options: UseBoardClicksOptions): UseBoardClicksRe
           setValidMoves([]);
         } else if (!selectedIsTurn && canPremove) {
           // Destination click for premove
-          onPremoveAttempt(selectedSquare.file, selectedSquare.rank, file, rank);
+          onPremoveAttempt(
+            selectedSquare.file,
+            selectedSquare.rank,
+            file,
+            rank
+          );
           setSelectedSquare(null);
           setValidMoves([]);
         } else {
@@ -184,7 +209,14 @@ export function useBoardClicks(options: UseBoardClicksOptions): UseBoardClicksRe
       }
       setArrowStart(null);
     },
-    [arrowStart, enableArrows, enableHighlights, setArrows, setHighlightedSquares, setArrowStart]
+    [
+      arrowStart,
+      enableArrows,
+      enableHighlights,
+      setArrows,
+      setHighlightedSquares,
+      setArrowStart,
+    ]
   );
 
   return {

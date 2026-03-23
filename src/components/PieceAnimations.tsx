@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Piece, Position } from '../engine/jsChessEngine';
 import { AnimationState } from '../hooks/usePieceAnimations';
 import { getPieceIcon } from '../utils/pieceIcons';
+import type { PieceSet } from '../types';
 
 import styles from './ChessBoard.module.css';
 
@@ -10,10 +11,12 @@ interface AnimatingPieceProps {
   from: Position;
   to: Position;
   startTime: number;
-  flipped?: boolean; // Whether to flip the board for black perspective
+  flipped?: boolean;
   onComplete: () => void;
   squareSize: number;
   animationDuration: number;
+  pieceSet: PieceSet;
+  renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
 
 const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
@@ -25,6 +28,8 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
   squareSize,
   flipped,
   animationDuration,
+  pieceSet,
+  renderPiece,
 }) => {
   const effectiveFrom = flipped
     ? { file: 7 - from.file, rank: 7 - from.rank }
@@ -43,33 +48,23 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / animationDuration, 1);
-
-      // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-
       const currentX = fromX + (toX - fromX) * easeOutQuart;
       const currentY = fromY + (toY - fromY) * easeOutQuart;
-
       setPosition({ x: currentX, y: currentY });
-
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
         onComplete();
       }
     };
-
     animationRef.current = requestAnimationFrame(animate);
-
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [fromX, fromY, toX, toY, startTime, onComplete, animationDuration]);
 
-  const pieceIcon = getPieceIcon(piece);
-  const scale = squareSize * 0.95; // Scale down to fit within the square
+  const scale = squareSize * 0.95;
   return (
     <div
       className={styles.animatingPiece}
@@ -80,11 +75,15 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
         height: scale,
       }}
     >
-      <img
-        src={pieceIcon}
-        alt='animating piece'
-        className={styles.animatingPieceImg}
-      />
+      {renderPiece ? (
+        renderPiece(piece, squareSize)
+      ) : (
+        <img
+          src={getPieceIcon(piece, pieceSet)}
+          alt='animating piece'
+          className={styles.animatingPieceImg}
+        />
+      )}
     </div>
   );
 };
@@ -95,22 +94,20 @@ interface PieceAnimationsProps {
   animationDuration: number;
   flipped?: boolean;
   onAnimationComplete: () => void;
+  pieceSet: PieceSet;
+  renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
 
-/**
- * Component that handles rendering of animated pieces during moves.
- * Manages multiple pieces that can be animated simultaneously (e.g., castling).
- */
 export const PieceAnimations: React.FC<PieceAnimationsProps> = ({
   animationState,
   squareSize,
   animationDuration,
   flipped,
   onAnimationComplete,
+  pieceSet,
+  renderPiece,
 }) => {
-  if (!animationState) {
-    return null;
-  }
+  if (!animationState) return null;
 
   return (
     <>
@@ -123,8 +120,10 @@ export const PieceAnimations: React.FC<PieceAnimationsProps> = ({
           startTime={animationState.startTime}
           squareSize={squareSize}
           animationDuration={animationDuration}
-          onComplete={index === 0 ? onAnimationComplete : () => {}} // Only call completion for the first piece
+          onComplete={index === 0 ? onAnimationComplete : () => {}}
           flipped={flipped}
+          pieceSet={pieceSet}
+          renderPiece={renderPiece}
         />
       ))}
     </>

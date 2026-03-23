@@ -1,47 +1,43 @@
 # react-shahmat
 
-A React chess board component with a controlled API, animations, and sound effects. The board is a pure view + interaction layer — you own the game state, whether it comes from a built-in engine, a chess server, or your own logic.
+A controlled React chess board component with smooth animations, sound effects, Chess.com-style premoves, and a built-in engine for quick prototyping.
 
-## Installation
+**[Live Demo](https://tibordp.github.io/react-shahmat/)** | **[npm](https://www.npmjs.com/package/react-shahmat)**
+
+## Install
 
 ```bash
 npm install react-shahmat
-# or
-yarn add react-shahmat
 ```
 
 ## Quick Start
 
-The fastest way to get a working chess board is with the `useChessGame` hook, which wraps the built-in engine and produces all the props `ChessBoard` needs:
+Three lines to a working chess board:
 
 ```tsx
 import { ChessBoard, useChessGame } from 'react-shahmat';
 
 function App() {
   const game = useChessGame();
-
-  return (
-    <div style={{ width: 500, height: 500 }}>
-      <ChessBoard {...game.boardProps} />
-    </div>
-  );
+  return <ChessBoard {...game.boardProps} />;
 }
 ```
 
-## Controlled API
+The board sizes to its parent by default. Wrap it in a sized container, or pass `size={500}` for a fixed size.
 
-`ChessBoard` is a controlled component (like `<input value={...} onChange={...}>`). The consumer provides the position, valid moves, and handles move callbacks:
+## Controlled Mode
+
+`ChessBoard` is a controlled component -- you provide the position, legal moves, and handle callbacks. This makes it suitable for chess servers, custom engines, puzzles, analysis boards, or chess variants.
 
 ```tsx
 import { ChessBoard, BoardMove, ValidMovesMap } from 'react-shahmat';
 
-function ControlledBoard() {
-  const [position, setPosition] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+function ServerBoard() {
+  const [position, setPosition] = useState(STARTING_FEN);
   const [validMoves, setValidMoves] = useState<ValidMovesMap>(new Map());
   const [lastMove, setLastMove] = useState<BoardMove>();
 
   const handleMove = (move: BoardMove) => {
-    // Validate and apply the move with your own engine/server
     sendToServer(move).then(response => {
       setPosition(response.fen);
       setValidMoves(response.validMoves);
@@ -60,106 +56,76 @@ function ControlledBoard() {
 }
 ```
 
-This makes react-shahmat suitable for:
-- **Chess servers** — position and moves come from a remote API
-- **Custom engines** — use chess.js, Stockfish, or your own move generator
-- **Analysis boards** — navigate through move trees
-- **Puzzle trainers** — provide only the correct move(s) as valid
-- **Chess variants** — the board doesn't enforce standard chess rules
-
-## Playing Against an AI
-
-Use `useChessGame` with `whiteMovable`/`blackMovable` to control which side is human. Feed AI moves via `game.makeMove()`:
-
-```tsx
-import { ChessBoard, useChessGame, GameState, BoardMove } from 'react-shahmat';
-
-function AIGame() {
-  const game = useChessGame({
-    blackMovable: false, // AI plays black
-    onPositionChange: async (gameState: GameState) => {
-      if (gameState.currentPlayer === 1 && !gameState.isGameOver) {
-        const aiMove = await getAIMove(gameState.fen);
-        game.makeMove(aiMove);
-      }
-    },
-  });
-
-  return <ChessBoard {...game.boardProps} orientation="white" />;
-}
-```
-
 ## Features
 
-- **Controlled component** — you own game state, the board is a view layer
-- **Built-in engine** (optional) — `useChessGame` hook for quick setup
-- **Touch and mouse support** — drag-and-drop with react-dnd
-- **Premoves** — queue moves during opponent's turn, with stacking support
-- **Piece animations** — smooth movement with easing
-- **Sound effects** — move, capture, check, checkmate, promotion, premove sounds
-- **Visual indicators** — last move highlight, valid move dots, check highlight, game end badges
-- **Right-click interactions** — draw arrows and highlight squares
-- **Responsive** — auto-sizes to container, or set a fixed size
-- **Themeable** — CSS custom properties for board colors
-- **TypeScript** — full type definitions
+- **Controlled component** -- you own game state, the board is a pure view layer
+- **Built-in engine** (optional) -- `useChessGame` hook for quick setup with full game logic
+- **Premoves** -- Chess.com-style premove queueing with stacking support (off by default)
+- **Animations** -- smooth piece movement with configurable easing and duration
+- **Sound effects** -- move, capture, check, checkmate, promotion, premove sounds via `useChessGame` or custom handler
+- **Arrows & highlights** -- right-click to draw arrows and highlight squares (controlled)
+- **Custom pieces** -- swap the piece image set or render pieces with arbitrary React components
+- **Theming** -- CSS custom properties for all board colors
+- **Touch & mouse** -- drag-and-drop via react-dnd with HTML5 and touch backends
+- **Responsive** -- auto-sizes to container, or set fixed size, or `'contain'` to fit parent
+- **TypeScript** -- full type definitions
 
-## ChessBoard Props
+## API Overview
 
-### Position & State
+All props at a glance:
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `position` | `string` | **(required)** | FEN string for the current position |
-| `orientation` | `'white' \| 'black'` | `'white'` | Which side faces the player |
-| `turnColor` | `'white' \| 'black'` | from FEN | Whose turn it is |
-| `lastMove` | `BoardMove` | — | Last move to highlight (from/to squares) |
-| `check` | `string` | — | Square with king in check (e.g. `'e1'`) |
-| `validMoves` | `ValidMovesMap` | — | Legal moves: `Map<fromSquare, toSquares[]>` |
-| `gameEndOverlay` | `GameEndOverlay` | — | Checkmate/stalemate/draw badge configuration |
+```tsx
+<ChessBoard
+  // Position & state
+  position='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+  orientation='white'
+  turnColor='white'
+  lastMove={{ from: 'e2', to: 'e4' }}
+  check='e8'
+  validMoves={movesMap}
+  gameEndOverlay={{ type: 'checkmate', winner: 'white' }}
+  // Callbacks
+  onMove={move => {}}
+  onPremove={move => {}}
+  onPremoveClear={() => {}}
+  onPlaySound={sound => {}}
+  // Interactivity
+  whiteMovable={true}
+  blackMovable={true}
+  readonly={false}
+  enablePremoves={false}
+  showMoveIndicators={true}
+  autoPromotionPiece='queen'
+  premoveCandidates={(piece, square) => [...squares]}
+  // Annotations (controlled)
+  arrows={[{ from: 'e2', to: 'e4' }]}
+  onArrowsChange={arrows => {}}
+  highlights={['e4', 'd5']}
+  onHighlightsChange={highlights => {}}
+  // Visual
+  size={500} // number | 'contain' | omit for parent width
+  showCoordinates={true}
+  enableAnimations={true}
+  animationDuration={300}
+  pieceSet={customPieceSet}
+  renderPiece={(piece, size) => <MyPiece />}
+  className='my-board'
+  style={{ '--light-square': '#f0d9b5' }}
+/>
+```
 
-### Callbacks
+## useChessGame
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `onMove` | `(move: BoardMove) => void` | User completed a move |
-| `onPremove` | `(move: BoardMove) => void` | User queued a premove |
-| `onPremoveClear` | `() => void` | Premoves were cleared (right-click) |
-| `onPlaySound` | `(sound: MoveSound) => void` | Sound event (override built-in sounds) |
-
-### Interactivity
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `whiteMovable` | `boolean` | `true` | Whether white pieces are interactive |
-| `blackMovable` | `boolean` | `true` | Whether black pieces are interactive |
-| `enablePremoves` | `boolean` | `true` | Enable premove functionality |
-| `showMoveIndicators` | `boolean` | `true` | Show valid move dots/rings |
-| `autoPromotionPiece` | `PromotionPiece` | — | Auto-promote pawns (skip dialog) |
-| `premoveCandidates` | `(piece, square) => Square[]` | built-in | Custom premove movement patterns |
-
-### Visual
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `size` | `number` | responsive | Fixed board size in pixels |
-| `showCoordinates` | `boolean` | `true` | Show rank/file labels |
-| `enableAnimations` | `boolean` | `true` | Enable piece animations |
-| `animationDuration` | `number` | `300` | Animation duration (ms) |
-| `enableSounds` | `boolean` | `true` | Enable built-in sounds |
-| `enableArrows` | `boolean` | `true` | Enable right-click arrows |
-| `enableHighlights` | `boolean` | `true` | Enable right-click highlights |
-| `className` | `string` | — | Additional CSS class |
-| `style` | `CSSProperties` | — | Inline styles (for CSS custom properties) |
-
-## useChessGame Hook
-
-Wraps the built-in chess engine and produces props for `ChessBoard`:
+Wraps the built-in chess engine and produces all the props `ChessBoard` needs:
 
 ```tsx
 const game = useChessGame({
-  initialFen?: string,           // Starting position (default: standard)
-  whiteMovable?: boolean,        // White is human (default: true)
-  blackMovable?: boolean,        // Black is human (default: true)
+  initialFen?: string,
+  whiteMovable?: boolean,          // default: true
+  blackMovable?: boolean,          // default: true
+  enableSounds?: boolean,          // default: true
+  soundManager?: SoundManager,     // custom audio sprite
+  onSound?: (sound) => void,       // full custom sound handler
   onPositionChange?: (state, lastMove?) => void,
   onError?: (error) => void,
 });
@@ -168,90 +134,115 @@ const game = useChessGame({
 <ChessBoard {...game.boardProps} />
 
 // Control the game
-game.makeMove({ from: 'e2', to: 'e4' });  // Execute a move (for AI/server)
-game.resetGame();                           // Reset to starting position
-game.setPosition(fen);                      // Load a FEN position
-game.getGameState();                        // Get current GameState
-game.engine;                                // Direct engine access
+game.makeMove({ from: 'e2', to: 'e4' });
+game.resetGame();
+game.setPosition(fen);
+game.getGameState();
+game.history;                      // GameHistoryEntry[]
+game.undo();                       // undo last move
+game.undo(toPly);                  // roll back to specific ply
+game.endGame(result);              // resign, draw, timeout
+game.engine;                       // direct engine access
 ```
 
 ## Theming
 
-Board colors are controlled via CSS custom properties. Set them on the board's `style` prop:
+Board colors are CSS custom properties. Set them via the `style` prop:
 
 ```tsx
 <ChessBoard
   {...game.boardProps}
-  style={{
-    '--light-square': '#f0d9b5',
-    '--dark-square': '#b58863',
-    '--selected-light': '#f7ec74',
-    '--selected-dark': '#baca44',
-  } as React.CSSProperties}
+  style={
+    {
+      '--light-square': '#f0d9b5',
+      '--dark-square': '#b58863',
+      '--selected-light': '#f7ec74',
+      '--selected-dark': '#baca44',
+    } as React.CSSProperties
+  }
 />
 ```
 
-Available custom properties:
+Available properties: `--light-square`, `--dark-square`, `--selected-light`, `--selected-dark`, `--highlight-light`, `--highlight-dark`, `--premove-light`, `--premove-dark`, `--check-light`, `--check-dark`, `--coord-light-text`, `--coord-dark-text`.
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `--light-square` | `#eeeed2` | Light square color |
-| `--dark-square` | `#769656` | Dark square color |
-| `--selected-light` | `#f7ec74` | Selected/last-move on light squares |
-| `--selected-dark` | `#baca44` | Selected/last-move on dark squares |
-| `--highlight-light` | `#ff6b6b` | Right-click highlight on light squares |
-| `--highlight-dark` | `#e55555` | Right-click highlight on dark squares |
-| `--premove-light` | `#dc2626` | Premove highlight on light squares |
-| `--premove-dark` | `#b91c1c` | Premove highlight on dark squares |
-| `--check-light` | `#ff4444` | Check highlight on light squares |
-| `--check-dark` | `#cc3333` | Check highlight on dark squares |
-| `--coord-light-text` | light square color | Coordinate label on dark squares |
-| `--coord-dark-text` | dark square color | Coordinate label on light squares |
+## Custom Pieces
 
-## Types
+Use `pieceSet` to swap piece images (maps piece keys like `wK`, `bQ` to image URLs), or `renderPiece` for full custom rendering with React components:
 
 ```tsx
-// Algebraic square notation
-type Square = string; // e.g. "e4"
+import { PieceSet } from 'react-shahmat';
 
-// A move in algebraic notation
+const myPieces: PieceSet = {
+  wK: '/pieces/wK.svg',
+  wQ: '/pieces/wQ.svg',
+  // ... all 12 piece keys
+};
+
+<ChessBoard {...game.boardProps} pieceSet={myPieces} />;
+```
+
+`renderPiece` takes priority over `pieceSet` and receives the `Piece` object and square size in pixels.
+
+## Custom Sounds
+
+Sounds are handled by `useChessGame`, not `ChessBoard`. Three approaches:
+
+1. **Default** -- built-in sounds play automatically (`enableSounds: true`)
+2. **Custom sprite** -- pass a `SoundManager` instance with your own audio sprite URLs
+3. **Full control** -- pass `onSound` to handle sound events yourself
+
+```tsx
+import { SoundManager } from 'react-shahmat';
+
+// Custom audio sprite
+const sounds = new SoundManager({
+  ogg: '/sounds/chess.ogg',
+  mp3: '/sounds/chess.mp3',
+  map: '/sounds/chess.json',
+});
+
+const game = useChessGame({ soundManager: sounds });
+```
+
+## Key Types
+
+```tsx
+type Square = string; // e.g. "e4"
+type PlayerColor = 'white' | 'black';
+type ValidMovesMap = Map<Square, Square[]>; // from -> destinations
+type MoveSound =
+  | 'move'
+  | 'capture'
+  | 'check'
+  | 'checkmate'
+  | 'promotion'
+  | 'draw'
+  | 'premove'
+  | 'error'
+  | 'gamestart';
+
 interface BoardMove {
   from: Square;
   to: Square;
   promotion?: 'queen' | 'rook' | 'bishop' | 'knight';
 }
 
-// Valid moves map: from-square → destination squares
-type ValidMovesMap = Map<Square, Square[]>;
+interface BoardArrow {
+  from: Square;
+  to: Square;
+}
 
-// Player color
-type PlayerColor = 'white' | 'black';
-
-// Game end overlay
 interface GameEndOverlay {
   type: 'checkmate' | 'stalemate' | 'draw';
   winner?: PlayerColor;
 }
-
-// Sound events
-type MoveSound = 'move' | 'capture' | 'check' | 'checkmate'
-  | 'promotion' | 'draw' | 'premove' | 'error' | 'gamestart';
 ```
 
-### Conversion Utilities
+Conversion utilities are also exported: `squareToPosition`, `positionToSquare`, `moveToBoardMove`, `boardMoveToInternal`, `fenToPieceArray`, `buildValidMovesMap`.
 
-For consumers working with the built-in engine's internal types:
+## Examples
 
-```tsx
-import {
-  squareToPosition,     // "e4" → { file: 4, rank: 3 }
-  positionToSquare,     // { file: 4, rank: 3 } → "e4"
-  moveToBoardMove,      // internal Move → BoardMove
-  boardMoveToInternal,  // BoardMove → internal Move
-  fenToPieceArray,      // FEN → Piece[][]
-  buildValidMovesMap,   // GameState → ValidMovesMap
-} from 'react-shahmat';
-```
+See the **[live demo](https://tibordp.github.io/react-shahmat/)** for interactive examples including two-player boards, custom themes, custom pieces, puzzles, arrows/highlights, premoves, history navigation, and playing against an engine.
 
 ## License
 

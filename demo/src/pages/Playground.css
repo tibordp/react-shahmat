@@ -347,31 +347,10 @@
    Mobile Menu Toggle
    ========================================================================== */
 
-.mobile-menu-toggle {
-  display: none;
-  position: fixed;
-  top: 56px;
-  left: 10px;
-  z-index: 1001;
-  background: rgba(50, 50, 50, 0.9);
-  color: white;
-  border: 1px solid #555;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  font-size: 18px;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-}
-
-.mobile-menu-toggle:active {
-  transform: scale(0.95);
-}
-
 .controls-overlay {
   display: none;
   position: fixed;
-  top: 0;
+  top: 46px; /* below nav bar */
   left: 0;
   right: 0;
   bottom: 0;
@@ -388,22 +367,18 @@
     flex-direction: column;
   }
 
-  .mobile-menu-toggle {
-    display: block;
-  }
-
-  /* Sidebar becomes a slide-out drawer */
+  /* Sidebar becomes a slide-out drawer below the nav bar */
   .controls-panel {
     position: fixed;
-    top: 0;
+    top: 46px; /* below nav bar */
     left: -100%;
     width: 85%;
     max-width: 320px;
-    height: 100dvh;
+    height: calc(100dvh - 46px);
     z-index: 1000;
     border-right: 1px solid #444;
     transition: left 0.3s ease;
-    padding-top: 60px;
+    padding-top: 16px;
   }
 
   .controls-panel.controls-open {

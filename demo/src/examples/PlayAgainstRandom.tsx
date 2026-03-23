@@ -25,7 +25,8 @@ function PlayAgainstRandom() {
 }`;
 
 export const TITLE = 'Play Against Random AI';
-export const DESCRIPTION = 'White is human, black plays random legal moves. Shows how to use onPositionChange to detect AI turns and game.makeMove() to execute moves programmatically.';
+export const DESCRIPTION =
+  'White is human, black plays random legal moves. Shows how to use onPositionChange to detect AI turns and game.makeMove() to execute moves programmatically.';
 
 export default function PlayAgainstRandom() {
   const gameRef = React.useRef<ReturnType<typeof useChessGame>>(null!);

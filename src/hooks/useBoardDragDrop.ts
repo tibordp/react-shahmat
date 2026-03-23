@@ -16,19 +16,37 @@ export interface UseBoardDragDropOptions {
   setValidMoves: React.Dispatch<React.SetStateAction<Position[]>>;
   setArrows: React.Dispatch<React.SetStateAction<Arrow[]>>;
   setHighlightedSquares: React.Dispatch<React.SetStateAction<Position[]>>;
-  onMoveAttempt: (fromFile: number, fromRank: number, toFile: number, toRank: number, isDrag?: boolean) => void;
-  onPremoveAttempt: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
+  onMoveAttempt: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number,
+    isDrag?: boolean
+  ) => void;
+  onPremoveAttempt: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number
+  ) => void;
   canMove: boolean;
   canPremove: boolean;
 }
 
 export interface UseBoardDragDropReturn {
-  handleDrop: (fromFile: number, fromRank: number, toFile: number, toRank: number) => void;
+  handleDrop: (
+    fromFile: number,
+    fromRank: number,
+    toFile: number,
+    toRank: number
+  ) => void;
   handleDragStart: (file: number, rank: number) => void;
   handleDragEnd: (file: number, rank: number) => void;
 }
 
-export function useBoardDragDrop(options: UseBoardDragDropOptions): UseBoardDragDropReturn {
+export function useBoardDragDrop(
+  options: UseBoardDragDropOptions
+): UseBoardDragDropReturn {
   const {
     boardState,
     turnColor,
@@ -67,7 +85,14 @@ export function useBoardDragDrop(options: UseBoardDragDropOptions): UseBoardDrag
       // already clears selection. If invalid, selection stays so the user
       // can click a valid destination instead.
     },
-    [boardState, turnColor, canMove, canPremove, onMoveAttempt, onPremoveAttempt, setSelectedSquare, setValidMoves]
+    [
+      boardState,
+      turnColor,
+      canMove,
+      canPremove,
+      onMoveAttempt,
+      onPremoveAttempt,
+    ]
   );
 
   const handleDragStart = useCallback(

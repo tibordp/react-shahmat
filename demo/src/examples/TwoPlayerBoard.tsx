@@ -12,7 +12,8 @@ function TwoPlayerBoard() {
 }`;
 
 export const TITLE = 'Two-Player Board';
-export const DESCRIPTION = 'The simplest interactive setup. useChessGame wraps the built-in engine and produces all the props ChessBoard needs. Both sides are human-controlled.';
+export const DESCRIPTION =
+  'The simplest interactive setup. useChessGame wraps the built-in engine and produces all the props ChessBoard needs. Both sides are human-controlled.';
 
 export default function TwoPlayerBoard() {
   const game = useChessGame();

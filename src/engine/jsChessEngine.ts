@@ -55,14 +55,33 @@ export interface GameState {
   result?: GameResult;
   moveHistory: Move[];
   capturedPieces: { white: Piece[]; black: Piece[] };
+  /** Number of times the current position has occurred (including this one) */
+  repetitionCount: number;
+  /** Half-moves since last capture or pawn move (for 50/75-move rule) */
+  halfmoveClock: number;
+  /** True if neither side has sufficient material to checkmate */
+  insufficientMaterial: boolean;
 }
 
 export interface GameResult {
   winner?: Color;
-  reason: 'checkmate' | 'stalemate' | 'draw' | 'resignation' | 'timeout';
+  reason:
+    | 'checkmate'
+    | 'stalemate'
+    | 'draw'
+    | 'resignation'
+    | 'timeout'
+    | 'repetition'
+    | 'fifty_moves'
+    | 'insufficient_material';
 }
 
-export type MoveType = 'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
+export type MoveType =
+  | 'normal'
+  | 'capture'
+  | 'castling'
+  | 'enPassant'
+  | 'promotion';
 
 export interface HistoryEntry {
   move: Move;
@@ -83,7 +102,6 @@ export interface ChessError {
   message: string;
   originalError?: Error;
 }
-
 
 export class JSChessEngine {
   private board: (Piece | null)[][];
@@ -1000,7 +1018,14 @@ export class JSChessEngine {
     const isCheck = this.isKingInCheck(this.currentPlayer);
     const isCheckmate = isCheck && this.getGameState().isGameOver;
     const algebraic = this.computeAlgebraic(
-      piece, from, to, type as MoveType, capturedPiece, promotionPiece, isCheck, isCheckmate
+      piece,
+      from,
+      to,
+      type as MoveType,
+      capturedPiece,
+      promotionPiece,
+      isCheck,
+      isCheckmate
     );
     this.historyEntries.push({
       move: moveRecord,
@@ -1182,7 +1207,12 @@ export class JSChessEngine {
     return notation;
   }
 
-  private getDisambiguation(piece: Piece, from: Position, to: Position, prevFen: string): string {
+  private getDisambiguation(
+    piece: Piece,
+    from: Position,
+    to: Position,
+    prevFen: string
+  ): string {
     // Parse the previous position to find other pieces of the same type that could reach the target
     const tempEngine = new JSChessEngine();
     tempEngine.setPosition(prevFen);
@@ -1220,6 +1250,88 @@ export class JSChessEngine {
     } else {
       return FILE_LETTERS[from.file] + (from.rank + 1);
     }
+  }
+
+  /**
+   * Count how many times the current position has occurred in the game.
+   * Compares piece placement, active color, castling rights, and en passant target.
+   */
+  public getRepetitionCount(): number {
+    if (this.fenHistory.length === 0) return 1;
+    const currentKey = this.positionKey(this.generateFEN());
+    let count = 0;
+    for (const fen of this.fenHistory) {
+      if (this.positionKey(fen) === currentKey) count++;
+    }
+    return count;
+  }
+
+  /** Extract the position-relevant part of a FEN (no move counters) */
+  private positionKey(fen: string): string {
+    const parts = fen.split(' ');
+    // piece placement + active color + castling + en passant
+    return parts.slice(0, 4).join(' ');
+  }
+
+  /**
+   * Check if the position has insufficient material for either side to checkmate.
+   * Only returns true when checkmate is literally impossible:
+   * - K vs K
+   * - K+B vs K
+   * - K+N vs K
+   * - K+B vs K+B (same color bishops)
+   */
+  public isInsufficientMaterial(): boolean {
+    const pieces: {
+      color: Color;
+      type: PieceType;
+      file: number;
+      rank: number;
+    }[] = [];
+
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece) {
+          pieces.push({ ...piece, file, rank });
+        }
+      }
+    }
+
+    // Any pawns, rooks, or queens → sufficient material
+    if (
+      pieces.some(
+        p =>
+          p.type === PieceType.Pawn ||
+          p.type === PieceType.Rook ||
+          p.type === PieceType.Queen
+      )
+    ) {
+      return false;
+    }
+
+    // Filter to non-king pieces
+    const minors = pieces.filter(p => p.type !== PieceType.King);
+
+    // K vs K
+    if (minors.length === 0) return true;
+
+    // K+minor vs K
+    if (minors.length === 1) return true;
+
+    // K+B vs K+B — only insufficient if bishops are on the same color square
+    if (
+      minors.length === 2 &&
+      minors[0].type === PieceType.Bishop &&
+      minors[1].type === PieceType.Bishop &&
+      minors[0].color !== minors[1].color
+    ) {
+      const color0 = (minors[0].file + minors[0].rank) % 2;
+      const color1 = (minors[1].file + minors[1].rank) % 2;
+      if (color0 === color1) return true;
+    }
+
+    return false;
   }
 
   public getGameState(): GameState {
@@ -1296,6 +1408,9 @@ export class JSChessEngine {
       result,
       moveHistory: this.moveHistory || [],
       capturedPieces,
+      repetitionCount: this.getRepetitionCount(),
+      halfmoveClock: this.halfmoveClock,
+      insufficientMaterial: this.isInsufficientMaterial(),
     };
   }
 
@@ -1321,7 +1436,7 @@ export class JSChessEngine {
     };
 
     // Count current pieces
-    const currentPieces = { white: {} as any, black: {} as any };
+    const currentPieces: { white: Record<number, number>; black: Record<number, number> } = { white: {}, black: {} };
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];

@@ -4,16 +4,16 @@
 
 body {
   margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family:
-    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
 }
 
 /* ==========================================================================
@@ -25,22 +25,52 @@ code {
   align-items: center;
   background: #1a1a1a;
   border-bottom: 1px solid #333;
-  padding: 0 20px;
+  padding: 0 12px;
   height: 46px;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.nav-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-right: 8px;
+  border-radius: 4px;
+}
+
+.nav-hamburger:hover {
+  color: #fff;
+  background: #333;
+}
+
+@media (max-width: 768px) {
+  .nav-hamburger {
+    display: block;
+  }
 }
 
 .nav-brand {
   font-size: 15px;
   font-weight: 700;
   color: #e0e0e0;
+  text-decoration: none;
   margin-right: auto;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .nav-links {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .nav-link {
@@ -48,9 +78,11 @@ code {
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
   transition: color 0.15s ease, background 0.15s ease;
+  display: flex;
+  align-items: center;
 }
 
 .nav-link:hover {
@@ -62,3 +94,7 @@ code {
   color: #fff;
   background: #333;
 }
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */

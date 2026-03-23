@@ -6,14 +6,85 @@
   padding: 32px 24px 64px;
 }
 
+/* Hero Section */
+
+.hero-section {
+  max-width: 900px;
+  margin: 0 auto 40px;
+  text-align: center;
+  padding-bottom: 32px;
+  border-bottom: 1px solid #333;
+}
+
+.hero-title {
+  font-size: 36px;
+  font-weight: 800;
+  margin: 0 0 12px;
+  color: #fff;
+  letter-spacing: -0.03em;
+}
+
+.hero-tagline {
+  font-size: 16px;
+  color: #aaa;
+  margin: 0 0 20px;
+  line-height: 1.5;
+  max-width: 540px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-install {
+  display: inline-block;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin-bottom: 20px;
+}
+
+.hero-install code {
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas,
+    monospace;
+  font-size: 14px;
+  color: #e0e0e0;
+}
+
+.hero-links {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hero-link {
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: #e0e0e0;
+  background: #333;
+  border: 1px solid #4a4a4a;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hero-link:hover {
+  background: #444;
+  border-color: #666;
+}
+
+/* Examples Header */
+
 .examples-header {
   max-width: 900px;
   margin: 0 auto 32px;
   text-align: center;
 }
 
-.examples-header h1 {
-  font-size: 28px;
+.examples-header h1,
+.examples-header h2 {
+  font-size: 24px;
   font-weight: 700;
   margin: 0 0 8px;
   color: #fff;
@@ -104,7 +175,8 @@
 }
 
 .example-code code {
-  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas, monospace;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas,
+    monospace;
   white-space: pre;
 }
 
@@ -113,8 +185,17 @@
     padding: 20px 12px 48px;
   }
 
-  .examples-header h1 {
-    font-size: 22px;
+  .hero-title {
+    font-size: 28px;
+  }
+
+  .hero-tagline {
+    font-size: 14px;
+  }
+
+  .examples-header h1,
+  .examples-header h2 {
+    font-size: 20px;
   }
 
   .example-header {

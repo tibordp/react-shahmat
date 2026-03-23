@@ -30,7 +30,8 @@ function Premoves() {
 }`;
 
 export const TITLE = 'Premoves';
-export const DESCRIPTION = 'Queue your next move while the opponent is thinking. Premoves show in red and execute automatically when your turn arrives. Multiple premoves can be stacked. Right-click to cancel.';
+export const DESCRIPTION =
+  'Queue your next move while the opponent is thinking. Premoves show in red and execute automatically when your turn arrives. Multiple premoves can be stacked. Right-click to cancel.';
 
 export default function Premoves() {
   const gameRef = React.useRef<ReturnType<typeof useChessGame>>(null!);
@@ -49,10 +50,5 @@ export default function Premoves() {
   });
   gameRef.current = game;
 
-  return (
-    <ChessBoard
-      {...game.boardProps}
-      enablePremoves={true}
-    />
-  );
+  return <ChessBoard {...game.boardProps} enablePremoves={true} />;
 }
