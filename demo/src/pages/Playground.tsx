@@ -545,6 +545,12 @@ function SettingsPanel({
           onChange={s.setHighlightDropTarget}
         />
         <Toggle
+          id='enableKeyboardNavigation'
+          label='Keyboard navigation'
+          checked={s.enableKeyboardNavigation}
+          onChange={s.setEnableKeyboardNavigation}
+        />
+        <Toggle
           id='enablePreMoves'
           label='Pre-moves'
           checked={s.enablePreMoves}
@@ -674,6 +680,8 @@ interface SettingsState {
   setShowMoveIndicators: (v: boolean) => void;
   highlightDropTarget: boolean;
   setHighlightDropTarget: (v: boolean) => void;
+  enableKeyboardNavigation: boolean;
+  setEnableKeyboardNavigation: (v: boolean) => void;
   aiMode: AiMode;
   setAiMode: (v: AiMode) => void;
   repetitionRule: string;
@@ -716,6 +724,8 @@ function useSettings(): SettingsState {
   const [highlights, setHighlights] = React.useState<string[]>([]);
   const [showMoveIndicators, setShowMoveIndicators] = React.useState(true);
   const [highlightDropTarget, setHighlightDropTarget] = React.useState(true);
+  const [enableKeyboardNavigation, setEnableKeyboardNavigation] =
+    React.useState(true);
   const [aiMode, setAiMode] = React.useState<AiMode>('medium');
   const [repetitionRule, setRepetitionRule] = React.useState('5');
   const [moveRule, setMoveRule] = React.useState('75');
@@ -790,6 +800,8 @@ function useSettings(): SettingsState {
     setShowMoveIndicators,
     highlightDropTarget,
     setHighlightDropTarget,
+    enableKeyboardNavigation,
+    setEnableKeyboardNavigation,
     aiMode,
     setAiMode,
     repetitionRule,
@@ -1086,6 +1098,7 @@ function Playground() {
             }
             showMoveIndicators={settings.showMoveIndicators}
             highlightDropTarget={settings.highlightDropTarget}
+            enableKeyboardNavigation={settings.enableKeyboardNavigation}
             readonly={nav.isViewingHistory}
             style={boardStyle}
           />

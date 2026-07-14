@@ -6,23 +6,23 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
-import { DndProvider, useDragLayer, useDragDropManager } from 'react-dnd';
+import { DndProvider } from 'react-dnd';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { Square } from './Square';
 import { ArrowOverlay } from './ArrowOverlay';
 import { PromotionDialog } from './PromotionDialog';
 import { PieceAnimations } from './PieceAnimations';
+import { CustomDragLayer } from './CustomDragLayer';
+import { DragCanceller } from './DragCanceller';
+import { GameEndBadge } from './GameEndBadge';
 import { usePieceAnimations } from '../hooks/usePieceAnimations';
 import { useBoardDragDrop } from '../hooks/useBoardDragDrop';
 import { useBoardClicks } from '../hooks/useBoardClicks';
 import { useBoardUIState } from '../hooks/useBoardUIState';
+import { useBoardKeyboard } from '../hooks/useBoardKeyboard';
+import { getPremoveCandidates } from '../utils/premoveCandidates';
 import { Piece, Position, PieceType, Color } from '../engine/chessRules';
-import {
-  getPieceIcon,
-  describePiece,
-  whiteKing,
-  defaultPieceSet,
-} from '../utils/pieceIcons';
+import { describePiece, defaultPieceSet } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
 import {
   PlayerColor,
@@ -39,287 +39,6 @@ import {
 } from '../types';
 import type { Square as SquareNotation } from '../types';
 import styles from './ChessBoard.module.css';
-
-// ============================================================================
-// Internal sub-components
-// ============================================================================
-
-interface CustomDragLayerProps {
-  squareSize: number;
-  boardId: string;
-  pieceSet: PieceSet;
-  renderPiece?: (piece: Piece, size: number) => React.ReactNode;
-}
-
-const CustomDragLayer: React.FC<CustomDragLayerProps> = ({
-  squareSize,
-  boardId,
-  pieceSet: ps,
-  renderPiece: rp,
-}) => {
-  const { isDragging, item, currentOffset } = useDragLayer(
-    (monitor: unknown) => ({
-      item: (
-        monitor as { getItem(): { piece?: Piece; boardId?: string } }
-      ).getItem(),
-      currentOffset: (
-        monitor as { getClientOffset(): { x: number; y: number } | null }
-      ).getClientOffset(),
-      isDragging: (monitor as { isDragging(): boolean }).isDragging(),
-    })
-  );
-
-  if (!isDragging || !currentOffset || item?.boardId !== boardId) return null;
-
-  const { x, y } = currentOffset;
-  const piece = item?.piece;
-  if (!piece) return null;
-
-  const shadow = `drop-shadow(${Math.max(1, squareSize * 0.03)}px ${Math.max(
-    1,
-    squareSize * 0.03
-  )}px ${Math.max(2, squareSize * 0.06)}px rgba(0, 0, 0, 0.6))`;
-
-  return (
-    <div className={styles.customDragLayer}>
-      <div
-        className={styles.dragPreviewPiece}
-        style={{
-          left: x - squareSize * 0.5,
-          top: y - squareSize * 0.5,
-          position: 'absolute',
-          width: squareSize,
-          height: squareSize,
-          filter: shadow,
-        }}
-      >
-        {rp ? (
-          rp(piece, squareSize)
-        ) : (
-          <img
-            src={getPieceIcon(piece, ps)}
-            alt=''
-            aria-hidden='true'
-            className={styles.dragPreviewPieceImg}
-          />
-        )}
-      </div>
-    </div>
-  );
-};
-
-/** Provides a programmatic drag cancel function via ref. Must be inside DndProvider. */
-function DragCanceller({
-  cancelRef,
-}: {
-  cancelRef: React.MutableRefObject<() => void>;
-}) {
-  const manager = useDragDropManager();
-  cancelRef.current = useCallback(() => {
-    if (manager.getMonitor().isDragging()) {
-      manager.dispatch({ type: 'dnd-core/END_DRAG' });
-    }
-  }, [manager]);
-  return null;
-}
-
-interface GameEndBadgeProps {
-  kingPosition: Position;
-  squareSize: number;
-  flipped?: boolean;
-  badgeType: 'winner' | 'loser' | 'draw';
-}
-
-const GameEndBadge: React.FC<GameEndBadgeProps> = ({
-  kingPosition,
-  squareSize,
-  flipped,
-  badgeType,
-}) => {
-  const effectivePosition = flipped
-    ? { file: 7 - kingPosition.file, rank: 7 - kingPosition.rank }
-    : kingPosition;
-
-  const kingX = effectivePosition.file * squareSize;
-  const kingY = (7 - effectivePosition.rank) * squareSize;
-
-  const badgeSize = squareSize * 0.5;
-
-  let badgeX = kingX + squareSize - badgeSize / 2;
-  let badgeY = kingY - badgeSize / 2;
-
-  const boardSize = squareSize * 8;
-
-  if (badgeX + badgeSize > boardSize) {
-    badgeX = boardSize - badgeSize;
-  }
-  if (badgeY < 0) {
-    badgeY = 0;
-  }
-
-  const getBadgeColor = () => {
-    switch (badgeType) {
-      case 'winner':
-        return '#4CAF50';
-      case 'loser':
-        return '#f44336';
-      case 'draw':
-        return '#757575';
-    }
-  };
-
-  const renderBadgeContent = () => {
-    if (badgeType === 'draw') {
-      return (
-        <span
-          style={{
-            color: 'white',
-            fontSize: badgeSize * 0.6,
-            fontWeight: 'bold',
-          }}
-        >
-          ½
-        </span>
-      );
-    } else {
-      return (
-        <img
-          src={whiteKing}
-          alt={badgeType === 'loser' ? 'defeated king' : 'victorious king'}
-          style={{
-            width: badgeSize * 0.7,
-            height: badgeSize * 0.7,
-            filter: 'brightness(0) invert(1)',
-            transform: badgeType === 'loser' ? 'rotate(90deg)' : 'none',
-          }}
-        />
-      );
-    }
-  };
-
-  return (
-    <div
-      className={styles.gameEndBadge}
-      style={{
-        position: 'absolute',
-        left: badgeX,
-        top: badgeY,
-        width: badgeSize,
-        height: badgeSize,
-        backgroundColor: getBadgeColor(),
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-        zIndex: 200,
-        pointerEvents: 'none',
-      }}
-    >
-      {renderBadgeContent()}
-    </div>
-  );
-};
-
-// ============================================================================
-// Premove movement patterns
-// ============================================================================
-
-function inBounds(file: number, rank: number): boolean {
-  return file >= 0 && file < 8 && rank >= 0 && rank < 8;
-}
-
-/** Returns squares a piece could reach based on its movement pattern,
- *  ignoring blocking pieces, pins, and check. Used for premove candidates. */
-function getPremoveCandidates(
-  piece: Piece,
-  file: number,
-  rank: number
-): Position[] {
-  const moves: Position[] = [];
-  const add = (f: number, r: number) => {
-    if (inBounds(f, r)) moves.push({ file: f, rank: r });
-  };
-  const addRay = (df: number, dr: number) => {
-    for (let i = 1; i < 8; i++) {
-      const f = file + df * i;
-      const r = rank + dr * i;
-      if (!inBounds(f, r)) break;
-      moves.push({ file: f, rank: r });
-    }
-  };
-
-  switch (piece.type) {
-    case PieceType.Pawn: {
-      const dir = piece.color === Color.White ? 1 : -1;
-      const startRank = piece.color === Color.White ? 1 : 6;
-      // Forward one
-      add(file, rank + dir);
-      // Forward two from starting position
-      if (rank === startRank) add(file, rank + dir * 2);
-      // Captures (diagonal) — always shown for premoves since we don't know
-      // what the board will look like when the premove executes
-      add(file - 1, rank + dir);
-      add(file + 1, rank + dir);
-      break;
-    }
-    case PieceType.Knight:
-      for (const [df, dr] of [
-        [-2, -1],
-        [-2, 1],
-        [-1, -2],
-        [-1, 2],
-        [1, -2],
-        [1, 2],
-        [2, -1],
-        [2, 1],
-      ]) {
-        add(file + df, rank + dr);
-      }
-      break;
-    case PieceType.Bishop:
-      addRay(1, 1);
-      addRay(1, -1);
-      addRay(-1, 1);
-      addRay(-1, -1);
-      break;
-    case PieceType.Rook:
-      addRay(1, 0);
-      addRay(-1, 0);
-      addRay(0, 1);
-      addRay(0, -1);
-      break;
-    case PieceType.Queen:
-      addRay(1, 0);
-      addRay(-1, 0);
-      addRay(0, 1);
-      addRay(0, -1);
-      addRay(1, 1);
-      addRay(1, -1);
-      addRay(-1, 1);
-      addRay(-1, -1);
-      break;
-    case PieceType.King:
-      for (const [df, dr] of [
-        [-1, -1],
-        [-1, 0],
-        [-1, 1],
-        [0, -1],
-        [0, 1],
-        [1, -1],
-        [1, 0],
-        [1, 1],
-      ]) {
-        add(file + df, rank + dr);
-      }
-      // Castling squares
-      add(file + 2, rank);
-      add(file - 2, rank);
-      break;
-  }
-
-  return moves;
-}
 
 // ============================================================================
 // ChessBoard Props
@@ -417,6 +136,14 @@ export interface ChessBoardProps {
   ) => SquareNotation[];
   /** When true, highlights the square under the cursor during piece drag. Default: false */
   highlightDropTarget?: boolean;
+  /**
+   * Keyboard navigation: arrow keys move a focus cursor, Enter/Space
+   * selects and moves, Escape clears. Default: enabled when the board is
+   * interactive (an onMove/onPremove handler is provided and the board is
+   * not readonly); static diagrams are skipped by the Tab order. Pass false
+   * to opt out entirely (e.g. when the host app owns arrow-key bindings).
+   */
+  enableKeyboardNavigation?: boolean;
   /** When true, board is non-interactive with a translucent overlay. Default: false */
   readonly?: boolean;
 }
@@ -459,13 +186,15 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   premoveCandidates: premoveCandidatesFn,
   whiteMovable = true,
   highlightDropTarget = false,
+  enableKeyboardNavigation,
   blackMovable = true,
   readonly: readonlyMode = false,
 }) => {
   const boardId = React.useId();
-  const [boardSize, setBoardSize] = useState(
-    typeof size === 'number' ? size : 512
-  );
+  // A numeric size prop is authoritative and reactive; the measured size is
+  // only used in the responsive modes (no size prop, or size="contain").
+  const [measuredSize, setMeasuredSize] = useState(512);
+  const boardSize = typeof size === 'number' ? size : measuredSize;
   const boardRef = useRef<HTMLDivElement>(null);
   const prevPositionRef = useRef<string | null>(null);
   const prevBoardRef = useRef<(Piece | null)[][] | null>(null);
@@ -554,10 +283,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     kingInCheckHighlight,
   } = uiState;
 
-  // Keyboard navigation: a focus cursor moved with arrow keys, activated with
-  // Enter/Space. Only rendered while the board has keyboard-visible focus.
-  const [focusedSquare, setFocusedSquare] = useState<Position | null>(null);
-  const [keyboardActive, setKeyboardActive] = useState(false);
   const squareDomId = useCallback(
     (file: number, rank: number) => `${boardId}-sq-${file}${rank}`,
     [boardId]
@@ -756,7 +481,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           ? Math.min(parentWidth, boardRef.current.parentElement.clientHeight) -
             20
           : parentWidth;
-        setBoardSize(Math.max(200, available));
+        // Ignore transient zero/negative measurements (e.g. display:none or
+        // pre-layout); otherwise track the parent exactly, however narrow.
+        if (available > 0) setMeasuredSize(available);
       }
     };
 
@@ -1378,12 +1105,43 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   const wrappedSquareClick = useCallback(
     (f: number, r: number) => {
       if (dragActiveRef.current) return;
-      // Keep the keyboard cursor in sync so keyboard users can continue
-      // from the last clicked square
-      setFocusedSquare({ file: f, rank: r });
       handleSquareClick(f, r);
     },
     [handleSquareClick]
+  );
+
+  // Keyboard navigation: a focus cursor moved with arrow keys, activated
+  // with Enter/Space. Only rendered while the board has keyboard-visible
+  // focus. Defaults to on for interactive boards; a static diagram (no
+  // move handlers, or readonly) stays out of the Tab order.
+  const keyboardEnabled =
+    enableKeyboardNavigation ??
+    (!readonlyMode && (!!onMove || (!!onPremove && canPremove)));
+  const {
+    focusedSquare,
+    keyboardActive,
+    syncCursor,
+    suppressNextFocusActivation,
+    handlers: keyboardHandlers,
+  } = useBoardKeyboard({
+    readonly: readonlyMode || !keyboardEnabled,
+    flipped,
+    suspended: promotionDialog.isOpen,
+    selectedSquare,
+    clearSelection,
+    hasPremoves: premoves.length > 0,
+    clearPremoves: clearPremovesAndNotify,
+    onActivateSquare: wrappedSquareClick,
+  });
+
+  // Mouse clicks keep the keyboard cursor in sync so keyboard users can
+  // continue from the last clicked square
+  const handleSquareClickWithCursor = useCallback(
+    (f: number, r: number) => {
+      syncCursor(f, r);
+      wrappedSquareClick(f, r);
+    },
+    [syncCursor, wrappedSquareClick]
   );
 
   const wrappedDragStart = useCallback(
@@ -1428,100 +1186,6 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   // Keyboard interaction: arrow keys move the focus cursor (respecting board
   // orientation), Enter/Space acts like a click on the cursor square, Escape
   // dismisses the promotion dialog / selection / premoves in that order.
-  const handleBoardKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (readonlyMode) return;
-
-      const moveCursor = (df: number, dr: number) => {
-        // Consume the key entirely — host pages often bind arrow keys to
-        // history navigation, which must not fire while the focused board
-        // is using them for cursor movement.
-        e.preventDefault();
-        e.stopPropagation();
-        setKeyboardActive(true);
-        setFocusedSquare(prev => {
-          if (!prev) return { file: 4, rank: flipped ? 7 : 0 }; // start at e1/e8
-          return {
-            file: Math.min(7, Math.max(0, prev.file + (flipped ? -df : df))),
-            rank: Math.min(7, Math.max(0, prev.rank + (flipped ? -dr : dr))),
-          };
-        });
-      };
-
-      switch (e.key) {
-        case 'ArrowUp':
-          moveCursor(0, 1);
-          break;
-        case 'ArrowDown':
-          moveCursor(0, -1);
-          break;
-        case 'ArrowLeft':
-          moveCursor(-1, 0);
-          break;
-        case 'ArrowRight':
-          moveCursor(1, 0);
-          break;
-        case 'Enter':
-        case ' ':
-          e.preventDefault();
-          e.stopPropagation();
-          setKeyboardActive(true);
-          if (focusedSquare) {
-            wrappedSquareClick(focusedSquare.file, focusedSquare.rank);
-          } else {
-            setFocusedSquare({ file: 4, rank: flipped ? 7 : 0 });
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          e.stopPropagation();
-          if (promotionDialog.isOpen) {
-            handlePromotionCancel();
-          } else if (selectedSquare) {
-            clearSelection();
-          } else if (premoves.length > 0) {
-            clearPremovesAndNotify();
-          }
-          break;
-      }
-    },
-    [
-      readonlyMode,
-      flipped,
-      focusedSquare,
-      wrappedSquareClick,
-      promotionDialog.isOpen,
-      handlePromotionCancel,
-      selectedSquare,
-      clearSelection,
-      premoves.length,
-      clearPremovesAndNotify,
-    ]
-  );
-
-  // Only show the focus cursor for keyboard-driven focus (Tab), not clicks.
-  const handleBoardFocus = useCallback(
-    (e: React.FocusEvent<HTMLDivElement>) => {
-      if (e.target !== e.currentTarget) return;
-      let focusVisible = true;
-      try {
-        focusVisible = e.currentTarget.matches(':focus-visible');
-      } catch {
-        // Older browsers without :focus-visible — always show the cursor
-      }
-      if (focusVisible) {
-        setKeyboardActive(true);
-        setFocusedSquare(prev => prev ?? { file: 4, rank: flipped ? 7 : 0 });
-      }
-    },
-    [flipped]
-  );
-
-  const handleBoardBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    setKeyboardActive(false);
-  }, []);
-
   // Screen-reader announcement for the most recent move
   const moveAnnouncement = useMemo(() => {
     if (!lastMove) return '';
@@ -1556,15 +1220,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         ref={boardRef}
         role='group'
         aria-label='Chess board'
-        tabIndex={readonlyMode ? -1 : 0}
+        tabIndex={keyboardEnabled ? 0 : -1}
         aria-activedescendant={
-          keyboardActive && focusedSquare
+          keyboardEnabled && keyboardActive && focusedSquare
             ? squareDomId(focusedSquare.file, focusedSquare.rank)
             : undefined
         }
-        onKeyDown={handleBoardKeyDown}
-        onFocus={handleBoardFocus}
-        onBlur={handleBoardBlur}
+        onKeyDown={keyboardEnabled ? keyboardHandlers.onKeyDown : undefined}
+        onFocus={keyboardEnabled ? keyboardHandlers.onFocus : undefined}
+        onBlur={keyboardEnabled ? keyboardHandlers.onBlur : undefined}
+        onPointerDown={
+          keyboardEnabled ? keyboardHandlers.onPointerDown : undefined
+        }
         className={`${styles.chessBoard}${className ? ` ${className}` : ''}`}
         style={{
           ...styleProp,
@@ -1602,7 +1269,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                 isHighlighted={highlightSet.has(key)}
                 isPreMove={preMoveSet.has(key)}
                 isKingInCheck={checkKey === key || checkHighlightKey === key}
-                onSquareClick={wrappedSquareClick}
+                onSquareClick={handleSquareClickWithCursor}
                 onDrop={handleDrop}
                 onDragStart={wrappedDragStart}
                 onDragEnd={wrappedDragEnd}
@@ -1658,6 +1325,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           onSelect={handlePromotion}
           onCancel={handlePromotionCancel}
           onRightClickCancel={handlePromotionRightClickCancel}
+          onBeforeRestoreFocus={suppressNextFocusActivation}
           pieceSet={effectivePieceSet}
           renderPiece={renderPiece}
         />

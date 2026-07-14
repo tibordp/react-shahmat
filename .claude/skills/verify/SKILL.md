@@ -32,7 +32,8 @@ Squares are addressable via accessibility attributes:
 - Board container: `[role="group"][aria-label="Chess board"]`, with
   `aria-activedescendant` tracking the keyboard cursor.
 - Selection state: `aria-pressed` on the square.
-- Promotion dialog buttons: `button img[alt^="Promote to"]`.
+- Promotion dialog: `[role="dialog"]` with `button[aria-label^="Promote to"]`
+  choices; it traps focus and closes on Escape.
 
 Interactions: click square centers for click-moves; `mouse.down/move/up` for
 drags (TouchBackend with mouse events); right-button drag draws arrows,

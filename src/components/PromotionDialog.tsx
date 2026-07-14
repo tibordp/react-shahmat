@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Piece, PieceType, Color } from '../engine/chessRules';
 import { getPieceIconByType, describePiece } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
@@ -15,9 +15,21 @@ export interface PromotionDialogProps {
   onCancel: () => void;
   /** Called on right-click (cancel + clear premoves) */
   onRightClickCancel?: () => void;
+  /**
+   * Called just before focus is restored to the previously focused element
+   * on close (lets the board ignore that programmatic focus event).
+   */
+  onBeforeRestoreFocus?: () => void;
   pieceSet: PieceSet;
   renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
+
+const PROMOTION_TYPES = [
+  PieceType.Queen,
+  PieceType.Rook,
+  PieceType.Bishop,
+  PieceType.Knight,
+];
 
 export const PromotionDialog: React.FC<PromotionDialogProps> = ({
   isOpen,
@@ -28,9 +40,28 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
   onSelect,
   onCancel,
   onRightClickCancel,
+  onBeforeRestoreFocus,
   pieceSet,
   renderPiece,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Modal focus management: remember the previously focused element, move
+  // focus to the first choice on open, and restore focus on close.
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const firstButton = dialogRef.current?.querySelector('button');
+    firstButton?.focus();
+    return () => {
+      onBeforeRestoreFocus?.();
+      previousFocusRef.current?.focus?.();
+      previousFocusRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks are stable; re-running on their identity would steal focus
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const effectiveSquare = flipped
@@ -42,18 +73,50 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
 
   const isVisuallyAtBottom = squareY === 7 * squareSize;
 
-  const promotionTypes = [
-    PieceType.Queen,
-    PieceType.Rook,
-    PieceType.Bishop,
-    PieceType.Knight,
-  ];
   const orderedTypes = isVisuallyAtBottom
-    ? [...promotionTypes].reverse()
-    : promotionTypes;
+    ? [...PROMOTION_TYPES].reverse()
+    : PROMOTION_TYPES;
 
   const dialogX = squareX;
   const dialogY = isVisuallyAtBottom ? squareY - 3 * squareSize : squareY;
+
+  // The picker is one composite widget: arrow keys move between the choices
+  // (with wraparound), Enter/Space activates, Escape cancels, and Tab is
+  // inert — there is exactly one place focus can be while the dialog is open.
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      return;
+    }
+
+    const step =
+      e.key === 'ArrowDown' || e.key === 'ArrowRight'
+        ? 1
+        : e.key === 'ArrowUp' || e.key === 'ArrowLeft'
+          ? -1
+          : 0;
+    if (step !== 0) {
+      e.preventDefault();
+      e.stopPropagation(); // keep host-page arrow hotkeys from firing
+      const buttons = Array.from(
+        dialogRef.current?.querySelectorAll('button') ?? []
+      );
+      if (buttons.length === 0) return;
+      const current = buttons.indexOf(
+        document.activeElement as HTMLButtonElement
+      );
+      const next =
+        (Math.max(current, 0) + step + buttons.length) % buttons.length;
+      buttons[next].focus();
+    }
+  };
 
   return (
     <>
@@ -74,6 +137,10 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
         }}
       />
       <div
+        ref={dialogRef}
+        role='dialog'
+        aria-modal='true'
+        aria-label={`Promote ${color === Color.White ? 'white' : 'black'} pawn`}
         className={styles.promotionDialog}
         style={{
           position: 'absolute',
@@ -85,11 +152,17 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
         }}
         onClick={e => e.stopPropagation()}
         onContextMenu={e => e.preventDefault()}
+        onKeyDown={handleDialogKeyDown}
       >
         {orderedTypes.map(type => (
           <button
             key={type}
             className={styles.promotionPiece}
+            // Name the button itself so it stays accessible when a custom
+            // renderPiece provides the visual content
+            aria-label={`Promote to ${describePiece({ type, color })}`}
+            // Roving focus via arrow keys — the buttons are not tab stops
+            tabIndex={-1}
             onClick={() => onSelect(type)}
           >
             {renderPiece ? (
@@ -97,7 +170,8 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
             ) : (
               <img
                 src={getPieceIconByType(color, type, pieceSet)}
-                alt={`Promote to ${describePiece({ type, color })}`}
+                alt=''
+                aria-hidden='true'
                 className={styles.promotionPieceImg}
               />
             )}

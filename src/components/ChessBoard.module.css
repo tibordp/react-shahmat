@@ -17,6 +17,8 @@
   --coord-light-text: var(--light-square);
   --coord-dark-text: var(--dark-square);
   --arrow-color: rgba(255, 170, 0, 0.6);
+  /* Keyboard focus cursor ring — follows the board theme by default */
+  --focus-cursor: color-mix(in srgb, var(--dark-square) 65%, black);
 
   display: grid;
   border-radius: 4px;
@@ -43,7 +45,7 @@
 .square.focus-cursor {
   box-shadow:
     inset 0 0 0 max(2px, 0.4cqmin) #fff,
-    inset 0 0 0 max(5px, 1.1cqmin) rgba(20, 85, 30, 0.75);
+    inset 0 0 0 max(5px, 1.1cqmin) var(--focus-cursor);
 }
 
 /* Visually hidden, available to screen readers (live move announcements) */
@@ -233,6 +235,11 @@
   position: absolute;
   pointer-events: none;
   z-index: 200;
+  /* Center custom-rendered pieces the same way .piece and
+     .drag-preview-piece do (the default <img> fills the box anyway) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .animating-piece-img {
@@ -285,15 +292,41 @@
 .promotion-piece {
   background: transparent;
   border: none;
+  padding: 0;
   cursor: pointer;
   transition: all 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Exact square cells so the focus highlight is square too */
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  flex: 0 1 auto;
 }
 
 .promotion-piece:hover {
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+  transform: scale(1.1);
+}
+
+/* Keyboard focus indicator: a soft rounded highlight matching the hover
+   treatment instead of the browser's default rectangular outline. Scoped to
+   :focus-visible so a mouse-opened dialog shows no ring until the keyboard
+   is actually used. The tile itself is never scaled — the dialog clips
+   overflow horizontally, which would make a scaled tile look non-square —
+   only the piece inside gets the hover-style pop. */
+.promotion-piece:focus {
+  outline: none;
+}
+
+.promotion-piece:focus-visible {
+  outline: none;
+  background: rgba(110, 110, 110, 0.18);
+  border-radius: 12%;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+}
+
+.promotion-piece:focus-visible > * {
   transform: scale(1.1);
 }
 

@@ -10,6 +10,8 @@ A controlled React chess board component with smooth animations, sound effects, 
 npm install react-shahmat
 ```
 
+Requires React 18 or newer.
+
 ## Quick Start
 
 Three lines to a working chess board:
@@ -67,7 +69,7 @@ function ServerBoard() {
 - **Custom pieces** -- swap the piece image set or render pieces with arbitrary React components
 - **Theming** -- CSS custom properties for all board colors
 - **Touch & mouse** -- drag-and-drop via react-dnd's touch backend (mouse events enabled)
-- **Keyboard & screen readers** -- arrow-key navigation, Enter/Space to move, labelled squares, and polite move announcements
+- **Keyboard & screen readers** -- arrow-key navigation, Enter/Space to move, labelled squares, and polite move announcements. On by default for interactive boards (static diagrams stay out of the Tab order); opt out with `enableKeyboardNavigation={false}`
 - **SSR-safe** -- no browser globals touched at import time; works with Next.js and friends
 - **Responsive** -- auto-sizes to container, or set fixed size, or `'contain'` to fit parent
 - **TypeScript** -- full type definitions
@@ -97,6 +99,8 @@ All props at a glance:
   readonly={false}
   enablePremoves={false}
   showMoveIndicators={true}
+  enableKeyboardNavigation={true} // default: on for interactive boards, off for static diagrams
+
   autoPromotionPiece='queen'
   premoveCandidates={(piece, square) => [...squares]}
   // Annotations — controlled (own the state)...
@@ -169,7 +173,7 @@ Board colors are CSS custom properties. Set them via the `style` prop:
 />
 ```
 
-Available properties: `--light-square`, `--dark-square`, `--selected-light`, `--selected-dark`, `--highlight-light`, `--highlight-dark`, `--premove-light`, `--premove-dark`, `--check-light`, `--check-dark`, `--coord-light-text`, `--coord-dark-text`.
+Available properties: `--light-square`, `--dark-square`, `--selected-light`, `--selected-dark`, `--highlight-light`, `--highlight-dark`, `--premove-light`, `--premove-dark`, `--check-light`, `--check-dark`, `--coord-light-text`, `--coord-dark-text`, `--focus-cursor` (keyboard focus ring; defaults to a darkened `--dark-square`, so it follows your theme automatically).
 
 ## Custom Pieces
 
