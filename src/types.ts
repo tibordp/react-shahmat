@@ -222,6 +222,42 @@ export function fenToPieceArray(fen: string): (Piece | null)[][] {
 }
 
 /**
+ * Serialize a board array (as produced by fenToPieceArray) back to a FEN
+ * string. The inverse of fenToPieceArray. Castling and en passant fields are
+ * emitted as "-" — post-process the string if you need them.
+ */
+export function pieceArrayToFen(
+  board: (Piece | null)[][],
+  turnColor: PlayerColor = 'white'
+): string {
+  const PIECE_CHARS = 'PRNBQK'; // indexed by PieceType
+  const rows: string[] = [];
+
+  // FEN rows go from rank 8 down to rank 1
+  for (let rank = 7; rank >= 0; rank--) {
+    let row = '';
+    let empty = 0;
+    for (let file = 0; file < 8; file++) {
+      const piece = board[rank]?.[file];
+      if (!piece) {
+        empty++;
+        continue;
+      }
+      if (empty > 0) {
+        row += empty;
+        empty = 0;
+      }
+      const char = PIECE_CHARS[piece.type];
+      row += piece.color === Color.White ? char : char.toLowerCase();
+    }
+    if (empty > 0) row += empty;
+    rows.push(row);
+  }
+
+  return `${rows.join('/')} ${turnColor === 'black' ? 'b' : 'w'} - - 0 1`;
+}
+
+/**
  * Build a ValidMovesMap from a GameState's validMoves array.
  */
 export function buildValidMovesMap(gameState: GameState): ValidMovesMap {

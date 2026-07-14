@@ -34,6 +34,8 @@ export interface UseBoardClicksOptions {
   ) => void;
   canMove: boolean;
   canPremove: boolean;
+  /** Position-editor mode: select any piece, move it to any square */
+  freeMove: boolean;
   enableArrows: boolean;
   enableHighlights: boolean;
   premoves: BoardMove[];
@@ -65,6 +67,7 @@ export function useBoardClicks(
     onPremoveAttempt,
     canMove,
     canPremove,
+    freeMove,
     enableArrows,
     enableHighlights,
     premoves,
@@ -88,6 +91,22 @@ export function useBoardClicks(
       setHighlightedSquares([]);
 
       const piece = boardState[rank]?.[file];
+
+      if (freeMove) {
+        // Position-editor semantics: select any piece regardless of color or
+        // turn, then move it to any other square (occupied = replace).
+        if (selectedSquare) {
+          if (selectedSquare.file !== file || selectedSquare.rank !== rank) {
+            onMoveAttempt(selectedSquare.file, selectedSquare.rank, file, rank);
+          }
+          setSelectedSquare(null);
+          setValidMoves([]);
+        } else if (piece) {
+          setSelectedSquare({ file, rank });
+          setValidMoves([]);
+        }
+        return;
+      }
       const isTurnPiece =
         piece && piece.color === turnColorEnum && isMovableColor(piece.color);
       const isPremovePiece =
@@ -148,6 +167,7 @@ export function useBoardClicks(
       selectedSquare,
       canMove,
       canPremove,
+      freeMove,
       turnColorEnum,
       isMovableColor,
       validMovesForSquare,

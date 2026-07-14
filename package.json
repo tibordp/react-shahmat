@@ -36,6 +36,7 @@
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
+    "dnd-core": "^16.0.1",
     "react-dnd": "^16.0.1",
     "react-dnd-touch-backend": "^16.0.1"
   },

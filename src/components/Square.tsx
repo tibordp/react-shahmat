@@ -30,9 +30,13 @@ export interface SquareProps {
     toRank: number
   ) => void;
   onDragStart: (file: number, rank: number) => void;
-  onDragEnd: (file: number, rank: number) => void;
+  onDragEnd: (file: number, rank: number, didDrop: boolean) => void;
   onRightMouseDown: (file: number, rank: number) => void;
   onRightMouseUp: (file: number, rank: number) => void;
+  /** Whether drops of external SparePiece items are accepted */
+  acceptSpare: boolean;
+  /** Called when a SparePiece item is dropped on this square */
+  onSpareDrop: (piece: Piece, file: number, rank: number) => void;
   highlightDropTarget: boolean;
   boardId: string;
   draggable: boolean;
@@ -45,13 +49,21 @@ export interface SquareProps {
   squareSize: number;
 }
 
-export interface DragItem {
-  type: 'piece';
-  file: number;
-  rank: number;
-  piece: Piece;
-  boardId: string;
-}
+/**
+ * Items dragged in the board's DnD context: either a piece on a board
+ * (identified by boardId + source square) or a spare piece dragged from
+ * outside the board (a SparePiece component).
+ */
+export type DragItem =
+  | {
+      type: 'piece';
+      file: number;
+      rank: number;
+      piece: Piece;
+      boardId: string;
+      spare?: undefined;
+    }
+  | { type: 'piece'; piece: Piece; spare: true; sourceId: string };
 
 export const Square: React.FC<SquareProps> = React.memo(
   ({
@@ -74,6 +86,8 @@ export const Square: React.FC<SquareProps> = React.memo(
     onDragEnd,
     onRightMouseDown,
     onRightMouseUp,
+    acceptSpare,
+    onSpareDrop,
     flipped,
     showCoordinates,
     highlightDropTarget,
@@ -97,8 +111,8 @@ export const Square: React.FC<SquareProps> = React.memo(
           return null;
         },
         canDrag: () => !!piece && draggable,
-        end: () => {
-          onDragEnd(file, rank);
+        end: (_item, monitor) => {
+          onDragEnd(file, rank, monitor.didDrop());
         },
         collect: monitor => ({
           isDragging: monitor.isDragging(),
@@ -110,14 +124,23 @@ export const Square: React.FC<SquareProps> = React.memo(
     const [{ isOver }, drop] = useDrop(
       () => ({
         accept: 'piece',
+        // Spare items are accepted only when the board opted in; board items
+        // only from this board (a rejected drop reads as "left the board" to
+        // the source, which is the coherent cross-board semantic).
+        canDrop: (item: DragItem) =>
+          item.spare ? acceptSpare : item.boardId === boardId,
         drop: (item: DragItem) => {
-          onDrop(item.file, item.rank, file, rank);
+          if (item.spare) {
+            onSpareDrop(item.piece, file, rank);
+          } else {
+            onDrop(item.file, item.rank, file, rank);
+          }
         },
         collect: monitor => ({
           isOver: monitor.isOver() && monitor.canDrop(),
         }),
       }),
-      [file, rank, onDrop]
+      [file, rank, onDrop, onSpareDrop, acceptSpare, boardId]
     );
 
     const isLight = (file + rank) % 2 === 1;

@@ -3,6 +3,11 @@
 // Components
 export { ChessBoard } from './components/ChessBoard';
 
+// Position editor building blocks
+export { SparePiece } from './components/SparePiece';
+export type { SparePieceProps } from './components/SparePiece';
+export { BoardDndProvider } from './components/BoardDndProvider';
+
 // Hooks
 export { useChessGame } from './hooks/useChessGame';
 export { useChessRules } from './hooks/useChessRules';
@@ -56,6 +61,7 @@ export {
   moveToBoardMove,
   boardMoveToInternal,
   fenToPieceArray,
+  pieceArrayToFen,
   buildValidMovesMap,
   toFigurine,
 } from './types';

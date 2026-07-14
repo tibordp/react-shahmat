@@ -163,6 +163,7 @@ export default [
       'react/jsx-runtime',
       'react-dnd',
       'react-dnd-touch-backend',
+      'dnd-core',
     ],
   },
   {
@@ -188,6 +189,7 @@ export default [
       'react/jsx-runtime',
       'react-dnd',
       'react-dnd-touch-backend',
+      'dnd-core',
     ],
   },
 ];

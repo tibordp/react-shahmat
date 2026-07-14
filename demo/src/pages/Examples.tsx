@@ -56,6 +56,11 @@ import CustomPieces, {
   TITLE as CustomPiecesTitle,
   DESCRIPTION as CustomPiecesDescription,
 } from '../examples/CustomPieces';
+import PositionEditor, {
+  SOURCE as PositionEditorSource,
+  TITLE as PositionEditorTitle,
+  DESCRIPTION as PositionEditorDescription,
+} from '../examples/PositionEditor';
 
 interface ExampleEntry {
   component: React.ComponentType;
@@ -130,6 +135,12 @@ const EXAMPLES: ExampleEntry[] = [
     source: HistoryNavigationSource,
     title: HistoryNavigationTitle,
     description: HistoryNavigationDescription,
+  },
+  {
+    component: PositionEditor,
+    source: PositionEditorSource,
+    title: PositionEditorTitle,
+    description: PositionEditorDescription,
   },
 ];
 

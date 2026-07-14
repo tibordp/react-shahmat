@@ -31,6 +31,8 @@ export interface UseBoardDragDropOptions {
   ) => void;
   canMove: boolean;
   canPremove: boolean;
+  /** Position-editor mode: any piece is draggable to any square */
+  freeMove: boolean;
 }
 
 export interface UseBoardDragDropReturn {
@@ -60,6 +62,7 @@ export function useBoardDragDrop(
     onPremoveAttempt,
     canMove,
     canPremove,
+    freeMove,
   } = options;
 
   const isMovableColor = useCallback(
@@ -72,6 +75,11 @@ export function useBoardDragDrop(
 
   const handleDrop = useCallback(
     (fromFile: number, fromRank: number, toFile: number, toRank: number) => {
+      if (freeMove) {
+        onMoveAttempt(fromFile, fromRank, toFile, toRank, true);
+        return;
+      }
+
       const piece = boardState[fromRank]?.[fromFile];
       const turnColorEnum = turnColor === 'white' ? Color.White : Color.Black;
       const isTurnPiece = piece && piece.color === turnColorEnum;
@@ -90,6 +98,7 @@ export function useBoardDragDrop(
       turnColor,
       canMove,
       canPremove,
+      freeMove,
       onMoveAttempt,
       onPremoveAttempt,
     ]
@@ -98,6 +107,16 @@ export function useBoardDragDrop(
   const handleDragStart = useCallback(
     (file: number, rank: number) => {
       const piece = boardState[rank]?.[file];
+
+      if (freeMove) {
+        if (!piece) return;
+        setArrows([]);
+        setHighlightedSquares([]);
+        setSelectedSquare({ file, rank });
+        setValidMoves([]); // selection highlight, no indicator dots
+        return;
+      }
+
       if (!piece || !isMovableColor(piece.color)) return;
 
       const turnColorEnum = turnColor === 'white' ? Color.White : Color.Black;
@@ -119,6 +138,7 @@ export function useBoardDragDrop(
       turnColor,
       canMove,
       canPremove,
+      freeMove,
       isMovableColor,
       validMovesForSquare,
       setArrows,

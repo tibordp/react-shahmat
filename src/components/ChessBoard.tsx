@@ -1,13 +1,14 @@
 import React, {
   useState,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useMemo,
 } from 'react';
-import { DndProvider } from 'react-dnd';
-import { TouchBackend } from 'react-dnd-touch-backend';
+import { DndProvider, DndContext } from 'react-dnd';
+import { getSharedDndManager } from './BoardDndProvider';
 import { Square } from './Square';
 import { ArrowOverlay } from './ArrowOverlay';
 import { PromotionDialog } from './PromotionDialog';
@@ -137,6 +138,25 @@ export interface ChessBoardProps {
   /** When true, highlights the square under the cursor during piece drag. Default: false */
   highlightDropTarget?: boolean;
   /**
+   * Position-editor mode: any piece can be dragged or clicked to any square,
+   * ignoring turns, validMoves, promotion, and premoves. onMove receives the
+   * raw from/to squares. readonly still disables interaction. Default: false
+   */
+  freeMove?: boolean;
+  /**
+   * Called when a SparePiece dragged from outside the board is dropped on a
+   * square. Providing this makes the board accept spare-piece drops (an
+   * ambient DnD context, e.g. BoardDndProvider, must wrap both the board and
+   * the spare pieces). Occupied squares report the same way — the consumer
+   * decides whether to replace.
+   */
+  onPiecePlace?: (piece: Piece, square: SquareNotation) => void;
+  /**
+   * Called when a board piece is dragged off the board (released outside any
+   * square). Providing this enables drag-off-to-remove.
+   */
+  onPieceRemove?: (square: SquareNotation) => void;
+  /**
    * Keyboard navigation: arrow keys move a focus cursor, Enter/Space
    * selects and moves, Escape clears. Default: enabled when the board is
    * interactive (an onMove/onPremove handler is provided and the board is
@@ -187,10 +207,14 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   whiteMovable = true,
   highlightDropTarget = false,
   enableKeyboardNavigation,
+  freeMove = false,
+  onPiecePlace,
+  onPieceRemove,
   blackMovable = true,
   readonly: readonlyMode = false,
 }) => {
   const boardId = React.useId();
+  const hasAmbientDnd = useContext(DndContext).dragDropManager != null;
   // A numeric size prop is authoritative and reactive; the measured size is
   // only used in the responsive modes (no size prop, or size="contain").
   const [measuredSize, setMeasuredSize] = useState(512);
@@ -201,6 +225,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   const wasDragMoveRef = useRef(false);
   // Tracks whether a drag is active — used to suppress click events that fire after drop
   const dragActiveRef = useRef(false);
+  // Set when a drag is programmatically cancelled (right-click) so the drag
+  // end handler can distinguish cancellation from a drop outside the board
+  const dragCancelledRef = useRef(false);
   const checkFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Populated by DragCanceller component inside DndProvider context
   const cancelDragRef = useRef<() => void>(() => {});
@@ -544,6 +571,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
   const validMovesForSquare = useCallback(
     (file: number, rank: number): Position[] => {
+      // Free-move mode has no move list — selection shows, no indicator dots
+      if (freeMove) return [];
+
       const piece = visualBoardState[rank]?.[file];
       if (!piece) return [];
 
@@ -588,6 +618,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       visualBoardState,
       movableColor,
       premoveCandidatesFn,
+      freeMove,
     ]
   );
 
@@ -925,6 +956,45 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     onPremoveClear?.();
   }, [uiClearPremoves, onPremoveClear]);
 
+  // Free-move (position editor) path: a deliberately tiny parallel to
+  // handleMoveAttempt — no legality, no loose castling, no promotion dialog,
+  // no sounds. onMove receives the raw from/to.
+  const handleFreeMoveAttempt = useCallback(
+    (
+      fromFile: number,
+      fromRank: number,
+      toFile: number,
+      toRank: number,
+      isDrag: boolean = false
+    ) => {
+      if (!onMove || (fromFile === toFile && fromRank === toRank)) return;
+      wasDragMoveRef.current = isDrag;
+      onMove({
+        from: positionToSquare({ file: fromFile, rank: fromRank }),
+        to: positionToSquare({ file: toFile, rank: toRank }),
+      });
+      clearSelection();
+    },
+    [onMove, clearSelection]
+  );
+
+  // readonly always wins over freeMove — gate explicitly rather than relying
+  // on the readonly overlay's pointer interception
+  const freeMoveActive = freeMove && !readonlyMode;
+  const onMoveAttempt = freeMoveActive
+    ? handleFreeMoveAttempt
+    : handleMoveAttempt;
+
+  // Spare pieces (external drag sources) are accepted only when the consumer
+  // opted in via onPiecePlace
+  const acceptSpare = !!onPiecePlace && !readonlyMode;
+  const handleSpareDrop = useCallback(
+    (piece: Piece, file: number, rank: number) => {
+      onPiecePlace?.(piece, positionToSquare({ file, rank }));
+    },
+    [onPiecePlace]
+  );
+
   // Drag and drop handlers
   const dragDropHandlers = useBoardDragDrop({
     boardState: visualBoardState,
@@ -935,10 +1005,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     setValidMoves: setValidMoves,
     setArrows: setArrowsControlled,
     setHighlightedSquares: setHighlightsControlled,
-    onMoveAttempt: handleMoveAttempt,
+    onMoveAttempt,
     onPremoveAttempt: handlePremoveAttempt,
     canMove,
     canPremove,
+    freeMove: freeMoveActive,
   });
 
   // Click handlers
@@ -954,10 +1025,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     setHighlightedSquares: setHighlightsControlled,
     arrowStart: arrowStart,
     setArrowStart: setArrowStart,
-    onMoveAttempt: handleMoveAttempt,
+    onMoveAttempt,
     onPremoveAttempt: handlePremoveAttempt,
     canMove,
     canPremove,
+    freeMove: freeMoveActive,
     enableArrows,
     enableHighlights,
     premoves: premoves,
@@ -1072,6 +1144,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     (file: number, rank: number): boolean => {
       const piece = visualBoardState[rank]?.[file];
       if (!piece) return false;
+      if (freeMove) return !readonlyMode;
       const pieceColor: PlayerColor =
         piece.color === Color.White ? 'white' : 'black';
       if (movableColor !== 'both' && movableColor !== pieceColor) return false;
@@ -1091,6 +1164,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       turnColorEnum,
       canMove,
       canPremove,
+      freeMove,
+      readonlyMode,
       stackPremoves,
       preMoveSet,
     ]
@@ -1154,19 +1229,28 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   );
 
   const wrappedDragEnd = useCallback(
-    (f: number, r: number) => {
+    (f: number, r: number, didDrop: boolean) => {
+      // A programmatic cancel (right-click during drag) also ends with
+      // didDrop === false — it must NOT count as "dragged off the board",
+      // or cancelling would delete the piece.
+      const cancelled = dragCancelledRef.current;
+      dragCancelledRef.current = false;
       handleDragEnd(f, r);
       boardRef.current?.classList.remove(styles.dragging);
+      if (!didDrop && !cancelled && onPieceRemove && !readonlyMode) {
+        onPieceRemove(positionToSquare({ file: f, rank: r }));
+      }
       requestAnimationFrame(() => {
         dragActiveRef.current = false;
       });
     },
-    [handleDragEnd]
+    [handleDragEnd, onPieceRemove, readonlyMode]
   );
 
   const wrappedRightMouseDown = useCallback(
     (f: number, r: number) => {
       if (dragActiveRef.current) {
+        dragCancelledRef.current = true;
         cancelDragRef.current();
         return;
       }
@@ -1207,8 +1291,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     return [...visualBoardState].reverse();
   }, [visualBoardState, flipped]);
 
-  return (
-    <DndProvider backend={TouchBackend} options={{ enableMouseEvents: true }}>
+  const boardContent = (
+    <>
       <CustomDragLayer
         squareSize={squareSize}
         boardId={boardId}
@@ -1275,6 +1359,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                 onDragEnd={wrappedDragEnd}
                 onRightMouseDown={wrappedRightMouseDown}
                 onRightMouseUp={wrappedRightMouseUp}
+                acceptSpare={acceptSpare}
+                onSpareDrop={handleSpareDrop}
                 boardId={boardId}
                 draggable={isPieceDraggable(actualFile, actualRank)}
                 squareId={squareDomId(actualFile, actualRank)}
@@ -1402,7 +1488,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           />
         )}
       </div>
-    </DndProvider>
+    </>
+  );
+
+  // Reuse an ambient react-dnd context when one exists (e.g. BoardDndProvider
+  // wrapping the board together with SparePiece palettes); otherwise provide
+  // the library's shared manager. The explicit manager (rather than a
+  // backend prop) opts out of react-dnd's refcounted global singleton, whose
+  // teardown/recreate cycle during route transitions can set up two touch
+  // backends at once — see getSharedDndManager.
+  if (hasAmbientDnd) return boardContent;
+  return (
+    <DndProvider manager={getSharedDndManager()}>{boardContent}</DndProvider>
   );
 };
 

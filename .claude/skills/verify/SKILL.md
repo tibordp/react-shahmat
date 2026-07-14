@@ -57,6 +57,18 @@ move, and up — the arrow-start state needs a render between events.
 - The FEN input (`#fenInput` + Load button) lives in the collapsed
   "Position" section of the settings panel — click the section title first.
 
+## Position editor (Examples page, last card)
+
+Spare pieces: `[role="img"][aria-label="white queen"]` etc. Drag with
+`mouse.down/move/up` from the palette onto a square; drag a board piece
+outside the board bounds to remove it; the `<code>` element in the card shows
+the live FEN. Regression to always check: **right-click during a drag cancels
+without deleting the piece**. Also verify the playground → examples
+navigation renders all boards with no console errors — react-dnd's global
+singleton is fragile across route swaps (the library passes an explicit
+shared manager to avoid "Cannot have two Touch backends"; a regression here
+crashes the whole Examples page).
+
 ## Quick checks worth including
 
 Move by click, move by drag, capture by drag, arrow + highlight, keyboard

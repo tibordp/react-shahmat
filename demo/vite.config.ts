@@ -8,7 +8,13 @@ export default defineConfig({
     // react-shahmat is symlinked from the parent directory (file:..), which
     // has its own node_modules. Without dedupe, imports resolved relative to
     // the symlink's real path can pull in a second copy of react/react-dnd.
-    dedupe: ['react', 'react-dom', 'react-dnd', 'react-dnd-touch-backend'],
+    dedupe: [
+      'react',
+      'react-dom',
+      'react-dnd',
+      'react-dnd-touch-backend',
+      'dnd-core',
+    ],
   },
   server: {
     port: 3000,

@@ -155,6 +155,47 @@ game.endGame(result);              // resign, draw, timeout
 game.rules;                       // direct rules access
 ```
 
+## Position Editor
+
+Building blocks for chess.com-style position setup — no dedicated editor
+component, you assemble it yourself:
+
+```tsx
+import {
+  ChessBoard, BoardDndProvider, SparePiece,
+  fenToPieceArray, pieceArrayToFen,
+} from 'react-shahmat';
+
+<BoardDndProvider>
+  <SparePiece piece={{ type: PieceType.Queen, color: Color.White }} />
+  {/* ... more palette pieces ... */}
+  <ChessBoard
+    position={fen}
+    freeMove                              // any piece to any square, no rules
+    onMove={({ from, to }) => {...}}      // piece moved on the board
+    onPiecePlace={(piece, square) => {...}} // spare piece dropped on a square
+    onPieceRemove={square => {...}}       // piece dragged off the board
+  />
+</BoardDndProvider>;
+```
+
+- `BoardDndProvider` gives the palette and the board one shared drag-and-drop
+  context; `ChessBoard` detects it and skips creating its own. (It's the
+  library's standard touch-plus-mouse backend — other react-dnd providers work
+  but aren't officially supported.)
+- `SparePiece` renders a draggable piece anywhere outside the board. It
+  accepts `pieceSet`/`renderPiece` like the board.
+- `freeMove` bypasses turns, `validMoves`, promotion, and premoves — `onMove`
+  reports the raw drag or click-click move; you own the position state.
+  Click-to-move and keyboard navigation work as usual.
+- `fenToPieceArray` / `pieceArrayToFen` convert between FEN and an
+  `(Piece | null)[][]` array for easy editing (castling/en-passant emitted
+  as `-`).
+- Omit `lastMove` in editor mode (it drives move animations/highlights, which
+  don't apply to hand-edited positions).
+
+See the Position Editor example in the demo for a complete ~60-line editor.
+
 ## Theming
 
 Board colors are CSS custom properties. Set them via the `style` prop:
