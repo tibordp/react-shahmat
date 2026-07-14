@@ -11,7 +11,7 @@ custom themes and pieces, history navigation).
 
 ### Prerequisites
 
-- Node.js 20 (see `.nvmrc` in the repository root)
+- Node.js 24 (see `.nvmrc` in the repository root)
 - npm
 
 The demo consumes the library via `"react-shahmat": "file:.."`, which resolves
