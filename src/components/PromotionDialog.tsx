@@ -1,6 +1,6 @@
 import React from 'react';
 import { Piece, PieceType, Color } from '../engine/chessRules';
-import { getPieceIconByType } from '../utils/pieceIcons';
+import { getPieceIconByType, describePiece } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
 
 import styles from './ChessBoard.module.css';
@@ -68,7 +68,10 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
           zIndex: 999,
         }}
         onClick={onCancel}
-        onContextMenu={e => { e.preventDefault(); (onRightClickCancel ?? onCancel)(); }}
+        onContextMenu={e => {
+          e.preventDefault();
+          (onRightClickCancel ?? onCancel)();
+        }}
       />
       <div
         className={styles.promotionDialog}
@@ -94,7 +97,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = ({
             ) : (
               <img
                 src={getPieceIconByType(color, type, pieceSet)}
-                alt='promotion piece'
+                alt={`Promote to ${describePiece({ type, color })}`}
                 className={styles.promotionPieceImg}
               />
             )}

@@ -44,8 +44,8 @@
 }
 
 .hero-install code {
-  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas,
-    monospace;
+  font-family:
+    'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
   color: #e0e0e0;
 }
@@ -66,7 +66,9 @@
   color: #e0e0e0;
   background: #333;
   border: 1px solid #4a4a4a;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .hero-link:hover {
@@ -175,8 +177,8 @@
 }
 
 .example-code code {
-  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas,
-    monospace;
+  font-family:
+    'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas, monospace;
   white-space: pre;
 }
 

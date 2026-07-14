@@ -15,9 +15,9 @@ export interface SoundManagerOptions {
 }
 
 export class SoundManager {
-  private ctx = new (window.AudioContext ||
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Safari legacy API
-    (window as any).webkitAudioContext)();
+  // Created lazily on first playback: constructing an AudioContext at import
+  // time breaks SSR (no window) and violates browser autoplay policy.
+  private ctx: AudioContext | null = null;
   private buffer: AudioBuffer | null = null;
   private spriteMap: Spritemap = {};
   private masterVol = 0.8;
@@ -68,17 +68,32 @@ export class SoundManager {
 
   /* ------------------ core logic ----------------------------------------- */
 
+  /** Lazily create the AudioContext; returns null where audio is unavailable. */
+  private getContext(): AudioContext | null {
+    if (this.ctx) return this.ctx;
+    if (typeof window === 'undefined') return null;
+    const Ctor =
+      window.AudioContext ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Safari legacy API
+      (window as any).webkitAudioContext;
+    if (!Ctor) return null;
+    this.ctx = new Ctor();
+    return this.ctx;
+  }
+
   async ensureReady() {
     if (!this.ready) this.ready = this.loadAssets();
     await this.ready;
   }
 
   private async loadAssets() {
+    const ctx = this.getContext();
+    if (!ctx) return;
     const [mapJson, audioBuf] = await Promise.all([
       fetch(this.jsonUrl).then(r => r.json()),
       fetch(this.selectAudioUrl())
         .then(r => r.arrayBuffer())
-        .then(ab => this.ctx.decodeAudioData(ab)),
+        .then(ab => ctx.decodeAudioData(ab)),
     ]);
     this.spriteMap = mapJson.spritemap;
     this.buffer = audioBuf;
@@ -91,9 +106,13 @@ export class SoundManager {
   }
 
   private async play(name: Cue) {
-    await this.ensureReady();
+    const ctx = this.getContext();
+    if (!ctx) return; // SSR / no Web Audio — silently no-op
 
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    await this.ensureReady();
+    if (!this.buffer) return;
+
+    if (ctx.state === 'suspended') await ctx.resume();
 
     const cue = this.spriteMap[name];
     if (!cue) {
@@ -101,12 +120,12 @@ export class SoundManager {
       return;
     }
 
-    const src = this.ctx.createBufferSource();
-    const gain = this.ctx.createGain();
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
     gain.gain.value = this.masterVol;
 
-    src.buffer = this.buffer!;
-    src.connect(gain).connect(this.ctx.destination);
+    src.buffer = this.buffer;
+    src.connect(gain).connect(ctx.destination);
 
     const offset = cue.start;
     const dur = cue.end - cue.start;

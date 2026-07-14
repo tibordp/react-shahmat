@@ -5,7 +5,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   {
-    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['dist/**', 'demo/**', 'node_modules/**'],
+  },
+  {
+    files: ['src/**/*.{ts,tsx}', 'tests/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -16,14 +19,17 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      'react': react,
+      react: react,
       'react-hooks': reactHooks,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_' },
+      ],
       'react/react-in-jsx-scope': 'off',
     },
     settings: {

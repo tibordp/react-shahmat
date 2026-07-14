@@ -1,6 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import typescript from "rollup-plugin-typescript2";
+import typescript from '@rollup/plugin-typescript';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import dts from 'rollup-plugin-dts';
 import postcss from 'rollup-plugin-postcss';
@@ -8,8 +8,9 @@ import copy from 'rollup-plugin-copy';
 import audiosprite from 'audiosprite';
 import fs from 'fs';
 import { tmpdir } from 'os';
+import { execFileSync } from 'child_process';
 
-import pkg from "./package.json" with { type: "json" };
+import pkg from './package.json' with { type: 'json' };
 
 // Custom SVG processing plugin
 function svgPlugin() {
@@ -37,7 +38,7 @@ function svgPlugin() {
 
         return `export default "${dataUrl}";`;
       }
-    }
+    },
   };
 }
 
@@ -45,37 +46,69 @@ export function audiospritePlugin(opts = {}) {
   return {
     name: 'audiosprite',
     async buildStart() {
-      const oggs = fs.readdirSync('src/sounds').filter(f => f.endsWith('.ogg')).map(f => `src/sounds/${f}`);
+      // audiosprite shells out to ffmpeg; fail with a clear message instead
+      // of a bare "spawn ffmpeg ENOENT" deep in the build.
+      try {
+        execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+      } catch {
+        throw new Error(
+          'ffmpeg is required to build the sound sprite but was not found on PATH. ' +
+            'Install it first (macOS: `brew install ffmpeg`, Debian/Ubuntu: `apt-get install ffmpeg`).'
+        );
+      }
+
+      const oggs = fs
+        .readdirSync('src/sounds')
+        .filter(f => f.endsWith('.ogg'))
+        .map(f => `src/sounds/${f}`);
       const tempDir = fs.mkdtempSync(`${tmpdir()}/audiosprite-`);
 
-      const { resources, spritemap } = await new Promise((resolve, reject) => audiosprite(oggs, {
-        bitrate: 56,
-        output: `${tempDir}/chess_sfx`,
-        samplerate: 44100,
-        ...opts
-      }, (err, result) => {
-        if (err) {
-           console.log(err);
-          reject(err);
-        } else {
-          resolve(result);
-        }
-      }));
+      const { resources, spritemap } = await new Promise((resolve, reject) =>
+        audiosprite(
+          oggs,
+          {
+            // opus+mp3 covers every modern browser. The opus export uses
+            // libopus (present in all common ffmpeg builds), unlike the ogg
+            // export which needs libvorbis (missing from e.g. Homebrew's
+            // ffmpeg 8). The .opus file is an ogg container and is emitted
+            // under the .ogg name the SoundManager expects.
+            export: 'opus,mp3',
+            bitrate: 56,
+            output: `${tempDir}/chess_sfx`,
+            samplerate: 44100,
+            ...opts,
+          },
+          (err, result) => {
+            if (err) {
+              console.log(err);
+              reject(err);
+            } else {
+              resolve(result);
+            }
+          }
+        )
+      );
 
       for (const res of resources) {
         const buff = fs.readFileSync(res);
-        const filename = res.split('/').pop();
-        this.emitFile({ type: 'asset', fileName: `sounds/${filename}`, source: buff });
+        const filename = res
+          .split('/')
+          .pop()
+          .replace(/\.opus$/, '.ogg');
+        this.emitFile({
+          type: 'asset',
+          fileName: `sounds/${filename}`,
+          source: buff,
+        });
       }
 
       // emit JSON map as an asset so it can be imported
       this.emitFile({
         type: 'asset',
         fileName: 'sounds/chess_sfx.json',
-        source: JSON.stringify({ spritemap }, null, 2)
+        source: JSON.stringify({ spritemap }, null, 2),
       });
-
-    }
+    },
   };
 }
 
@@ -86,7 +119,7 @@ export default [
       {
         file: pkg.main,
         format: 'cjs',
-        exports: "auto",
+        exports: 'auto',
       },
       {
         file: pkg.module,
@@ -104,17 +137,33 @@ export default [
           localsConvention: 'camelCase',
         },
         minimize: true,
-        inject: true
+        inject: true,
       }),
       svgPlugin(),
       copy({
-        targets: [
-          { src: 'src/icons/*', dest: 'dist/icons' }
-        ]
+        targets: [{ src: 'src/icons/*', dest: 'dist/icons' }],
       }),
-      typescript({ useTsconfigDeclarationDir: true, clean: true }),
+      // Declarations are not emitted here — the second config bundles all
+      // types into dist/index.d.ts via rollup-plugin-dts, which is what the
+      // package.json "types"/"exports" fields point at.
+      typescript({
+        tsconfig: './tsconfig.json',
+        compilerOptions: {
+          declaration: false,
+          declarationDir: undefined,
+          outDir: './dist',
+        },
+      }),
     ],
-    external: ['react', 'react-dom'],
+    // Runtime dependencies must NOT be bundled — consumers install them via
+    // the "dependencies" field, and inlining them would ship react-dnd twice.
+    external: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react-dnd',
+      'react-dnd-touch-backend',
+    ],
   },
   {
     input: 'src/index.ts',
@@ -133,6 +182,12 @@ export default [
         tsconfig: './tsconfig.json',
       }),
     ],
-    external: ['react', 'react-dom'],
+    external: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react-dnd',
+      'react-dnd-touch-backend',
+    ],
   },
 ];

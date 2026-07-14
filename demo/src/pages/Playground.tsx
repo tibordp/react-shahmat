@@ -52,7 +52,11 @@ const AI_MOVE_DELAY_MS = 500;
 // Section — collapsible settings section
 // ============================================================================
 
-function Section({ title, defaultOpen = false, children }: {
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
   title: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
@@ -201,12 +205,17 @@ function MoveHistory({
 
   return (
     <div className={`move-history ${mobileExpanded ? 'mobile-expanded' : ''}`}>
-      <button className='move-history-header' onClick={() => setMobileExpanded(!mobileExpanded)}>
+      <button
+        className='move-history-header'
+        onClick={() => setMobileExpanded(!mobileExpanded)}
+      >
         <span>
           <span className={`turn-indicator ${turnColor}`} />
           Moves
         </span>
-        <span className='mobile-expand-chevron'>{mobileExpanded ? '\u25BE' : '\u25B4'}</span>
+        <span className='mobile-expand-chevron'>
+          {mobileExpanded ? '\u25BE' : '\u25B4'}
+        </span>
       </button>
 
       <div className='move-history-list' ref={listRef}>
@@ -283,7 +292,11 @@ function MoveHistory({
         <button className='pgn-button' onClick={onExportPGN} title='Copy PGN'>
           Export
         </button>
-        <button className='pgn-button' onClick={() => setShowImport(!showImport)} title='Load PGN'>
+        <button
+          className='pgn-button'
+          onClick={() => setShowImport(!showImport)}
+          title='Load PGN'
+        >
           Import
         </button>
       </div>
@@ -438,8 +451,8 @@ function SettingsPanel({
             {stockfish.isThinking
               ? 'Thinking...'
               : stockfish.isReady
-              ? 'Ready'
-              : 'Loading...'}
+                ? 'Ready'
+                : 'Loading...'}
           </span>
         </div>
       )}
@@ -461,71 +474,160 @@ function SettingsPanel({
       />
 
       <Section title='Draw Rules'>
-        <Select id='repetitionRule' label='Repetition' value={s.repetitionRule}
+        <Select
+          id='repetitionRule'
+          label='Repetition'
+          value={s.repetitionRule}
           onChange={s.setRepetitionRule}
           options={[
             { value: 'off', label: 'Off' },
             { value: '3', label: 'Threefold' },
             { value: '5', label: 'Fivefold (FIDE)' },
-          ]} />
-        <Select id='moveRule' label='Move rule' value={s.moveRule}
+          ]}
+        />
+        <Select
+          id='moveRule'
+          label='Move rule'
+          value={s.moveRule}
           onChange={s.setMoveRule}
           options={[
             { value: 'off', label: 'Off' },
             { value: '50', label: '50-move' },
             { value: '75', label: '75-move (FIDE)' },
-          ]} />
-        <Toggle id='insufficientMaterial' label='Insufficient material'
-          checked={s.insufficientMaterial} onChange={s.setInsufficientMaterial} />
+          ]}
+        />
+        <Toggle
+          id='insufficientMaterial'
+          label='Insufficient material'
+          checked={s.insufficientMaterial}
+          onChange={s.setInsufficientMaterial}
+        />
       </Section>
 
       <Section title='Board' defaultOpen>
-        <Select id='boardTheme' label='Theme' value={s.boardTheme}
+        <Select
+          id='boardTheme'
+          label='Theme'
+          value={s.boardTheme}
           onChange={v => s.setBoardTheme(v as ThemeKey)}
-          options={Object.entries(BOARD_THEMES).map(([key, t]) => ({ value: key, label: t.name }))} />
+          options={Object.entries(BOARD_THEMES).map(([key, t]) => ({
+            value: key,
+            label: t.name,
+          }))}
+        />
         <div className='control-group'>
           <label>Orientation</label>
-          <button className='control-button flip-button'
-            onClick={() => s.setOrientation(prev => prev === 'white' ? 'black' : 'white')}>
+          <button
+            className='control-button flip-button'
+            onClick={() =>
+              s.setOrientation(prev => (prev === 'white' ? 'black' : 'white'))
+            }
+          >
             {s.orientation === 'white' ? 'White' : 'Black'}
           </button>
         </div>
-        <Toggle id='showCoordinates' label='Coordinates' checked={s.showCoordinates} onChange={s.setShowCoordinates} />
-        <Toggle id='showMoveIndicators' label='Move indicators' checked={s.showMoveIndicators} onChange={s.setShowMoveIndicators} />
-        <Toggle id='enablePreMoves' label='Pre-moves' checked={s.enablePreMoves} onChange={s.setEnablePreMoves} />
+        <Toggle
+          id='showCoordinates'
+          label='Coordinates'
+          checked={s.showCoordinates}
+          onChange={s.setShowCoordinates}
+        />
+        <Toggle
+          id='showMoveIndicators'
+          label='Move indicators'
+          checked={s.showMoveIndicators}
+          onChange={s.setShowMoveIndicators}
+        />
+        <Toggle
+          id='highlightDropTarget'
+          label='Drop target highlight'
+          checked={s.highlightDropTarget}
+          onChange={s.setHighlightDropTarget}
+        />
+        <Toggle
+          id='enablePreMoves'
+          label='Pre-moves'
+          checked={s.enablePreMoves}
+          onChange={s.setEnablePreMoves}
+        />
         {s.enablePreMoves && (
-          <Toggle id='stackPremoves' label='Stack pre-moves' checked={s.stackPremoves} onChange={s.setStackPremoves} />
+          <Toggle
+            id='stackPremoves'
+            label='Stack pre-moves'
+            checked={s.stackPremoves}
+            onChange={s.setStackPremoves}
+          />
         )}
-        <Toggle id='enableAnimations' label='Animations' checked={s.enableAnimations} onChange={s.setEnableAnimations} />
-        <Select id='animationDuration' label='Anim. speed' value={s.animationDuration}
-          onChange={s.setAnimationDuration} disabled={!s.enableAnimations}
+        <Toggle
+          id='enableAnimations'
+          label='Animations'
+          checked={s.enableAnimations}
+          onChange={s.setEnableAnimations}
+        />
+        <Select
+          id='animationDuration'
+          label='Anim. speed'
+          value={s.animationDuration}
+          onChange={s.setAnimationDuration}
+          disabled={!s.enableAnimations}
           options={[
             { value: 100, label: '100ms' },
             { value: 200, label: '200ms' },
             { value: 300, label: '300ms' },
             { value: 500, label: '500ms' },
             { value: 800, label: '800ms' },
-          ]} />
-        <Toggle id='enableSounds' label='Sounds' checked={s.enableSounds} onChange={s.setEnableSounds} />
-        <Toggle id='enableArrows' label='Arrows' checked={s.enableArrows} onChange={s.setEnableArrows} />
-        <Toggle id='enableHighlights' label='Highlights' checked={s.enableHighlights} onChange={s.setEnableHighlights} />
+          ]}
+        />
+        <Toggle
+          id='enableSounds'
+          label='Sounds'
+          checked={s.enableSounds}
+          onChange={s.setEnableSounds}
+        />
+        <Toggle
+          id='enableArrows'
+          label='Arrows'
+          checked={s.enableArrows}
+          onChange={s.setEnableArrows}
+        />
+        <Toggle
+          id='enableHighlights'
+          label='Highlights'
+          checked={s.enableHighlights}
+          onChange={s.setEnableHighlights}
+        />
       </Section>
 
       <Section title='Position'>
         <div className='control-group fen-group'>
-          <input id='fenInput' type='text' value={s.fenInput}
+          <input
+            id='fenInput'
+            type='text'
+            value={s.fenInput}
             onChange={e => s.setFenInput(e.target.value)}
-            placeholder='Enter FEN string...' className='fen-input' />
-          <button className='control-button load-button' onClick={s.onLoadFen} disabled={!s.fenInput.trim()}>
+            placeholder='Enter FEN string...'
+            className='fen-input'
+          />
+          <button
+            className='control-button load-button'
+            onClick={s.onLoadFen}
+            disabled={!s.fenInput.trim()}
+          >
             Load
           </button>
         </div>
-        <Select id='testPosition' label='Presets' value=''
-          onChange={v => { if (v) s.onLoadPreset(v as string); }}
+        <Select
+          id='testPosition'
+          label='Presets'
+          value=''
+          onChange={v => {
+            if (v) s.onLoadPreset(v as string);
+          }}
           options={[
             { value: '', label: 'Select...' },
             ...TEST_POSITIONS.map(p => ({ value: p.fen, label: p.label })),
-          ]} />
+          ]}
+        />
       </Section>
     </div>
   );
@@ -570,6 +672,8 @@ interface SettingsState {
   setHighlights: React.Dispatch<React.SetStateAction<string[]>>;
   showMoveIndicators: boolean;
   setShowMoveIndicators: (v: boolean) => void;
+  highlightDropTarget: boolean;
+  setHighlightDropTarget: (v: boolean) => void;
   aiMode: AiMode;
   setAiMode: (v: AiMode) => void;
   repetitionRule: string;
@@ -611,6 +715,7 @@ function useSettings(): SettingsState {
   >([]);
   const [highlights, setHighlights] = React.useState<string[]>([]);
   const [showMoveIndicators, setShowMoveIndicators] = React.useState(true);
+  const [highlightDropTarget, setHighlightDropTarget] = React.useState(true);
   const [aiMode, setAiMode] = React.useState<AiMode>('medium');
   const [repetitionRule, setRepetitionRule] = React.useState('5');
   const [moveRule, setMoveRule] = React.useState('75');
@@ -683,6 +788,8 @@ function useSettings(): SettingsState {
     setHighlights,
     showMoveIndicators,
     setShowMoveIndicators,
+    highlightDropTarget,
+    setHighlightDropTarget,
     aiMode,
     setAiMode,
     repetitionRule,
@@ -978,6 +1085,7 @@ function Playground() {
               settings.enableHighlights ? settings.setHighlights : undefined
             }
             showMoveIndicators={settings.showMoveIndicators}
+            highlightDropTarget={settings.highlightDropTarget}
             readonly={nav.isViewingHistory}
             style={boardStyle}
           />
@@ -996,7 +1104,7 @@ function Playground() {
             window.prompt('PGN:', pgn);
           });
         }}
-        onImportPGN={(pgn) => {
+        onImportPGN={pgn => {
           const success = game.loadPGN(pgn);
           if (success) nav.setViewingPly(null);
           return success;

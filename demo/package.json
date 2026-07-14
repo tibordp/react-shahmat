@@ -9,11 +9,10 @@
     "@types/react-dom": "^19.1.6",
     "react": "^19.1.0",
     "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
     "react-dnd-touch-backend": "^16.0.1",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",
-    "react-shahmat": "link:..",
+    "react-shahmat": "file:..",
     "stockfish": "^16.0.0",
     "typescript": "^5.8.3"
   },
@@ -25,14 +24,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "copy-stockfish": "cp node_modules/stockfish/src/stockfish-nnue-16-single.js public/stockfish.js && cp node_modules/stockfish/src/stockfish-nnue-16-single.wasm public/stockfish-nnue-16-single.wasm"
-  },
-  "resolutions": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
-    "react-dnd-touch-backend": "^16.0.1"
   }
 }

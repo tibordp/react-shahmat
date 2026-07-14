@@ -2,18 +2,10 @@
 
 // Components
 export { ChessBoard } from './components/ChessBoard';
-export { ArrowOverlay } from './components/ArrowOverlay';
-export { PieceAnimations } from './components/PieceAnimations';
-export { PromotionDialog } from './components/PromotionDialog';
-export { Square } from './components/Square';
 
 // Hooks
 export { useChessGame } from './hooks/useChessGame';
 export { useChessRules } from './hooks/useChessRules';
-export { useBoardClicks } from './hooks/useBoardClicks';
-export { useBoardDragDrop } from './hooks/useBoardDragDrop';
-export { useBoardUIState } from './hooks/useBoardUIState';
-export { usePieceAnimations } from './hooks/usePieceAnimations';
 
 // Engine
 export { ChessRules } from './engine/chessRules';
@@ -31,7 +23,7 @@ export type {
 } from './types';
 
 // Types - from component
-export type { ChessBoardProps } from './components/ChessBoard';
+export type { ChessBoardProps, ChessBoardStyle } from './components/ChessBoard';
 export type {
   UseChessGameOptions,
   UseChessGameReturn,

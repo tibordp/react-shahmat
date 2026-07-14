@@ -63,10 +63,12 @@ function ServerBoard() {
 - **Premoves** -- Chess.com-style premove queueing with stacking support (off by default)
 - **Animations** -- smooth piece movement with configurable easing and duration
 - **Sound effects** -- move, capture, check, checkmate, promotion, premove sounds via `useChessGame` or custom handler
-- **Arrows & highlights** -- right-click to draw arrows and highlight squares (controlled)
+- **Arrows & highlights** -- right-click to draw arrows and highlight squares (controlled or uncontrolled)
 - **Custom pieces** -- swap the piece image set or render pieces with arbitrary React components
 - **Theming** -- CSS custom properties for all board colors
-- **Touch & mouse** -- drag-and-drop via react-dnd with HTML5 and touch backends
+- **Touch & mouse** -- drag-and-drop via react-dnd's touch backend (mouse events enabled)
+- **Keyboard & screen readers** -- arrow-key navigation, Enter/Space to move, labelled squares, and polite move announcements
+- **SSR-safe** -- no browser globals touched at import time; works with Next.js and friends
 - **Responsive** -- auto-sizes to container, or set fixed size, or `'contain'` to fit parent
 - **TypeScript** -- full type definitions
 
@@ -97,16 +99,20 @@ All props at a glance:
   showMoveIndicators={true}
   autoPromotionPiece='queen'
   premoveCandidates={(piece, square) => [...squares]}
-  // Annotations (controlled)
+  // Annotations — controlled (own the state)...
   arrows={[{ from: 'e2', to: 'e4' }]}
   onArrowsChange={arrows => {}}
   highlights={['e4', 'd5']}
   onHighlightsChange={highlights => {}}
+  // ...or uncontrolled (board keeps the state internally)
+  enableArrows={true}
+  enableHighlights={true}
   // Visual
   size={500} // number | 'contain' | omit for parent width
   showCoordinates={true}
   enableAnimations={true}
   animationDuration={300}
+  highlightDropTarget={false} // outline the square under a dragged piece
   pieceSet={customPieceSet}
   renderPiece={(piece, size) => <MyPiece />}
   className='my-board'

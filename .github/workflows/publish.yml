@@ -1,0 +1,47 @@
+name: Publish to npm
+
+# Publishes via npm trusted publishing (OIDC) — no npm token is stored in
+# GitHub. One-time setup on npmjs.com: package Settings → Trusted Publisher →
+# GitHub Actions, with repository owner `tibordp`, repository `react-shahmat`,
+# and workflow filename `publish.yml`.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC trusted publishing
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg (required by audiosprite)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing requires npm >= 11.5.1; Node 20 ships npm 10
+      - name: Update npm for trusted publishing support
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      # prepublishOnly runs the build; OIDC provides auth and provenance
+      - name: Publish
+        run: npm publish

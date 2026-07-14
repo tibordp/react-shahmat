@@ -2,12 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { BoardMove, PromotionPiece } from 'react-shahmat';
 
 export type AiMode =
-  | 'random'
-  | 'worstfish'
-  | 'easy'
-  | 'medium'
-  | 'hard'
-  | 'maximum';
+  'random' | 'worstfish' | 'easy' | 'medium' | 'hard' | 'maximum';
 
 export interface StockfishAPI {
   /** Search for a move. Mode determines strategy. */
@@ -154,10 +149,10 @@ export const useStockfish = (): StockfishAPI => {
             mode === 'easy'
               ? 1
               : mode === 'medium'
-              ? 8
-              : mode === 'hard'
-              ? 15
-              : 20;
+                ? 8
+                : mode === 'hard'
+                  ? 15
+                  : 20;
           worker.postMessage(`setoption name Skill Level value ${skillLevel}`);
           worker.postMessage('setoption name MultiPV value 1');
         }
@@ -176,12 +171,12 @@ export const useStockfish = (): StockfishAPI => {
           const goCommand = isWorstfish
             ? 'go depth 5'
             : mode === 'easy'
-            ? 'go depth 1'
-            : mode === 'medium'
-            ? 'go depth 5'
-            : mode === 'hard'
-            ? 'go movetime 1000'
-            : 'go movetime 2000';
+              ? 'go depth 1'
+              : mode === 'medium'
+                ? 'go depth 5'
+                : mode === 'hard'
+                  ? 'go movetime 1000'
+                  : 'go movetime 2000';
 
           worker.postMessage(goCommand);
         };

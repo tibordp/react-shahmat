@@ -1,69 +1,64 @@
 # react-shahmat Demo
 
-This demo application showcases the react-shahmat chess board component with Stockfish engine integration. It demonstrates how to build a complete chess playing interface with AI opponent support.
+This demo application showcases the react-shahmat chess board component with
+Stockfish engine integration: a playground with every board option exposed,
+plus a gallery of focused examples (controlled boards, puzzles, premoves,
+custom themes and pieces, history navigation).
 
-**Disclaimer:** This demo was entirely created by Claude Code. The code quality and architecture may not meet typical production standards.
-
-## Features
-
-- **Stockfish Integration** - Play against a strong chess engine
-- **Multiple Difficulty Levels** - Adjustable engine strength
-- **Analysis Mode** - View engine evaluation and best moves
-- **Responsive Design** - Works on desktop and mobile
-- **Full Game Controls** - Reset, undo, position setup
+**[Live demo](https://tibordp.github.io/react-shahmat/)**
 
 ## Development
 
 ### Prerequisites
 
-- Node.js 16 or higher
-- npm or yarn
+- Node.js 20 (see `.nvmrc` in the repository root)
+- npm
+
+The demo consumes the library via `"react-shahmat": "file:.."`, which resolves
+to the **built** package, so build the library first.
 
 ### Setup
 
 ```bash
-# Install dependencies
+# From the repository root: install and build the library
+# (the sound sprite build requires ffmpeg — brew install ffmpeg / apt-get install ffmpeg)
 npm install
-
-# Start development server
-npm start
-```
-
-The demo will be available at http://localhost:3000
-
-### Build
-
-```bash
-# Build for production
 npm run build
+
+# Then, in demo/
+cd demo
+npm install
+npm run copy-stockfish   # copies the Stockfish WASM build into public/
+npm run dev
 ```
 
-## Usage
+The demo will be available at http://localhost:3000.
 
-1. **Playing Against AI**: Select difficulty level and make your moves
-2. **Analysis**: Toggle analysis mode to see engine evaluation
-3. **Position Setup**: Use FEN input to set custom positions
-4. **Game Controls**: Reset game or undo moves as needed
+Tip: run `npm run dev` (rollup watch) in the repository root in a second
+terminal to rebuild the library on change while the demo dev server is
+running.
 
-## Stockfish Integration
+## Available scripts
 
-The demo uses the official Stockfish WASM build for chess analysis and AI moves. Stockfish files are automatically copied to the public directory during build.
+- `npm run dev` — start the Vite development server
+- `npm run build` — production build (output in `build/`)
+- `npm run typecheck` — TypeScript type checking (`tsc --noEmit`)
+- `npm run preview` — serve the production build locally
+- `npm run copy-stockfish` — copy Stockfish WASM files into `public/`
 
-## Available Scripts
+## Stockfish integration
 
-- `npm start` - Start development server
-- `npm run build` - Build for production
-- `npm test` - Run tests
-- `npm run lint` - Run ESLint
-- `npm run format` - Format code with Prettier
+The demo uses the official Stockfish WASM build for AI moves. The files are
+copied from the `stockfish` npm package into `public/` by
+`npm run copy-stockfish` (CI does this during deployment).
 
-## Technology Stack
+## Technology stack
 
 - React 19
 - TypeScript
+- Vite
 - react-shahmat (chess board component)
 - Stockfish WASM (chess engine)
-- Create React App (build tooling)
 
 ## License
 

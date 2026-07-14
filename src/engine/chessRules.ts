@@ -77,11 +77,7 @@ export interface GameResult {
 }
 
 export type MoveType =
-  | 'normal'
-  | 'capture'
-  | 'castling'
-  | 'enPassant'
-  | 'promotion';
+  'normal' | 'capture' | 'castling' | 'enPassant' | 'promotion';
 
 export interface HistoryEntry {
   move: Move;
@@ -119,6 +115,9 @@ export class ChessRules {
     blackKingSide: boolean;
     blackQueenSide: boolean;
   };
+  // getGameState() is expensive (full legal move enumeration) and callers
+  // invoke it several times per position — cache until the position mutates.
+  private cachedGameState: GameState | null = null;
 
   constructor() {
     this.board = this.createEmptyBoard();
@@ -691,19 +690,124 @@ export class ChessRules {
   }
 
   private isKingInCheckAt(color: Color, file: number, rank: number): boolean {
-    // Check if any enemy piece can attack the given position
     const enemyColor = color === Color.White ? Color.Black : Color.White;
-    for (let r = 0; r < 8; r++) {
-      for (let f = 0; f < 8; f++) {
-        const piece = this.board[r][f];
-        if (piece && piece.color === enemyColor) {
-          const moves = this.getValidMovesForPiece(f, r, piece, false); // Don't include castling to avoid recursion
-          if (moves.some(move => move.file === file && move.rank === rank)) {
+    return this.isSquareAttacked(file, rank, enemyColor);
+  }
+
+  private static readonly KNIGHT_OFFSETS: ReadonlyArray<
+    readonly [number, number]
+  > = [
+    [2, 1],
+    [2, -1],
+    [-2, 1],
+    [-2, -1],
+    [1, 2],
+    [1, -2],
+    [-1, 2],
+    [-1, -2],
+  ];
+
+  private static readonly KING_OFFSETS: ReadonlyArray<
+    readonly [number, number]
+  > = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ];
+
+  private static readonly ROOK_DIRECTIONS: ReadonlyArray<
+    readonly [number, number]
+  > = [
+    [0, 1],
+    [0, -1],
+    [1, 0],
+    [-1, 0],
+  ];
+
+  private static readonly BISHOP_DIRECTIONS: ReadonlyArray<
+    readonly [number, number]
+  > = [
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ];
+
+  /**
+   * Test whether a square is attacked by any piece of the given color, by
+   * probing outward from the square (knight/king/pawn offsets plus sliding
+   * rays) instead of generating every enemy piece's move list.
+   */
+  private isSquareAttacked(
+    file: number,
+    rank: number,
+    byColor: Color
+  ): boolean {
+    // Knight attacks
+    for (const [df, dr] of ChessRules.KNIGHT_OFFSETS) {
+      const p = this.getPiece({ file: file + df, rank: rank + dr });
+      if (p && p.color === byColor && p.type === PieceType.Knight) return true;
+    }
+
+    // King attacks (adjacent squares)
+    for (const [df, dr] of ChessRules.KING_OFFSETS) {
+      const p = this.getPiece({ file: file + df, rank: rank + dr });
+      if (p && p.color === byColor && p.type === PieceType.King) return true;
+    }
+
+    // Pawn attacks: a white pawn attacks diagonally upward, so it must sit
+    // one rank below the target square (and vice versa for black).
+    const pawnRank = byColor === Color.White ? rank - 1 : rank + 1;
+    for (const df of [-1, 1]) {
+      const p = this.getPiece({ file: file + df, rank: pawnRank });
+      if (p && p.color === byColor && p.type === PieceType.Pawn) return true;
+    }
+
+    // Sliding attacks: rook/queen along ranks and files
+    for (const [df, dr] of ChessRules.ROOK_DIRECTIONS) {
+      let f = file + df;
+      let r = rank + dr;
+      while (this.isInBounds(f, r)) {
+        const p = this.board[r][f];
+        if (p) {
+          if (
+            p.color === byColor &&
+            (p.type === PieceType.Rook || p.type === PieceType.Queen)
+          ) {
             return true;
           }
+          break;
         }
+        f += df;
+        r += dr;
       }
     }
+
+    // Sliding attacks: bishop/queen along diagonals
+    for (const [df, dr] of ChessRules.BISHOP_DIRECTIONS) {
+      let f = file + df;
+      let r = rank + dr;
+      while (this.isInBounds(f, r)) {
+        const p = this.board[r][f];
+        if (p) {
+          if (
+            p.color === byColor &&
+            (p.type === PieceType.Bishop || p.type === PieceType.Queen)
+          ) {
+            return true;
+          }
+          break;
+        }
+        f += df;
+        r += dr;
+      }
+    }
+
     return false;
   }
 
@@ -880,8 +984,18 @@ export class ChessRules {
       else if (to.rank === promotionRank) {
         type = 'promotion';
         capturedPiece = targetPiece || undefined;
-        if (!promotionPiece) {
+        // Note: PieceType.Pawn === 0 is falsy, so compare against undefined —
+        // an explicit (illegal) pawn promotion must be rejected, not treated
+        // as "no piece supplied".
+        if (promotionPiece === undefined) {
           promotionRequired = true;
+        } else if (
+          promotionPiece !== PieceType.Queen &&
+          promotionPiece !== PieceType.Rook &&
+          promotionPiece !== PieceType.Bishop &&
+          promotionPiece !== PieceType.Knight
+        ) {
+          return { valid: false };
         }
       }
       // Regular pawn move or capture
@@ -917,9 +1031,11 @@ export class ChessRules {
     to: Position,
     promotionPiece?: PieceType
   ): MoveResult {
-    // First analyze the move to get rich information
+    // First analyze the move to get rich information. A promotion move
+    // without a promotion piece is valid-but-incomplete: report it as
+    // promotionRequired instead of executing with an undefined piece.
     const analysis = this.analyzeMoveType(from, to, promotionPiece);
-    if (!analysis.valid) {
+    if (!analysis.valid || analysis.promotionRequired) {
       return {
         success: false,
         promotionRequired: analysis.promotionRequired,
@@ -928,6 +1044,10 @@ export class ChessRules {
 
     const piece = this.getPiece(from)!; // We know it exists from analysis
     const { type, capturedPiece, additionalMoves } = analysis;
+
+    // SAN disambiguation must be computed against the pre-move board, so do
+    // it now, before the move is executed.
+    const disambiguation = this.computeDisambiguation(piece, from, to);
 
     // Clear en passant target from previous turn
     this.enPassantTarget = null;
@@ -964,13 +1084,33 @@ export class ChessRules {
       this.board[from.rank][from.file] = null;
     } else {
       // Handle normal moves and captures
-      // Check for double pawn move (sets en passant target)
+      // Check for double pawn move (sets en passant target).
+      // Only record the target when an enemy pawn stands adjacent and could
+      // actually capture — a "phantom" target makes the FEN non-canonical and
+      // breaks repetition detection (positions differing only in an unusable
+      // ep field must compare equal).
       if (
         piece.type === PieceType.Pawn &&
         Math.abs(to.rank - from.rank) === 2
       ) {
         const direction = piece.color === Color.White ? 1 : -1;
-        this.enPassantTarget = { file: to.file, rank: from.rank + direction };
+        for (const fileOffset of [-1, 1]) {
+          const neighbor = this.getPiece({
+            file: to.file + fileOffset,
+            rank: to.rank,
+          });
+          if (
+            neighbor &&
+            neighbor.type === PieceType.Pawn &&
+            neighbor.color !== piece.color
+          ) {
+            this.enPassantTarget = {
+              file: to.file,
+              rank: from.rank + direction,
+            };
+            break;
+          }
+        }
       }
 
       // Regular move or capture
@@ -980,6 +1120,12 @@ export class ChessRules {
       // Update castling rights for king and rook moves
       this.updateCastlingRights(from.file, from.rank, piece);
     }
+
+    // Any move landing on a home corner square kills that side's castling
+    // right — this is how rights are lost when a rook is captured at home.
+    // (If the square was empty, the original rook already left and the right
+    // is already gone, so clearing again is harmless.)
+    this.clearCastlingRightsAt(to.file, to.rank);
 
     // Update halfmove clock (resets on capture or pawn move)
     if (
@@ -1013,10 +1159,13 @@ export class ChessRules {
       this.fullmoveNumber++;
     }
 
+    // The position changed — invalidate the cached game state
+    this.cachedGameState = null;
+
     // Build rich history entry
     const fen = this.generateFEN();
     const isCheck = this.isKingInCheck(this.currentPlayer);
-    const isCheckmate = isCheck && this.getGameState().isGameOver;
+    const isCheckmate = isCheck && !this.hasAnyLegalMove();
     const algebraic = this.computeAlgebraic(
       piece,
       from,
@@ -1025,7 +1174,8 @@ export class ChessRules {
       capturedPiece,
       promotionPiece,
       isCheck,
-      isCheckmate
+      isCheckmate,
+      disambiguation
     );
     this.historyEntries.push({
       move: moveRecord,
@@ -1050,40 +1200,14 @@ export class ChessRules {
 
   public isKingInCheck(color: Color): boolean {
     // Find the king of the specified color
-    let kingPosition: Position | null = null;
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
         if (piece && piece.type === PieceType.King && piece.color === color) {
-          kingPosition = { file, rank };
-          break;
-        }
-      }
-      if (kingPosition) break;
-    }
-
-    if (!kingPosition) return false;
-
-    // Check if any enemy piece can attack the king's position
-    const enemyColor = color === Color.White ? Color.Black : Color.White;
-    for (let rank = 0; rank < 8; rank++) {
-      for (let file = 0; file < 8; file++) {
-        const piece = this.board[rank][file];
-        if (piece && piece.color === enemyColor) {
-          const moves = this.getValidMovesForPiece(file, rank, piece, false); // Use raw moves to avoid circular dependency
-          if (
-            moves.some(
-              move =>
-                move.file === kingPosition!.file &&
-                move.rank === kingPosition!.rank
-            )
-          ) {
-            return true;
-          }
+          return this.isKingInCheckAt(color, file, rank);
         }
       }
     }
-
     return false;
   }
 
@@ -1118,6 +1242,17 @@ export class ChessRules {
           this.castlingRights.blackKingSide = false;
         }
       }
+    }
+  }
+
+  /** Clear the castling right associated with a rook home square, if any. */
+  private clearCastlingRightsAt(file: number, rank: number): void {
+    if (rank === 0) {
+      if (file === 0) this.castlingRights.whiteQueenSide = false;
+      else if (file === 7) this.castlingRights.whiteKingSide = false;
+    } else if (rank === 7) {
+      if (file === 0) this.castlingRights.blackQueenSide = false;
+      else if (file === 7) this.castlingRights.blackKingSide = false;
     }
   }
 
@@ -1157,7 +1292,8 @@ export class ChessRules {
     capturedPiece: Piece | undefined,
     promotionPiece: PieceType | undefined,
     isCheck: boolean,
-    isCheckmate: boolean
+    isCheckmate: boolean,
+    disambiguation: string
   ): string {
     const FILE_LETTERS = 'abcdefgh';
     const toSquare = FILE_LETTERS[to.file] + (to.rank + 1);
@@ -1179,18 +1315,7 @@ export class ChessRules {
     } else {
       const PIECE_LETTERS = ['', 'R', 'N', 'B', 'Q', 'K'];
       notation = PIECE_LETTERS[piece.type];
-
-      // Disambiguation: check if another piece of the same type can reach the same square
-      // We check the board AFTER the move, but we need the board BEFORE.
-      // Since we already moved, use fenHistory to avoid recomputation.
-      // Simpler: check from the current board state if any same-type piece
-      // at a DIFFERENT position could also reach this square. But the board
-      // already has the move applied. Instead, just always disambiguate for knights
-      // and rooks which commonly need it — use both file and rank if needed.
-      // Actually, let's use the previous FEN to check properly.
-      const prevFen = this.fenHistory[this.fenHistory.length - 1]; // last FEN before this move was added
-      const disambig = this.getDisambiguation(piece, from, to, prevFen);
-      notation += disambig;
+      notation += disambiguation;
 
       if (isCapture) {
         notation += 'x';
@@ -1207,30 +1332,34 @@ export class ChessRules {
     return notation;
   }
 
-  private getDisambiguation(
+  /**
+   * SAN disambiguation for the move about to be played. Must be called on the
+   * pre-move board (from makeMove, before the move is executed): finds other
+   * same-type pieces that could also legally reach the target square.
+   */
+  private computeDisambiguation(
     piece: Piece,
     from: Position,
-    to: Position,
-    prevFen: string
+    to: Position
   ): string {
-    // Parse the previous position to find other pieces of the same type that could reach the target
-    const tempEngine = new ChessRules();
-    tempEngine.setPosition(prevFen);
-    const board = tempEngine.board;
+    // Pawns and kings never need disambiguation (pawn captures are
+    // disambiguated by file in SAN; there is only one king).
+    if (piece.type === PieceType.Pawn || piece.type === PieceType.King) {
+      return '';
+    }
 
-    let sameTypePositions: Position[] = [];
+    const sameTypePositions: Position[] = [];
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
-        const p = board[rank][file];
+        const p = this.board[rank][file];
         if (
           p &&
           p.type === piece.type &&
           p.color === piece.color &&
           (rank !== from.rank || file !== from.file)
         ) {
-          // Check if this piece can also reach the target square
-          const validation = tempEngine.isValidMove({ file, rank }, to);
-          if (validation.valid) {
+          const moves = this.getValidMoves({ file, rank });
+          if (moves.some(m => m.file === to.file && m.rank === to.rank)) {
             sameTypePositions.push({ file, rank });
           }
         }
@@ -1362,7 +1491,10 @@ export class ChessRules {
     const promoMatch = rest.match(/=([QRBN])$/);
     if (promoMatch) {
       const promoMap: Record<string, PieceType> = {
-        Q: PieceType.Queen, R: PieceType.Rook, B: PieceType.Bishop, N: PieceType.Knight,
+        Q: PieceType.Queen,
+        R: PieceType.Rook,
+        B: PieceType.Bishop,
+        N: PieceType.Knight,
       };
       promotionPiece = promoMap[promoMatch[1]];
       rest = rest.slice(0, -2);
@@ -1375,8 +1507,11 @@ export class ChessRules {
     let pieceType = PieceType.Pawn;
     if (rest.length > 0 && 'KQRBN'.includes(rest[0])) {
       const pieceMap: Record<string, PieceType> = {
-        K: PieceType.King, Q: PieceType.Queen, R: PieceType.Rook,
-        B: PieceType.Bishop, N: PieceType.Knight,
+        K: PieceType.King,
+        Q: PieceType.Queen,
+        R: PieceType.Rook,
+        B: PieceType.Bishop,
+        N: PieceType.Knight,
       };
       pieceType = pieceMap[rest[0]];
       rest = rest.slice(1);
@@ -1402,14 +1537,25 @@ export class ChessRules {
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
-        if (!piece || piece.color !== this.currentPlayer || piece.type !== pieceType) continue;
+        if (
+          !piece ||
+          piece.color !== this.currentPlayer ||
+          piece.type !== pieceType
+        )
+          continue;
         if (disambigFile >= 0 && file !== disambigFile) continue;
         if (disambigRank >= 0 && rank !== disambigRank) continue;
 
         const from = { file, rank };
         const validation = this.isValidMove(from, to, promotionPiece);
         if (validation.valid) {
-          return { fromFile: file, fromRank: rank, toFile: toFile, toRank: toRank, promotionPiece };
+          return {
+            fromFile: file,
+            fromRank: rank,
+            toFile: toFile,
+            toRank: toRank,
+            promotionPiece,
+          };
         }
       }
     }
@@ -1417,28 +1563,46 @@ export class ChessRules {
     return null;
   }
 
+  /** True if the current player has at least one legal move (cheap mate/stalemate probe). */
+  private hasAnyLegalMove(): boolean {
+    for (let rank = 0; rank < 8; rank++) {
+      for (let file = 0; file < 8; file++) {
+        const piece = this.board[rank][file];
+        if (piece && piece.color === this.currentPlayer) {
+          if (this.getValidMoves({ file, rank }).length > 0) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   public getGameState(): GameState {
-    // Get all valid moves for current player
+    if (this.cachedGameState) return this.cachedGameState;
+
+    // Get all valid moves for current player. getValidMoves already returns
+    // fully legal destinations, so no re-validation is needed — a pawn move
+    // to the last rank is a promotion by definition and expands to all four
+    // promotion choices.
     const validMoves: Move[] = [];
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
         if (piece && piece.color === this.currentPlayer) {
           const pieceMoves = this.getValidMoves({ file, rank });
+          const promotionRank =
+            piece.type === PieceType.Pawn
+              ? piece.color === Color.White
+                ? 7
+                : 0
+              : -1;
           for (const move of pieceMoves) {
-            const from = { file, rank };
-            const to = { file: move.file, rank: move.rank };
-            const validation = this.isValidMove(from, to);
-
-            if (validation.promotionRequired) {
-              // Generate all four promotion options
-              const promotionPieces = [
+            if (move.rank === promotionRank) {
+              for (const promotionPiece of [
                 PieceType.Queen,
                 PieceType.Rook,
                 PieceType.Bishop,
                 PieceType.Knight,
-              ];
-              for (const promotionPiece of promotionPieces) {
+              ]) {
                 validMoves.push({
                   fromFile: file,
                   fromRank: rank,
@@ -1448,7 +1612,6 @@ export class ChessRules {
                 });
               }
             } else {
-              // Regular move
               validMoves.push({
                 fromFile: file,
                 fromRank: rank,
@@ -1482,7 +1645,7 @@ export class ChessRules {
       }
     }
 
-    return {
+    this.cachedGameState = {
       fen: this.generateFEN(),
       currentPlayer: this.currentPlayer,
       validMoves,
@@ -1495,6 +1658,7 @@ export class ChessRules {
       halfmoveClock: this.halfmoveClock,
       insufficientMaterial: this.isInsufficientMaterial(),
     };
+    return this.cachedGameState;
   }
 
   private getCapturedPieces(): { white: Piece[]; black: Piece[] } {
@@ -1519,7 +1683,10 @@ export class ChessRules {
     };
 
     // Count current pieces
-    const currentPieces: { white: Record<number, number>; black: Record<number, number> } = { white: {}, black: {} };
+    const currentPieces: {
+      white: Record<number, number>;
+      black: Record<number, number>;
+    } = { white: {}, black: {} };
     for (let rank = 0; rank < 8; rank++) {
       for (let file = 0; file < 8; file++) {
         const piece = this.board[rank][file];
@@ -1611,76 +1778,86 @@ export class ChessRules {
     return piece.color === Color.White ? char.toUpperCase() : char;
   }
 
+  /**
+   * Load a position from FEN. Validates structure (8x8 board, exactly one
+   * king per side, well-formed fields) and returns false without touching
+   * the engine state if the FEN is invalid.
+   */
   public setPosition(fen: string): boolean {
-    try {
-      const parts = fen.split(' ');
-      if (parts.length < 4) return false; // Need at least position, color, castling, en passant
+    const parts = fen.trim().split(/\s+/);
+    if (parts.length < 4 || parts.length > 6) return false;
 
-      const position = parts[0];
-      const activeColor = parts[1];
-      const castlingRights = parts[2];
-      const enPassant = parts[3];
-      const halfmove = parts[4] ? parseInt(parts[4]) : 0;
-      const fullmove = parts[5] ? parseInt(parts[5]) : 1;
+    const [position, activeColor, castlingField, enPassant] = parts;
+    const halfmoveField = parts[4] ?? '0';
+    const fullmoveField = parts[5] ?? '1';
 
-      // Clear board
-      this.board = this.createEmptyBoard();
+    // Parse the board into a temporary structure first
+    const ranks = position.split('/');
+    if (ranks.length !== 8) return false;
 
-      // Parse board position
-      const ranks = position.split('/');
-      for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
-        const rank = ranks[rankIndex];
-        let fileIndex = 0;
+    const newBoard = this.createEmptyBoard();
+    let whiteKings = 0;
+    let blackKings = 0;
 
-        for (const char of rank) {
-          if (char >= '1' && char <= '8') {
-            // Empty squares
-            fileIndex += parseInt(char);
-          } else {
-            // Piece
-            const piece = this.fenCharToPiece(char);
-            if (piece) {
-              this.board[7 - rankIndex][fileIndex] = piece;
-            }
-            fileIndex++;
+    for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
+      let fileIndex = 0;
+      for (const char of ranks[rankIndex]) {
+        if (char >= '1' && char <= '8') {
+          fileIndex += parseInt(char);
+        } else {
+          const piece = this.fenCharToPiece(char);
+          if (!piece || fileIndex > 7) return false;
+          if (piece.type === PieceType.King) {
+            if (piece.color === Color.White) whiteKings++;
+            else blackKings++;
           }
+          newBoard[7 - rankIndex][fileIndex] = piece;
+          fileIndex++;
         }
       }
-
-      // Set active color
-      this.currentPlayer = activeColor === 'w' ? Color.White : Color.Black;
-
-      // Parse castling rights
-      this.castlingRights = {
-        whiteKingSide: castlingRights.includes('K'),
-        whiteQueenSide: castlingRights.includes('Q'),
-        blackKingSide: castlingRights.includes('k'),
-        blackQueenSide: castlingRights.includes('q'),
-      };
-
-      // Parse en passant target
-      if (enPassant !== '-') {
-        const file = enPassant.charCodeAt(0) - 97; // 'a' = 97
-        const rank = parseInt(enPassant[1]) - 1; // Convert to 0-based
-        this.enPassantTarget = { file, rank };
-      } else {
-        this.enPassantTarget = null;
-      }
-
-      // Set move counters
-      this.halfmoveClock = halfmove;
-      this.fullmoveNumber = fullmove;
-
-      // Clear move history and last move when setting position
-      this.lastMove = null;
-      this.moveHistory = [];
-      this.historyEntries = [];
-      this.fenHistory = [fen];
-
-      return true;
-    } catch {
-      return false;
+      if (fileIndex !== 8) return false;
     }
+
+    if (whiteKings !== 1 || blackKings !== 1) return false;
+
+    if (activeColor !== 'w' && activeColor !== 'b') return false;
+
+    if (!/^(-|K?Q?k?q?)$/.test(castlingField) || castlingField === '')
+      return false;
+
+    let enPassantTarget: Position | null = null;
+    if (enPassant !== '-') {
+      if (!/^[a-h][36]$/.test(enPassant)) return false;
+      enPassantTarget = {
+        file: enPassant.charCodeAt(0) - 97,
+        rank: parseInt(enPassant[1]) - 1,
+      };
+    }
+
+    if (!/^\d+$/.test(halfmoveField) || !/^\d+$/.test(fullmoveField))
+      return false;
+
+    // Everything validated — commit
+    this.cachedGameState = null;
+    this.board = newBoard;
+    this.currentPlayer = activeColor === 'w' ? Color.White : Color.Black;
+    this.castlingRights = {
+      whiteKingSide: castlingField.includes('K'),
+      whiteQueenSide: castlingField.includes('Q'),
+      blackKingSide: castlingField.includes('k'),
+      blackQueenSide: castlingField.includes('q'),
+    };
+    this.enPassantTarget = enPassantTarget;
+    this.halfmoveClock = parseInt(halfmoveField);
+    this.fullmoveNumber = parseInt(fullmoveField);
+
+    // Clear move history and last move when setting position
+    this.lastMove = null;
+    this.moveHistory = [];
+    this.historyEntries = [];
+    this.fenHistory = [this.generateFEN()];
+
+    return true;
   }
 
   private fenCharToPiece(char: string): Piece | null {
@@ -1706,6 +1883,7 @@ export class ChessRules {
   }
 
   public resetGame(): void {
+    this.cachedGameState = null;
     this.board = this.createEmptyBoard();
     this.currentPlayer = Color.White;
     this.enPassantTarget = null;

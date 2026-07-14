@@ -1,8 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { getEmptyImage } from 'react-dnd-html5-backend';
 import { Piece } from '../engine/chessRules';
-import { getPieceIcon } from '../utils/pieceIcons';
+import { getPieceIcon, describePiece } from '../utils/pieceIcons';
 import type { PieceSet } from '../types';
 
 import styles from './ChessBoard.module.css';
@@ -34,8 +33,13 @@ export interface SquareProps {
   onDragEnd: (file: number, rank: number) => void;
   onRightMouseDown: (file: number, rank: number) => void;
   onRightMouseUp: (file: number, rank: number) => void;
+  highlightDropTarget: boolean;
   boardId: string;
   draggable: boolean;
+  /** DOM id used as the board's aria-activedescendant target */
+  squareId: string;
+  /** True when the keyboard focus cursor is on this square */
+  isFocused: boolean;
   pieceSet: PieceSet;
   renderPiece?: (piece: Piece, size: number) => React.ReactNode;
   squareSize: number;
@@ -72,14 +76,17 @@ export const Square: React.FC<SquareProps> = React.memo(
     onRightMouseUp,
     flipped,
     showCoordinates,
+    highlightDropTarget,
     boardId,
     draggable,
+    squareId,
+    isFocused,
     pieceSet: ps,
     renderPiece: rp,
     squareSize,
   }) => {
     const squareRef = useRef<HTMLDivElement>(null);
-    const [{ isDragging }, drag, preview] = useDrag(
+    const [{ isDragging }, drag] = useDrag(
       () => ({
         type: 'piece',
         item: () => {
@@ -93,17 +100,12 @@ export const Square: React.FC<SquareProps> = React.memo(
         end: () => {
           onDragEnd(file, rank);
         },
-        collect: (monitor) => ({
+        collect: monitor => ({
           isDragging: monitor.isDragging(),
         }),
       }),
       [piece, file, rank, onDragStart, onDragEnd, boardId, draggable]
     );
-
-    // Setup drag preview to prevent native drag behavior
-    useEffect(() => {
-      preview(getEmptyImage(), { captureDraggingState: true });
-    }, [preview]);
 
     const [{ isOver }, drop] = useDrop(
       () => ({
@@ -111,11 +113,11 @@ export const Square: React.FC<SquareProps> = React.memo(
         drop: (item: DragItem) => {
           onDrop(item.file, item.rank, file, rank);
         },
-        collect: (monitor) => ({
+        collect: monitor => ({
           isOver: monitor.isOver() && monitor.canDrop(),
         }),
       }),
-      [file, rank, onDrop, isValidMove]
+      [file, rank, onDrop]
     );
 
     const isLight = (file + rank) % 2 === 1;
@@ -129,6 +131,9 @@ export const Square: React.FC<SquareProps> = React.memo(
 
     if (isOver) {
       squareClass += ` ${styles.dropTarget}`;
+      if (highlightDropTarget) {
+        squareClass += ` ${styles.dropTargetHighlight}`;
+      }
     }
 
     if (isLastMoveFrom || isLastMoveTo) {
@@ -155,7 +160,17 @@ export const Square: React.FC<SquareProps> = React.memo(
       squareClass += ` ${styles.kingInCheck}`;
     }
 
+    if (isFocused) {
+      squareClass += ` ${styles.focusCursor}`;
+    }
+
     const pieceIcon = piece && !rp ? getPieceIcon(piece, ps) : null;
+
+    // Accessible name: "e4, white knight" / "e4" for an empty square
+    const squareName = String.fromCharCode(97 + file) + (rank + 1);
+    const ariaLabel = piece
+      ? `${squareName}, ${describePiece(piece)}`
+      : squareName;
 
     // Show file label on rank 0 (bottom row)
     const showFileLabel = showCoordinates && rank === (flipped ? 7 : 0);
@@ -173,6 +188,10 @@ export const Square: React.FC<SquareProps> = React.memo(
     return (
       <div
         ref={attachRef}
+        id={squareId}
+        role='button'
+        aria-label={ariaLabel}
+        aria-pressed={isSelected}
         className={squareClass}
         onClick={() => onSquareClick(file, rank)}
         onMouseDown={e => {
@@ -195,7 +214,11 @@ export const Square: React.FC<SquareProps> = React.memo(
           (isDragging || isAnimatingFrom || isAnimatingTo ? null : rp ? (
             <div className={styles.piece}>{rp(piece, squareSize)}</div>
           ) : pieceIcon ? (
-            <img src={pieceIcon} alt='chess piece' className={styles.piece} />
+            <img
+              src={pieceIcon}
+              alt={describePiece(piece)}
+              className={styles.piece}
+            />
           ) : null)}
         {isValidMove && (
           <div

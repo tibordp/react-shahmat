@@ -80,7 +80,8 @@ const AnimatingPiece: React.FC<AnimatingPieceProps> = ({
       ) : (
         <img
           src={getPieceIcon(piece, pieceSet)}
-          alt='animating piece'
+          alt=''
+          aria-hidden='true'
           className={styles.animatingPieceImg}
         />
       )}
@@ -97,6 +98,8 @@ interface PieceAnimationsProps {
   pieceSet: PieceSet;
   renderPiece?: (piece: Piece, size: number) => React.ReactNode;
 }
+
+const noop = () => {};
 
 export const PieceAnimations: React.FC<PieceAnimationsProps> = ({
   animationState,
@@ -120,7 +123,7 @@ export const PieceAnimations: React.FC<PieceAnimationsProps> = ({
           startTime={animationState.startTime}
           squareSize={squareSize}
           animationDuration={animationDuration}
-          onComplete={index === 0 ? onAnimationComplete : () => {}}
+          onComplete={index === 0 ? onAnimationComplete : noop}
           flipped={flipped}
           pieceSet={pieceSet}
           renderPiece={renderPiece}

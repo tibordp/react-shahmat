@@ -4,7 +4,6 @@
 /node_modules
 /.pnp
 .pnp.js
-package-lock.json
 
 # testing
 /coverage
@@ -73,6 +72,9 @@ demo/.env.production.local
 demo/npm-debug.log*
 demo/yarn-debug.log*
 demo/yarn-error.log*
+
+# Claude Code local settings (the skills/ directory is tracked)
+.claude/settings.local.json
 
 # Vercel
 .vercel

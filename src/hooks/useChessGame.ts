@@ -271,7 +271,7 @@ export function useChessGame(
       if (enableSounds && !onSound) sm.ensureReady();
       notifyPositionChange();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount
   }, [notifyPositionChange]);
 
   // Execute a move internally
@@ -427,7 +427,7 @@ export function useChessGame(
       isCheckmate: entry.isCheckmate,
       algebraic: entry.algebraic,
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- gameState is intentional: triggers recomputation when engine state changes (engine is mutable)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- gameState is intentional: triggers recomputation when engine state changes (engine is mutable)
   }, [chessEngine, gameState]);
 
   // Public API: undo to a specific ply
@@ -482,9 +482,13 @@ export function useChessGame(
         const r = manualGameResultRef.current;
         if (r.reason === 'resignation' && r.winner !== undefined) {
           h.Result = r.winner === 0 ? '1-0' : '0-1';
-        } else if (r.reason === 'draw' || r.reason === 'stalemate' ||
-                   r.reason === 'repetition' || r.reason === 'fifty_moves' ||
-                   r.reason === 'insufficient_material') {
+        } else if (
+          r.reason === 'draw' ||
+          r.reason === 'stalemate' ||
+          r.reason === 'repetition' ||
+          r.reason === 'fifty_moves' ||
+          r.reason === 'insufficient_material'
+        ) {
           h.Result = '1/2-1/2';
         }
       }
@@ -511,7 +515,9 @@ export function useChessGame(
     (pgn: string): boolean => {
       // Strip headers
       const lines = pgn.split('\n');
-      const moveLines = lines.filter(l => !l.startsWith('[') && l.trim() !== '');
+      const moveLines = lines.filter(
+        l => !l.startsWith('[') && l.trim() !== ''
+      );
       const moveText = moveLines.join(' ');
 
       // Extract individual moves (strip move numbers, results, comments)
@@ -519,10 +525,14 @@ export function useChessGame(
         .replace(/\{[^}]*\}/g, '') // remove comments
         .replace(/\([^)]*\)/g, '') // remove variations
         .split(/\s+/)
-        .filter(t =>
-          t &&
-          !t.match(/^\d+\.+$/) && // move numbers
-          t !== '1-0' && t !== '0-1' && t !== '1/2-1/2' && t !== '*'
+        .filter(
+          t =>
+            t &&
+            !t.match(/^\d+\.+$/) && // move numbers
+            t !== '1-0' &&
+            t !== '0-1' &&
+            t !== '1/2-1/2' &&
+            t !== '*'
         );
 
       // Reset and replay

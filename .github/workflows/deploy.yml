@@ -28,26 +28,26 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: yarn
+          node-version-file: .nvmrc
+          cache: npm
 
       - name: Install library dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Build library
-        run: yarn build
+        run: npm run build
 
       - name: Install demo dependencies
         working-directory: demo
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Copy Stockfish files
         working-directory: demo
-        run: yarn copy-stockfish
+        run: npm run copy-stockfish
 
       - name: Build demo
         working-directory: demo
-        run: yarn build
+        run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

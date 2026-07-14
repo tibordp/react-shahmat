@@ -14,7 +14,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // Pin implicit type libraries: without this, tsc walks up to the parent
+    // package's node_modules/@types and trips over stub packages there
+    // (e.g. @types/minimatch).
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

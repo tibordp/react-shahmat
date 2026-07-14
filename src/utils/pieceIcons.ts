@@ -32,6 +32,22 @@ export const defaultPieceSet: PieceSet = {
   bK: blackKing,
 };
 
+const PIECE_NAMES: Record<PieceType, string> = {
+  [PieceType.Pawn]: 'pawn',
+  [PieceType.Rook]: 'rook',
+  [PieceType.Knight]: 'knight',
+  [PieceType.Bishop]: 'bishop',
+  [PieceType.Queen]: 'queen',
+  [PieceType.King]: 'king',
+};
+
+/** Human-readable piece description for accessibility, e.g. "white knight" */
+export function describePiece(piece: Piece): string {
+  return `${piece.color === Color.White ? 'white' : 'black'} ${
+    PIECE_NAMES[piece.type]
+  }`;
+}
+
 /** Get the icon URL for a piece from a given piece set */
 export function getPieceIcon(
   piece: Piece,

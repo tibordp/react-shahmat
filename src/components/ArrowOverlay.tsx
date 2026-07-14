@@ -3,6 +3,9 @@ import { Position } from '../engine/chessRules';
 
 import styles from './ChessBoard.module.css';
 
+// Chess.com style yellow-orange
+const ARROW_COLOR = 'rgba(255, 170, 0, 0.6)';
+
 interface ArrowComponentProps {
   fromX: number;
   fromY: number;
@@ -10,6 +13,7 @@ interface ArrowComponentProps {
   toY: number;
   isKnightMove: boolean;
   squareSize: number;
+  markerId: string;
 }
 
 const ArrowComponent: React.FC<ArrowComponentProps> = ({
@@ -19,28 +23,13 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({
   toY,
   isKnightMove,
   squareSize,
+  markerId,
 }) => {
   const arrowHeadSize = Math.max(15, squareSize * 0.4);
   const strokeWidth = Math.max(8, squareSize * 0.2);
-  const color = 'rgba(255, 170, 0, 0.6)'; // Chess.com style yellow-orange
-  const markerId = `arrowhead-${Math.random().toString(36).substr(2, 9)}`;
+  const color = ARROW_COLOR;
   const shortenAmount = arrowHeadSize * 0.75;
   const edgeOffset = squareSize * 0.35; // 10% from edge towards center
-
-  // Common marker definition
-  const marker = (
-    <marker
-      id={markerId}
-      markerWidth={2}
-      markerHeight={3}
-      refX={0}
-      refY={1.2}
-      orient='auto'
-      markerUnits='strokeWidth'
-    >
-      <polygon points={`0,0 0,2.4, 1.5,1.2`} fill={color} />
-    </marker>
-  );
 
   let pathElement;
 
@@ -113,12 +102,7 @@ const ArrowComponent: React.FC<ArrowComponentProps> = ({
     );
   }
 
-  return (
-    <g>
-      <defs>{marker}</defs>
-      {pathElement}
-    </g>
-  );
+  return <g>{pathElement}</g>;
 };
 
 export interface ArrowOverlayProps {
@@ -134,6 +118,9 @@ export const ArrowOverlay: React.FC<ArrowOverlayProps> = ({
   squareSize,
   flipped = false,
 }) => {
+  // One shared arrowhead marker per overlay; useId keeps the DOM id unique
+  // when several boards render on the same page.
+  const markerId = `${React.useId()}-arrowhead`;
   return (
     <svg
       className={styles.arrowOverlay}
@@ -147,6 +134,19 @@ export const ArrowOverlay: React.FC<ArrowOverlayProps> = ({
         zIndex: 100,
       }}
     >
+      <defs>
+        <marker
+          id={markerId}
+          markerWidth={2}
+          markerHeight={3}
+          refX={0}
+          refY={1.2}
+          orient='auto'
+          markerUnits='strokeWidth'
+        >
+          <polygon points='0,0 0,2.4, 1.5,1.2' fill={ARROW_COLOR} />
+        </marker>
+      </defs>
       {arrows.map((arrow, index) => {
         const fromX =
           (flipped ? 7 - arrow.from.file : arrow.from.file) * squareSize +
@@ -177,6 +177,7 @@ export const ArrowOverlay: React.FC<ArrowOverlayProps> = ({
             toY={toY}
             isKnightMove={isKnightMove}
             squareSize={squareSize}
+            markerId={markerId}
           />
         );
       })}
