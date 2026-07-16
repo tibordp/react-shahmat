@@ -5,9 +5,9 @@ node_modules
 build
 dist
 
-# Generated files
-public/stockfish.js
-public/stockfish-nnue-16-single.wasm
+# Generated files (copied from node_modules by demo's copy-stockfish)
+demo/public/stockfish.js
+demo/public/stockfish.wasm
 
 # Logs
 *.log

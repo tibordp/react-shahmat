@@ -20,7 +20,7 @@
 
 # stockfish files (copied from node_modules during build)
 /public/stockfish.js
-/public/stockfish-nnue-16-single.wasm
+/public/stockfish.wasm
 
 # IDE and editor files
 .vscode/

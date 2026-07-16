@@ -412,6 +412,64 @@
   display: flex;
   gap: 4px;
   padding: 4px 8px 8px;
+  position: relative;
+}
+
+/* Transient "Copied as PGN" confirmation, sized and placed to sit directly
+   over the Export button. The wrapper gives the toast the button's exact
+   track to fill, so the two stay aligned however the row is sized. */
+.pgn-export-wrap {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+.pgn-export-wrap .pgn-button {
+  flex: 1;
+}
+
+.pgn-toast-wrap {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  margin-bottom: 4px;
+  pointer-events: none;
+  /* Floats over the .move-nav buttons, which would otherwise paint on top */
+  z-index: 1;
+}
+
+/* Matches .pgn-button's box so the toast is the same size as the button.
+   min-width: 0 lets it shrink to the button's track rather than to the
+   text's min-content width, which flexbox would otherwise floor it at. */
+.pgn-toast {
+  background: #4caf50;
+  border: 1px solid #4caf50;
+  border-radius: 4px;
+  color: #fff;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 12px; /* .pgn-button's line box, so heights agree */
+  padding: 3px 10px;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+  animation: pgn-toast-in 0.15s ease-out;
+}
+
+@keyframes pgn-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pgn-toast {
+    animation: none;
+  }
 }
 
 .pgn-button {

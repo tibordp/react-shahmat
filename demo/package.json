@@ -13,7 +13,7 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",
     "react-shahmat": "file:..",
-    "stockfish": "^16.0.0",
+    "stockfish": "^18.0.8",
     "typescript": "^5.8.3"
   },
   "devDependencies": {
@@ -26,6 +26,6 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "copy-stockfish": "cp node_modules/stockfish/src/stockfish-nnue-16-single.js public/stockfish.js && cp node_modules/stockfish/src/stockfish-nnue-16-single.wasm public/stockfish-nnue-16-single.wasm"
+    "copy-stockfish": "cp node_modules/stockfish/bin/stockfish-18-lite-single.js public/stockfish.js && cp node_modules/stockfish/bin/stockfish-18-lite-single.wasm public/stockfish.wasm"
   }
 }

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { BoardMove, PromotionPiece } from 'react-shahmat';
 
 export type AiMode =
-  'random' | 'worstfish' | 'easy' | 'medium' | 'hard' | 'maximum';
+  'random' | 'worstfish' | 'drawfish' | 'easy' | 'medium' | 'hard' | 'maximum';
 
 export interface StockfishAPI {
   /** Search for a move. Mode determines strategy. */
@@ -17,6 +17,8 @@ interface PendingRequest {
   timeoutId: ReturnType<typeof setTimeout>;
   worstMove?: BoardMove;
   isWorstfish: boolean;
+  /** Keyed by UCI move; present only in drawfish mode. */
+  drawCandidates?: Map<string, { move: BoardMove; distance: number }>;
 }
 
 export const useStockfish = (): StockfishAPI => {
@@ -49,7 +51,7 @@ export const useStockfish = (): StockfishAPI => {
         readyRef.current = true;
         if (mounted) setIsReady(true);
       } else if (message.startsWith('info') && message.includes(' pv ')) {
-        // Track MultiPV info lines for worstfish mode
+        // Track MultiPV info lines for worstfish/drawfish modes
         const pending = pendingRef.current;
         if (pending?.isWorstfish) {
           const pvMatch = message.match(/ pv ([a-h][1-8][a-h][1-8])([qrbn])?/);
@@ -61,14 +63,47 @@ export const useStockfish = (): StockfishAPI => {
               /* ignore */
             }
           }
+        } else if (
+          pending?.drawCandidates &&
+          !/\b(lowerbound|upperbound)\b/.test(message)
+        ) {
+          const pvMatch = message.match(/ pv ([a-h][1-8][a-h][1-8])([qrbn])?/);
+          const scoreMatch = message.match(/ score (cp|mate) (-?\d+)/);
+          if (pvMatch && scoreMatch) {
+            const value = parseInt(scoreMatch[2], 10);
+            // Mate lines are as far from equality as it gets; among them,
+            // a longer mate counts as (marginally) closer to a draw.
+            const distance =
+              scoreMatch[1] === 'cp'
+                ? Math.abs(value)
+                : 1_000_000 - Math.abs(value);
+            try {
+              // Deeper iterations overwrite shallower scores for the same move
+              pending.drawCandidates.set(pvMatch[1] + (pvMatch[2] ?? ''), {
+                move: parseUCIMove(pvMatch[1], pvMatch[2]),
+                distance,
+              });
+            } catch {
+              /* ignore */
+            }
+          }
         }
       } else if (message.startsWith('bestmove')) {
         const pending = pendingRef.current;
         if (pending) {
           clearTimeout(pending.timeoutId);
 
+          const drawPick = pending.drawCandidates
+            ? [...pending.drawCandidates.values()].reduce(
+                (best, c) => (!best || c.distance < best.distance ? c : best),
+                null as { move: BoardMove; distance: number } | null
+              )
+            : null;
+
           if (pending.isWorstfish && pending.worstMove) {
             pending.resolve(pending.worstMove);
+          } else if (drawPick) {
+            pending.resolve(drawPick.move);
           } else {
             const match = message.match(
               /bestmove ([a-h][1-8][a-h][1-8])([qrbn])?/
@@ -122,6 +157,7 @@ export const useStockfish = (): StockfishAPI => {
 
       const requestId = ++nextRequestId.current;
       const isWorstfish = mode === 'worstfish';
+      const isDrawfish = mode === 'drawfish';
       setIsThinking(true);
 
       return new Promise<BoardMove | null>(resolve => {
@@ -138,10 +174,16 @@ export const useStockfish = (): StockfishAPI => {
           }
         }, 8000);
 
-        pendingRef.current = { resolve, requestId, timeoutId, isWorstfish };
+        pendingRef.current = {
+          resolve,
+          requestId,
+          timeoutId,
+          isWorstfish,
+          drawCandidates: isDrawfish ? new Map() : undefined,
+        };
 
         // Configure engine based on mode
-        if (isWorstfish) {
+        if (isWorstfish || isDrawfish) {
           worker.postMessage('setoption name Skill Level value 20');
           worker.postMessage('setoption name MultiPV value 200');
         } else {
@@ -168,15 +210,16 @@ export const useStockfish = (): StockfishAPI => {
           }
           worker.removeEventListener('message', onReady);
 
-          const goCommand = isWorstfish
-            ? 'go depth 5'
-            : mode === 'easy'
-              ? 'go depth 1'
-              : mode === 'medium'
-                ? 'go depth 5'
-                : mode === 'hard'
-                  ? 'go movetime 1000'
-                  : 'go movetime 2000';
+          const goCommand =
+            isWorstfish || isDrawfish
+              ? 'go depth 5'
+              : mode === 'easy'
+                ? 'go depth 1'
+                : mode === 'medium'
+                  ? 'go depth 5'
+                  : mode === 'hard'
+                    ? 'go movetime 1000'
+                    : 'go movetime 2000';
 
           worker.postMessage(goCommand);
         };

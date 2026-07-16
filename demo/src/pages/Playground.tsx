@@ -48,6 +48,16 @@ const TEST_POSITIONS = [
 
 const AI_MOVE_DELAY_MS = 500;
 
+const AI_MODE_OPTIONS: { value: AiMode; label: string }[] = [
+  { value: 'random', label: 'Random' },
+  { value: 'worstfish', label: 'Worstfish' },
+  { value: 'drawfish', label: 'Drawfish' },
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+  { value: 'maximum', label: 'Maximum' },
+];
+
 // ============================================================================
 // Section — collapsible settings section
 // ============================================================================
@@ -163,13 +173,23 @@ function MoveHistory({
   viewingPly: number | null;
   onNavigate: (ply: number | null) => void;
   turnColor: 'white' | 'black';
-  onExportPGN: () => void;
+  /** Resolves true when the PGN reached the clipboard. */
+  onExportPGN: () => Promise<boolean>;
   onImportPGN: (pgn: string) => boolean;
 }) {
   const [showImport, setShowImport] = React.useState(false);
   const [pgnInput, setPgnInput] = React.useState('');
   const [mobileExpanded, setMobileExpanded] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
+  const copiedTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    []
+  );
 
   // Auto-scroll to latest move when viewing live
   React.useEffect(() => {
@@ -289,9 +309,24 @@ function MoveHistory({
       </div>
 
       <div className='pgn-actions'>
-        <button className='pgn-button' onClick={onExportPGN} title='Copy PGN'>
-          Export
-        </button>
+        <div className='pgn-export-wrap'>
+          {/* Always mounted so the live region announces the text it receives */}
+          <div className='pgn-toast-wrap' role='status' aria-live='polite'>
+            {copied && <span className='pgn-toast'>Copied!</span>}
+          </div>
+          <button
+            className='pgn-button'
+            onClick={async () => {
+              if (!(await onExportPGN())) return;
+              setCopied(true);
+              if (copiedTimer.current) clearTimeout(copiedTimer.current);
+              copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+            }}
+            title='Copy PGN'
+          >
+            Export
+          </button>
+        </div>
         <button
           className='pgn-button'
           onClick={() => setShowImport(!showImport)}
@@ -368,6 +403,10 @@ function SettingsPanel({
   const s = settings;
   const gameState = game.getGameState();
   const isGameOver = gameState.isGameOver;
+  // Only an enabled AI on a non-random mode actually drives the worker
+  const usesEngine =
+    (s.blackAi && s.blackAiMode !== 'random') ||
+    (s.whiteAi && s.whiteAiMode !== 'random');
 
   return (
     <div className={`controls-panel ${isOpen ? 'controls-open' : ''}`}>
@@ -411,36 +450,39 @@ function SettingsPanel({
         </button>
       </div>
 
-      {/* ---- AI configuration ---- */}
+      {/* ---- AI configuration: each side gets its own engine personality ---- */}
       <Toggle
         id='blackAi'
         label='Black AI'
         checked={s.blackAi}
         onChange={s.setBlackAi}
       />
+      {s.blackAi && (
+        <Select
+          id='blackAiMode'
+          label='Black Mode'
+          value={s.blackAiMode}
+          onChange={v => s.setBlackAiMode(v as AiMode)}
+          options={AI_MODE_OPTIONS}
+        />
+      )}
       <Toggle
         id='whiteAi'
         label='White AI'
         checked={s.whiteAi}
         onChange={s.setWhiteAi}
       />
+      {s.whiteAi && (
+        <Select
+          id='whiteAiMode'
+          label='White Mode'
+          value={s.whiteAiMode}
+          onChange={v => s.setWhiteAiMode(v as AiMode)}
+          options={AI_MODE_OPTIONS}
+        />
+      )}
 
-      <Select
-        id='aiMode'
-        label='AI Mode'
-        value={s.aiMode}
-        onChange={v => s.setAiMode(v as AiMode)}
-        options={[
-          { value: 'random', label: 'Random' },
-          { value: 'worstfish', label: 'Worstfish' },
-          { value: 'easy', label: 'Easy' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'hard', label: 'Hard' },
-          { value: 'maximum', label: 'Maximum' },
-        ]}
-      />
-
-      {s.aiMode !== 'random' && (
+      {usesEngine && (
         <div className='control-group'>
           <label>Engine</label>
           <span
@@ -682,8 +724,10 @@ interface SettingsState {
   setHighlightDropTarget: (v: boolean) => void;
   enableKeyboardNavigation: boolean;
   setEnableKeyboardNavigation: (v: boolean) => void;
-  aiMode: AiMode;
-  setAiMode: (v: AiMode) => void;
+  whiteAiMode: AiMode;
+  setWhiteAiMode: (v: AiMode) => void;
+  blackAiMode: AiMode;
+  setBlackAiMode: (v: AiMode) => void;
   repetitionRule: string;
   setRepetitionRule: (v: string) => void;
   moveRule: string;
@@ -726,7 +770,8 @@ function useSettings(): SettingsState {
   const [highlightDropTarget, setHighlightDropTarget] = React.useState(true);
   const [enableKeyboardNavigation, setEnableKeyboardNavigation] =
     React.useState(true);
-  const [aiMode, setAiMode] = React.useState<AiMode>('medium');
+  const [whiteAiMode, setWhiteAiMode] = React.useState<AiMode>('medium');
+  const [blackAiMode, setBlackAiMode] = React.useState<AiMode>('medium');
   const [repetitionRule, setRepetitionRule] = React.useState('5');
   const [moveRule, setMoveRule] = React.useState('75');
   const [insufficientMaterial, setInsufficientMaterial] = React.useState(true);
@@ -802,8 +847,10 @@ function useSettings(): SettingsState {
     setHighlightDropTarget,
     enableKeyboardNavigation,
     setEnableKeyboardNavigation,
-    aiMode,
-    setAiMode,
+    whiteAiMode,
+    setWhiteAiMode,
+    blackAiMode,
+    setBlackAiMode,
     repetitionRule,
     setRepetitionRule,
     moveRule,
@@ -830,7 +877,8 @@ function useAI(
   stockfish: ReturnType<typeof useStockfish>,
   whiteAi: boolean,
   blackAi: boolean,
-  aiMode: AiMode
+  whiteAiMode: AiMode,
+  blackAiMode: AiMode
 ) {
   const mountedRef = React.useRef(true);
   React.useEffect(() => {
@@ -845,7 +893,8 @@ function useAI(
 
   return React.useCallback(
     async (gameState: GameState, _lastMove?: BoardMove) => {
-      const isAiTurn = gameState.currentPlayer === 0 ? whiteAi : blackAi;
+      const isWhiteTurn = gameState.currentPlayer === 0;
+      const isAiTurn = isWhiteTurn ? whiteAi : blackAi;
       if (
         !isAiTurn ||
         gameState.isGameOver ||
@@ -853,16 +902,17 @@ function useAI(
       )
         return;
 
+      const mode = isWhiteTurn ? whiteAiMode : blackAiMode;
       const startTick = performance.now();
 
       try {
         let move: BoardMove | null = null;
 
-        if (aiMode === 'random') {
+        if (mode === 'random') {
           const idx = Math.floor(Math.random() * gameState.validMoves.length);
           move = moveToBoardMove(gameState.validMoves[idx]);
         } else {
-          move = await stockfish.getMove(gameState.fen, aiMode);
+          move = await stockfish.getMove(gameState.fen, mode);
         }
 
         if (!mountedRef.current) return;
@@ -880,7 +930,7 @@ function useAI(
         console.error('AI move error:', error);
       }
     },
-    [whiteAi, blackAi, stockfish, aiMode]
+    [whiteAi, blackAi, stockfish, whiteAiMode, blackAiMode]
   );
 }
 
@@ -1031,7 +1081,8 @@ function Playground() {
     stockfish,
     settings.whiteAi,
     settings.blackAi,
-    settings.aiMode
+    settings.whiteAiMode,
+    settings.blackAiMode
   );
   onPositionChangeRef.current = handleAIMove;
 
@@ -1110,12 +1161,17 @@ function Playground() {
         history={game.history}
         viewingPly={nav.viewingPly}
         onNavigate={nav.navigate}
-        onExportPGN={() => {
+        onExportPGN={async () => {
           const pgn = game.toPGN();
-          navigator.clipboard.writeText(pgn).catch(() => {
+          try {
+            // navigator.clipboard is undefined outside secure contexts
+            await navigator.clipboard.writeText(pgn);
+            return true;
+          } catch {
             // Fallback: prompt
             window.prompt('PGN:', pgn);
-          });
+            return false;
+          }
         }}
         onImportPGN={pgn => {
           const success = game.loadPGN(pgn);
